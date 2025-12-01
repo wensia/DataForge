@@ -12,6 +12,11 @@ const routes: RouteRecordRaw[] = [
     name: 'Accounts',
     component: () => import('@/views/AccountManager.vue'),
   },
+  {
+    path: '/api-keys',
+    name: 'ApiKeys',
+    component: () => import('@/views/ApiKeyManager.vue'),
+  },
 ]
 
 const router = createRouter({

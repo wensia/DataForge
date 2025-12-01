@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { NCard, NButton, NSpace, NIcon, NResult } from 'naive-ui'
-import { CloudOutline, RefreshOutline, PeopleOutline } from '@vicons/ionicons5'
 import { getHealthStatus } from '@/api'
 import type { ResponseModel } from '@/types'
+import { CloudOutline, KeyOutline, PeopleOutline, RefreshOutline } from '@vicons/ionicons5'
+import { NButton, NCard, NIcon, NResult, NSpace } from 'naive-ui'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const loading = ref(false)
@@ -27,6 +27,10 @@ const checkHealth = async () => {
 
 const goToAccounts = () => {
   router.push('/accounts')
+}
+
+const goToApiKeys = () => {
+  router.push('/api-keys')
 }
 
 onMounted(() => {
@@ -76,6 +80,12 @@ onMounted(() => {
               <n-icon :component="PeopleOutline" />
             </template>
             账号管理
+          </n-button>
+          <n-button type="info" @click="goToApiKeys">
+            <template #icon>
+              <n-icon :component="KeyOutline" />
+            </template>
+            API 密钥管理
           </n-button>
         </n-space>
       </template>
