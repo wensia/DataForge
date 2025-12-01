@@ -17,6 +17,23 @@ class Settings(BaseSettings):
     # API 配置
     api_prefix: str = "/api/v1"
 
+    # API密钥配置
+    api_keys: str = ""  # 从环境变量加载,逗号分隔多个密钥
+
+    # 安全审计日志配置
+    enable_security_audit: bool = True
+    security_log_file: str = "logs/security.log"
+
+    def get_api_keys_list(self) -> list[str]:
+        """获取API密钥列表
+
+        Returns:
+            list[str]: API密钥列表
+        """
+        if not self.api_keys:
+            return []
+        return [key.strip() for key in self.api_keys.split(",") if key.strip()]
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
