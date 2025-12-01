@@ -1,0 +1,51 @@
+# 依赖
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+release/
+
+# 日志
+logs/
+*.log
+
+# PID 文件
+.backend.pid
+.frontend.pid
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# SSH 密钥文件
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# 临时文件
+tmp/
+temp/
+
+# Cursor
+.cursor/
+
+
+
+
