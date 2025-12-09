@@ -38,7 +38,7 @@ export function SimplePagination({
   totalPages,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 20, 50, 100],
+  pageSizeOptions = [10, 20, 50, 100, 300, 500, 1000],
   className,
 }: SimplePaginationProps) {
   const pageNumbers = getPageNumbers(page, totalPages)

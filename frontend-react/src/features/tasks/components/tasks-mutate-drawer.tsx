@@ -45,7 +45,7 @@ const formSchema = z
   .object({
     name: z.string().min(1, '任务名称不能为空'),
     description: z.string().optional().default(''),
-    task_type: z.enum(['cron', 'interval', 'date']),
+    task_type: z.enum(['cron', 'interval', 'date', 'manual']),
     cron_expression: z.string().optional(),
     interval_seconds: z.coerce.number().optional(),
     run_date: z.string().optional(),

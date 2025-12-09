@@ -54,6 +54,12 @@ class CallRecord(BaseTable, table=True):
     department: str | None = Field(default=None, description="部门")
     transcript: str | None = Field(default=None, description="通话录音转写文本")
 
+    # 员工映射字段（通过 staff_mapping 回写）
+    staff_id: int | None = Field(default=None, foreign_key="staff.id", description="关联的员工ID")
+    mapped_position: str | None = Field(default=None, description="映射的职位")
+    mapped_campus: str | None = Field(default=None, description="映射的校区")
+    mapped_department: str | None = Field(default=None, description="映射的部门")
+
     # 扩展字段（JSON 存储，灵活保存其他数据）
     raw_data: dict[str, Any] = Field(
         default_factory=dict,
@@ -115,6 +121,11 @@ class CallRecordResponse(SQLModel):
     raw_data: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    # 员工映射字段
+    staff_id: int | None = None
+    mapped_position: str | None = None
+    mapped_campus: str | None = None
+    mapped_department: str | None = None
 
 
 class CallRecordStats(SQLModel):

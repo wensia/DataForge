@@ -16,6 +16,7 @@
 import json
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, select
 
 from app.clients.yunke import CallLogClient
@@ -322,32 +323,44 @@ async def run(
             batch_num = i // batch_size + 1
 
             try:
+                # 构建批量插入数据
+                values = []
                 for record in batch:
-                    # 使用 FIELD_MAPPING 转换字段
                     mapped_data = _convert_record(record, FIELD_MAPPING)
-
-                    # 创建 CallRecord 对象
-                    call_record = CallRecord(
-                        source="yunke",
-                        record_id=str(record.get("id", "")),
-                        caller=str(record.get("simPhone", "")) or None,
-                        callee=str(record.get("callNumber", "")) or None,
-                        call_time=_parse_datetime(record.get("startCallTime", "")),
-                        duration=record.get("callSeconds"),
-                        call_type=(
-                            "outbound" if record.get("incomingCall") == 0 else "inbound"
-                        ),
-                        call_result=str(record.get("callStatus", "")) or None,
-                        customer_name=record.get("planCustomerName") or None,
-                        staff_name=record.get("userIdName") or None,
-                        department=record.get("departmentList") or None,
-                        raw_data=mapped_data,
+                    values.append(
+                        {
+                            "source": "yunke",
+                            "record_id": str(record.get("id", "")),
+                            "caller": str(record.get("simPhone", "")) or None,
+                            "callee": str(record.get("callNumber", "")) or None,
+                            "call_time": _parse_datetime(record.get("startCallTime", "")),
+                            "duration": record.get("callSeconds"),
+                            "call_type": (
+                                "outbound" if record.get("incomingCall") == 0 else "inbound"
+                            ),
+                            "call_result": str(record.get("callStatus", "")) or None,
+                            "customer_name": record.get("planCustomerName") or None,
+                            "staff_name": record.get("userIdName") or None,
+                            "department": record.get("departmentList") or None,
+                            "raw_data": mapped_data,
+                        }
                     )
-                    session.add(call_record)
 
+                # 使用 PostgreSQL INSERT ... ON CONFLICT DO NOTHING
+                stmt = pg_insert(CallRecord).values(values)
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=["source", "record_id"]
+                )
+                result_proxy = session.exec(stmt)
                 session.commit()
-                total_created += len(batch)
-                task_log(f"批次 {batch_num} 写入成功: {len(batch)} 条")
+
+                # rowcount 返回实际插入的行数
+                inserted = result_proxy.rowcount if result_proxy.rowcount >= 0 else len(batch)
+                total_created += inserted
+                skipped = len(batch) - inserted
+                if skipped > 0:
+                    result["skipped_records"] += skipped
+                task_log(f"批次 {batch_num} 完成: 插入 {inserted} 条, 跳过 {skipped} 条")
 
             except Exception as e:
                 session.rollback()

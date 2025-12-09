@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
-import { useTasks, usePauseTask, useResumeTask, useRunTask } from '../api'
+import { useTasks, usePauseTask, useResumeTask } from '../api'
 import { statuses, categories } from '../data/data'
 import { type Task } from '../data/schema'
 import { DataTableBulkActions } from './data-table-bulk-actions'
@@ -61,7 +61,6 @@ export function TasksTable() {
   // Task mutations
   const pauseTask = usePauseTask()
   const resumeTask = useResumeTask()
-  const runTask = useRunTask()
 
   // Local UI-only states
   const [rowSelection, setRowSelection] = useState({})
@@ -141,16 +140,10 @@ export function TasksTable() {
   }
 
   // Context menu handlers
-  const handleRun = async () => {
+  const handleRun = () => {
     if (!contextTask) return
-    try {
-      await runTask.mutateAsync(contextTask.id)
-      toast.success('任务已开始执行')
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : '执行失败，请重试'
-      toast.error(message)
-    }
+    setCurrentRow(contextTask)
+    setOpen('run')
     setContextMenuOpen(false)
   }
 
@@ -371,7 +364,7 @@ export function TasksTable() {
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' className='w-[160px]'>
-          <DropdownMenuItem onClick={handleRun} disabled={runTask.isPending}>
+          <DropdownMenuItem onClick={handleRun}>
             <Play className='mr-2 h-4 w-4' />
             立即执行
           </DropdownMenuItem>

@@ -321,7 +321,16 @@ export function DataAnalysis() {
 
     try {
       const result = await deleteMutation.mutateAsync(selectedIds)
-      toast.success(`成功删除 ${result.deleted_count} 条记录`)
+      if (result.deleted_count === 0) {
+        toast.warning('没有记录被删除，数据可能已更新，正在刷新...')
+        refetchRecords()
+      } else if (result.deleted_count < selectedIds.length) {
+        toast.success(
+          `成功删除 ${result.deleted_count} 条记录（${selectedIds.length - result.deleted_count} 条已不存在）`
+        )
+      } else {
+        toast.success(`成功删除 ${result.deleted_count} 条记录`)
+      }
       setRowSelection({})
       setShowDeleteDialog(false)
     } catch {
@@ -521,7 +530,7 @@ export function DataAnalysis() {
                 ))
               ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <MemoizedTableRow key={row.id} row={row} />
+                  <TableRow key={row.id} row={row} />
                 ))
               ) : (
                 <tr className='hover:bg-muted/50 border-b transition-colors'>

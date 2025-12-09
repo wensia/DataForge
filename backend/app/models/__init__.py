@@ -97,6 +97,20 @@ from app.models.asr_config import (
     ASRProvider,
     ASR_PROVIDER_PRESETS,
 )
+from app.models.staff import (
+    CAMPUS_OPTIONS,
+    Staff,
+    StaffCreate,
+    StaffMapping,
+    StaffMappingCreate,
+    StaffMappingResponse,
+    StaffMappingUpdate,
+    StaffResponse,
+    StaffUpdate,
+    StaffWithMappings,
+    ApplyToRecordsRequest,
+    ApplyToRecordsResponse,
+)
 
 __all__ = [
     "AIProvider",
@@ -171,4 +185,16 @@ __all__ = [
     "ASRConfigUpdate",
     "ASRProvider",
     "ASR_PROVIDER_PRESETS",
+    "CAMPUS_OPTIONS",
+    "Staff",
+    "StaffCreate",
+    "StaffMapping",
+    "StaffMappingCreate",
+    "StaffMappingResponse",
+    "StaffMappingUpdate",
+    "StaffResponse",
+    "StaffUpdate",
+    "StaffWithMappings",
+    "ApplyToRecordsRequest",
+    "ApplyToRecordsResponse",
 ]

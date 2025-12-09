@@ -60,24 +60,62 @@ async def execute_task(
     Returns:
         TaskExecution: 执行记录
     """
-    # 解析参数表达式
-    resolved_kwargs = resolve_kwargs(kwargs)
-
-    execution_id: int | None = None
-    start_time = datetime.now()
-
     # 创建执行记录
     with Session(engine) as session:
         execution = TaskExecution(
             task_id=task_id,
             status=ExecutionStatus.RUNNING,
             trigger_type=trigger_type,
-            started_at=start_time,
+            started_at=datetime.now(),
         )
         session.add(execution)
         session.commit()
         session.refresh(execution)
         execution_id = execution.id
+
+    # 使用共用的执行逻辑
+    return await execute_task_with_execution(
+        task_id=task_id,
+        handler=handler,
+        execution_id=execution_id,
+        trigger_type=trigger_type,
+        **kwargs,
+    )
+
+
+async def execute_task_with_execution(
+    task_id: int,
+    handler: Callable,
+    execution_id: int,
+    trigger_type: str = "scheduled",
+    **kwargs: Any,
+) -> TaskExecution:
+    """
+    使用已存在的执行记录执行任务
+
+    Args:
+        task_id: 任务 ID
+        handler: 处理函数
+        execution_id: 已创建的执行记录 ID
+        trigger_type: 触发类型 (scheduled/manual)
+        **kwargs: 传递给处理函数的参数
+
+    Returns:
+        TaskExecution: 执行记录
+    """
+    # 解析参数表达式
+    resolved_kwargs = resolve_kwargs(kwargs)
+
+    start_time = datetime.now()
+
+    # 更新执行记录状态为 RUNNING
+    with Session(engine) as session:
+        execution = session.get(TaskExecution, execution_id)
+        if execution:
+            execution.status = ExecutionStatus.RUNNING
+            execution.started_at = start_time
+            session.add(execution)
+            session.commit()
 
     logger.info(f"开始执行任务 #{task_id}, 执行记录 #{execution_id}")
 

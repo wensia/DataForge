@@ -1,5 +1,6 @@
 """任务管理服务"""
 
+import asyncio
 import json
 from datetime import datetime
 from functools import partial
@@ -20,7 +21,11 @@ from app.models.task import (
     TaskStatus,
     TaskType,
 )
-from app.models.task_execution import TaskExecution, TaskExecutionDetailResponse
+from app.models.task_execution import (
+    ExecutionStatus,
+    TaskExecution,
+    TaskExecutionDetailResponse,
+)
 from app.scheduler.core import get_scheduler
 from app.scheduler.executor import execute_task
 from app.scheduler.registry import get_handler
@@ -170,7 +175,7 @@ def resume_task(task_id: int) -> bool:
 
 
 async def run_task_now(task_id: int) -> dict:
-    """立即执行任务"""
+    """立即执行任务（后台异步执行，立即返回）"""
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -180,22 +185,51 @@ async def run_task_now(task_id: int) -> dict:
             handler = get_handler(task.handler_path)
             kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
 
-            # 执行任务
-            execution = await execute_task(
+            # 先创建执行记录（状态为 pending）
+            execution = TaskExecution(
                 task_id=task_id,
-                handler=handler,
+                status=ExecutionStatus.PENDING,
                 trigger_type="manual",
-                **kwargs,
+            )
+            session.add(execution)
+            session.commit()
+            session.refresh(execution)
+            execution_id = execution.id
+
+            # 在后台异步执行任务，不等待完成
+            asyncio.create_task(
+                _run_task_background(task_id, handler, execution_id, kwargs)
             )
 
             return {
                 "success": True,
                 "message": "任务已触发",
-                "execution_id": execution.id,
+                "execution_id": execution_id,
             }
         except Exception as e:
             logger.error(f"执行任务失败: {e}")
             return {"success": False, "message": str(e)}
+
+
+async def _run_task_background(
+    task_id: int,
+    handler,
+    execution_id: int,
+    kwargs: dict,
+) -> None:
+    """后台执行任务的辅助函数"""
+    from app.scheduler.executor import execute_task_with_execution
+
+    try:
+        await execute_task_with_execution(
+            task_id=task_id,
+            handler=handler,
+            execution_id=execution_id,
+            trigger_type="manual",
+            **kwargs,
+        )
+    except Exception as e:
+        logger.error(f"后台执行任务 #{task_id} 失败: {e}")
 
 
 def get_task_executions(

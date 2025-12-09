@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import {
   type ColumnDef,
   flexRender,
@@ -13,6 +13,8 @@ import {
   Loader2,
   Ban,
   Eye,
+  Terminal,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -24,8 +26,10 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -92,6 +96,13 @@ export function TaskExecutions() {
     useState<TaskExecution | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
+  // 日志跟踪状态
+  const [trackedExecutionId, setTrackedExecutionId] = useState<number | null>(null)
+  const [trackedLogs, setTrackedLogs] = useState<string[]>([])
+  const [isTracking, setIsTracking] = useState(false)
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const logScrollRef = useRef<HTMLDivElement>(null)
+
   // 获取任务列表（用于筛选）
   const { data: tasks = [] } = useTasks()
 
@@ -128,8 +139,108 @@ export function TaskExecutions() {
     )
   }, [executions, searchQuery])
 
+  // 清理 SSE 连接
+  const cleanupSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    setIsTracking(false)
+  }, [])
+
+  // 建立 SSE 连接跟踪日志
+  const connectSSE = useCallback((executionId: number) => {
+    // 如果已经有连接，先关闭
+    cleanupSSE()
+
+    const authToken = localStorage.getItem('auth_token')
+    const sseUrl = authToken
+      ? `/api/v1/tasks/executions/${executionId}/logs/stream?token=${authToken}`
+      : `/api/v1/tasks/executions/${executionId}/logs/stream`
+
+    const eventSource = new EventSource(sseUrl)
+    eventSourceRef.current = eventSource
+    setIsTracking(true)
+    setTrackedLogs([])
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.log) {
+          setTrackedLogs((prev) => [...prev, data.log])
+        }
+        if (data.finished) {
+          setIsTracking(false)
+          eventSource.close()
+          eventSourceRef.current = null
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    }
+
+    eventSource.onerror = () => {
+      setIsTracking(false)
+      eventSource.close()
+      eventSourceRef.current = null
+    }
+  }, [cleanupSSE])
+
+  // 处理跟踪切换
+  const handleTrackToggle = useCallback((executionId: number, checked: boolean) => {
+    if (checked) {
+      setTrackedExecutionId(executionId)
+      connectSSE(executionId)
+    } else {
+      setTrackedExecutionId(null)
+      setTrackedLogs([])
+      cleanupSSE()
+    }
+  }, [connectSSE, cleanupSSE])
+
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      cleanupSSE()
+    }
+  }, [cleanupSSE])
+
+  // 自动滚动到日志底部
+  useEffect(() => {
+    if (logScrollRef.current) {
+      logScrollRef.current.scrollTop = logScrollRef.current.scrollHeight
+    }
+  }, [trackedLogs])
+
+  // 获取当前跟踪的执行记录
+  const trackedExecution = useMemo(() => {
+    if (!trackedExecutionId) return null
+    return executions.find((e) => e.id === trackedExecutionId) || null
+  }, [trackedExecutionId, executions])
+
   // 列定义
   const columns: ColumnDef<TaskExecution>[] = [
+    {
+      id: 'track',
+      header: '跟踪',
+      cell: ({ row }) => {
+        const execution = row.original
+        const isRunning = execution.status === 'running' || execution.status === 'pending'
+        const isCurrentlyTracked = trackedExecutionId === execution.id
+
+        return (
+          <Checkbox
+            checked={isCurrentlyTracked}
+            onCheckedChange={(checked) => {
+              handleTrackToggle(execution.id, checked === true)
+            }}
+            onClick={(e) => e.stopPropagation()}
+            disabled={!isRunning && !isCurrentlyTracked}
+            aria-label='跟踪日志'
+          />
+        )
+      },
+    },
     {
       accessorKey: 'id',
       header: ({ column }) => (
@@ -440,6 +551,65 @@ export function TaskExecutions() {
           </DataPageContent>
         )}
       </Main>
+
+      {/* 日志跟踪面板 */}
+      {trackedExecutionId && (
+        <div className='bg-background fixed right-0 bottom-0 left-0 z-40 border-t shadow-lg md:left-[--sidebar-width]'>
+          <div className='flex items-center justify-between border-b px-4 py-2'>
+            <div className='flex items-center gap-2'>
+              <Terminal className='h-4 w-4' />
+              <span className='text-sm font-medium'>
+                日志跟踪 - {trackedExecution?.task_name || `执行 #${trackedExecutionId}`}
+              </span>
+              {isTracking && (
+                <Badge variant='secondary' className='gap-1'>
+                  <Loader2 className='h-3 w-3 animate-spin' />
+                  实时
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-6 w-6'
+              onClick={() => {
+                setTrackedExecutionId(null)
+                setTrackedLogs([])
+                cleanupSSE()
+              }}
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          </div>
+          <ScrollArea className='h-[200px]' ref={logScrollRef}>
+            <div className='p-4'>
+              {trackedLogs.length > 0 ? (
+                <pre className='whitespace-pre-wrap font-mono text-xs'>
+                  {trackedLogs.map((line, index) => (
+                    <div
+                      key={index}
+                      className={cn(
+                        'py-0.5',
+                        line.toLowerCase().includes('error') && 'text-destructive',
+                        line.toLowerCase().includes('warn') &&
+                          'text-yellow-600 dark:text-yellow-500',
+                        line.toLowerCase().includes('success') &&
+                          'text-green-600 dark:text-green-500'
+                      )}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </pre>
+              ) : (
+                <p className='text-muted-foreground text-center text-sm'>
+                  {isTracking ? '等待日志...' : '暂无日志'}
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* 执行详情弹窗 */}
       <ExecutionDetailDialog
