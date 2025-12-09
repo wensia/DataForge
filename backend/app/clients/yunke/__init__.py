@@ -54,6 +54,15 @@ from app.clients.yunke.client import (
 # 报表客户端
 from app.clients.yunke.report import ReportClient
 
+# 录音客户端
+from app.clients.yunke.record import RecordClient
+
+# 通话记录客户端
+from app.clients.yunke.call_log import CallLogClient
+
+# 部门客户端
+from app.clients.yunke.dept import DeptClient
+
 __all__ = [
     # 认证
     "check_and_get_users",
@@ -67,4 +76,10 @@ __all__ = [
     "YunkePasswordException",
     # 报表
     "ReportClient",
+    # 录音
+    "RecordClient",
+    # 通话记录
+    "CallLogClient",
+    # 部门
+    "DeptClient",
 ]

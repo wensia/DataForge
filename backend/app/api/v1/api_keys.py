@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from loguru import logger
 from sqlmodel import Session, select
 
@@ -68,10 +68,7 @@ async def create_api_key(key_data: ApiKeyCreate):
             select(ApiKey).where(ApiKey.key == key_value)
         ).first()
         if existing:
-            raise HTTPException(
-                status_code=400,
-                detail="API 密钥已存在",
-            )
+            return ResponseModel.error(code=400, message="API 密钥已存在")
 
         # 创建新密钥
         new_key = ApiKey(
@@ -109,7 +106,7 @@ async def get_api_key(key_id: int):
     with Session(engine) as session:
         key = session.get(ApiKey, key_id)
         if not key:
-            raise HTTPException(status_code=404, detail="API 密钥不存在")
+            return ResponseModel.error(code=404, message="API 密钥不存在")
 
         return ResponseModel.success(
             data=ApiKeyResponse(
@@ -133,7 +130,7 @@ async def update_api_key(key_id: int, key_data: ApiKeyUpdate):
     with Session(engine) as session:
         key = session.get(ApiKey, key_id)
         if not key:
-            raise HTTPException(status_code=404, detail="API 密钥不存在")
+            return ResponseModel.error(code=404, message="API 密钥不存在")
 
         # 更新字段
         if key_data.name is not None:
@@ -173,7 +170,7 @@ async def delete_api_key(key_id: int):
     with Session(engine) as session:
         key = session.get(ApiKey, key_id)
         if not key:
-            raise HTTPException(status_code=404, detail="API 密钥不存在")
+            return ResponseModel.error(code=404, message="API 密钥不存在")
 
         key_name = key.name
         session.delete(key)

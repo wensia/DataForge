@@ -1,26 +1,29 @@
 """API密钥验证中间件"""
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.config import settings
 from app.schemas.response import ResponseModel
 from app.utils.auth import api_key_validator
+from app.utils.jwt_auth import decode_token
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """API密钥验证中间件
 
-    在请求处理前验证API密钥,确保只有授权客户端可以访问API
+    在请求处理前验证API密钥或JWT Token,确保只有授权客户端可以访问API
 
     验证流程:
     1. 检查路径是否在豁免列表中
-    2. 从查询参数提取api_key
-    3. 验证密钥有效性
-    4. 记录验证日志
+    2. 尝试获取 JWT Token（按优先级）:
+       - Authorization 头: Bearer <token>（前端登录用户）
+       - 查询参数: ?token=xxx（SSE 等场景）
+    3. 如果 JWT 验证成功，允许请求通过
+    4. 否则从查询参数提取 api_key 并验证
     5. 验证失败返回401/403错误
     """
 
@@ -28,6 +31,14 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = [
         "/",  # 根路径
         "/api/v1/health",  # 健康检查
+        "/api/v1/yunke/record/url",  # 录音下载地址（公开）
+        "/api/v1/accounts",  # 账号列表（录音下载页面需要）
+        "/api/v1/auth/login",  # 用户登录
+        "/api/v1/auth/me",  # 获取当前用户（需要JWT，不需要API Key）
+        "/api/v1/record-proxy/stream",  # 录音代理（前端播放）
+        "/docs",  # Swagger UI
+        "/redoc",  # ReDoc
+        "/openapi.json",  # OpenAPI Schema
     ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -44,6 +55,30 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         request_path = request.url.path
         if request_path in self.EXEMPT_PATHS:
             return await call_next(request)
+
+        # 尝试获取 JWT token
+        # 1. 优先从 Authorization 头获取（前端登录用户）
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]  # 去掉 "Bearer " 前缀
+            logger.debug(f"从 Authorization 头获取 token, 长度: {len(token)}")
+        else:
+            # 2. 兼容 SSE 场景，从查询参数获取
+            token = request.query_params.get("token")
+            if token:
+                logger.debug(f"从查询参数获取 token, 长度: {len(token)}")
+
+        if token:
+            payload = decode_token(token)
+            if payload:
+                # JWT 验证成功，设置用户信息
+                logger.info(f"JWT 认证成功: user_id={payload.user_id}, path={request_path}")
+                request.state.user_id = payload.user_id  # 使用整数格式
+                request.state.user_email = payload.email
+                request.state.user_role = payload.role
+                return await call_next(request)
+            else:
+                logger.warning(f"JWT 认证失败, path={request_path}, 将尝试 API Key 认证")
 
         # 从查询参数提取API密钥
         api_key = request.query_params.get("api_key")
@@ -67,15 +102,16 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             if key_type == "client" and request_path.startswith("/api/v1/api-keys"):
                 # 记录权限拒绝日志
                 request_info["client_id"] = client_metadata.get("client_id", "unknown")
-                api_key_validator.log_validation_attempt(api_key, False, {
-                    **request_info,
-                    "reason": "客户端密钥无权访问密钥管理接口"
-                })
+                api_key_validator.log_validation_attempt(
+                    api_key,
+                    False,
+                    {**request_info, "reason": "客户端密钥无权访问密钥管理接口"},
+                )
 
                 # 返回 403 Forbidden
                 error_response = ResponseModel.error(
                     code=403,
-                    message="权限不足: 客户端密钥无法访问密钥管理接口,请使用管理员密钥"
+                    message="权限不足: 客户端密钥无法访问密钥管理接口,请使用管理员密钥",
                 )
                 return JSONResponse(
                     status_code=403,
@@ -99,7 +135,9 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
 
             # 在响应头中添加客户端标识和密钥类型(便于调试)
-            response.headers["X-Client-ID"] = client_metadata.get("client_id", "unknown")
+            response.headers["X-Client-ID"] = client_metadata.get(
+                "client_id", "unknown"
+            )
             response.headers["X-Key-Type"] = key_type  # 新增
             return response
         else:

@@ -1,33 +1,39 @@
-# 云客中转项目规则
+# DataForge 项目规则
 
 > 精简版规则文档 - 只包含每次会话都需要的核心信息
 
 ## 项目概述
 
-云客中转 = FastAPI 后端 + Vue3 前端,用于管理云客 CRM 账号和数据同步。
+DataForge（数据熔炉）= FastAPI 后端 + React 前端，多源数据集成与管理平台。
 
 ## 目录结构
 
 ```
-backend/app/          # FastAPI 应用 (端口 8847)
-  ├── main.py         # 入口 + 中间件注册
-  ├── config.py       # 配置 + 环境变量
-  ├── api/v1/         # API 路由
-  ├── models/         # SQLModel 数据库模型
-  ├── middleware/     # 中间件 (API 密钥验证等)
-  └── utils/          # 工具函数
+backend/
+  ├── app/            # FastAPI 应用 (端口 8847)
+  │   ├── main.py     # 入口 + 中间件注册
+  │   ├── config.py   # 配置 + 环境变量
+  │   ├── api/v1/     # API 路由
+  │   ├── models/     # SQLModel 数据库模型
+  │   ├── scheduler/  # 任务调度器模块
+  │   ├── clients/    # 外部 API 客户端 (云客、AI)
+  │   └── utils/      # 工具函数
+  └── scripts/        # 定时任务脚本文件夹
 
-frontend/src/         # Vue3 应用 (端口 3691)
-  ├── api/            # API 请求封装
-  ├── views/          # 页面组件
-  └── stores/         # Pinia 状态管理
+frontend-react/src/   # React 应用 (端口 3692)
+  ├── components/     # shadcn/ui 组件
+  ├── features/       # 功能模块 (按业务划分)
+  ├── hooks/          # 自定义 Hooks
+  ├── lib/            # 工具库 (api-client, utils)
+  ├── styles/         # 全局样式
+  └── routes.tsx      # 路由配置
 ```
 
 ## 技术栈
 
-**后端**: Python 3.11 + FastAPI + SQLModel + SQLite + httpx
-**前端**: Vue 3 (Composition API) + Vite + Naive UI + Pinia
-**工具**: ruff (后端格式化) + Biome (前端格式化)
+**后端**: Python 3.11 + FastAPI + SQLModel + PostgreSQL + httpx + APScheduler
+**前端**: React 18 + Vite + shadcn/ui + TanStack Query/Table + Tailwind CSS
+**工具**: ruff (后端格式化) + ESLint + Prettier (前端格式化)
 
 ## 核心规范
 
@@ -66,7 +72,7 @@ ResponseModel(code=200, message="success", data={...})
 
 # 手动启动
 cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8847
-cd frontend && pnpm dev --port 3691
+cd frontend-react && pnpm dev --port 3692
 ```
 
 ## 扩展文档
@@ -74,11 +80,14 @@ cd frontend && pnpm dev --port 3691
 详细规则和特定领域信息在以下文件,按需查阅:
 
 - `docs/rules/backend.md` - 后端详细开发规范
-- `docs/rules/frontend.md` - 前端详细开发规范
+- `docs/rules/frontend.md` - 前端详细开发规范 (React + shadcn/ui)
+- `docs/rules/scheduler.md` - 定时任务系统规范
 - `docs/rules/yunke-api.md` - 云客 API 集成规范
+- `docs/rules/feishu.md` - 飞书多维表格集成规范
+- `docs/rules/data-sync.md` - 数据同步规范（飞书→本地数据库）
+- `docs/rules/ai-integration.md` - AI 集成规范（Kimi/DeepSeek）
+- `docs/rules/auth.md` - 用户认证规范
 - `docs/rules/deploy.md` - 服务器部署和运维
-- `docs/API密钥使用指南.md` - API 密钥详细说明
-- `docs/RULES.md` - 完整的项目规则文档
 
 ## 重要提醒
 

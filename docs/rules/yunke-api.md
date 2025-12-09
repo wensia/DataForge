@@ -14,7 +14,9 @@ backend/app/clients/yunke/
 ├── base.py          # 基础配置（URL、Headers、Client工厂）
 ├── auth.py          # 认证相关独立函数（登录、获取密钥等）
 ├── client.py        # API客户端基类（YunkeApiClient）
-└── report.py        # 报表API客户端（ReportClient）
+├── report.py        # 报表API客户端（ReportClient）
+├── record.py        # 录音API客户端（RecordClient）
+└── call_log.py      # 通话记录API客户端（CallLogClient）
 ```
 
 ## 客户端架构
@@ -52,7 +54,7 @@ YunkePasswordException       # 密码错误（不重试）
 
 ```python
 # 需要重新登录的错误码
-RELOGIN_ERROR_CODES = {"10001", "10002", "401", "10003", "22003", "22004"}
+RELOGIN_ERROR_CODES = {"10001", "10002", "401", "10003", "22003", "22004", "302"}
 
 # 密码错误（不重试）
 PASSWORD_ERROR_CODES = {"10004", "10005", "10006", "22001", "22002"}
@@ -241,6 +243,27 @@ client = ReportClient(
 | `get_outbound_call_report()` | 外呼报表快捷方法 | 同上 |
 | `get_inbound_call_report()` | 呼入报表快捷方法 | 同上 |
 
+### RecordClient (record.py)
+
+| 方法 | 说明 | API路径 |
+|------|------|---------|
+| `get_record_url()` | 获取录音下载地址 | `/pc/callLog/getRecordUrl` |
+
+### CallLogClient (call_log.py)
+
+| 方法 | 说明 | API路径 |
+|------|------|---------|
+| `get_call_logs()` | 获取通话记录列表 | `/pc/callLog/list` |
+
+**请求参数:**
+- `start_time`: 开始时间，格式 "YYYY-MM-DD HH:mm"
+- `end_time`: 结束时间，格式 "YYYY-MM-DD HH:mm"
+- `page`: 页码
+- `page_size`: 每页数量，最大200
+- `department_id`: 部门ID（可选）
+- `user_id`: 用户ID（可选）
+- `call_type`: 通话类型，s=外呼，i=呼入，空=全部
+
 ### auth.py (独立函数)
 
 | 函数 | 说明 |
@@ -249,5 +272,7 @@ client = ReportClient(
 | `encrypt_with_rsa()` | RSA加密 |
 | `check_and_get_users()` | 检查账号获取公司列表 |
 | `password_login()` | 密码登录 |
+
+
 
 

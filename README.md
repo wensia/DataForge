@@ -1,11 +1,19 @@
-# 云客中转
+# DataForge
 
-云客中转系统 - 用于管理云客账号和数据同步的中转服务。
+DataForge（数据熔炉）- 多源数据集成与管理平台
+
+## 功能特性
+
+- **多账号管理** - 统一管理多个外部系统账号
+- **数据同步** - 自动同步通话记录、报表等数据
+- **第三方集成** - 支持飞书多维表格等平台集成
+- **定时任务** - 灵活的任务调度系统
+- **API 服务** - RESTful API 对外输出数据
 
 ## 项目结构
 
 ```
-├── backend/          # 后端服务 (FastAPI + SQLModel)
+├── backend/          # 后端服务 (FastAPI + PostgreSQL)
 ├── frontend/         # 前端应用 (Vue3 + NaiveUI)
 ├── docs/             # 项目文档
 ├── logs/             # 日志文件
@@ -17,7 +25,7 @@
 ### 后端
 - Python 3.11+
 - FastAPI
-- SQLModel + SQLite
+- SQLModel + PostgreSQL
 - uv (包管理)
 
 ### 前端
@@ -84,4 +92,6 @@ git push origin v1.0.0
 ## 许可证
 
 MIT License
+
+
 

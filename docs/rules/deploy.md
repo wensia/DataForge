@@ -58,12 +58,14 @@ http://124.220.15.80:8090/tencentcloud
 |------|------|------|------|
 | 443 | TCP | HTTPS | 如果配置 SSL 证书 |
 | 8090 | TCP | 1Panel | 面板管理（建议限制 IP） |
+| 5432 | TCP | PostgreSQL | 仅开发环境需要（限制 IP） |
 
 ### 内部端口（无需对外开放）
 
 | 端口 | 说明 |
 |------|------|
 | 8847 | 后端服务端口，通过 Nginx 代理 |
+| 5432 | PostgreSQL 端口（服务器上通过 127.0.0.1 访问） |
 
 ### 腾讯云安全组配置
 
@@ -88,7 +90,10 @@ TCP     8090     你的IP          1Panel管理（限制IP）
 │  └── /api/       → 后端服务 (127.0.0.1:8847)           │
 ├─────────────────────────────────────────────────────────┤
 │  后端服务 (systemd: yunke-backend)                      │
-│  └── FastAPI + SQLite (:8847)                          │
+│  └── FastAPI (:8847) → PostgreSQL (:5432)              │
+├─────────────────────────────────────────────────────────┤
+│  PostgreSQL 16 (:5432)                                  │
+│  └── 数据库: production                                 │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -99,7 +104,7 @@ TCP     8090     你的IP          1Panel管理（限制IP）
 ├── backend/                    # 后端代码
 │   ├── app/                    # 应用代码
 │   ├── .venv/                  # Python 虚拟环境
-│   ├── app.db                  # SQLite 数据库
+│   ├── .env                    # 环境变量配置
 │   └── pyproject.toml          # 依赖配置
 ├── frontend/                   # 前端代码
 │   ├── dist/                   # 构建产物
@@ -127,14 +132,57 @@ python3.11 -m pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple
 sudo apt install nginx -y
 ```
 
-### 2. 创建项目目录
+### 2. 安装 PostgreSQL 16
+
+```bash
+# 添加 PostgreSQL 官方源
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo apt update
+
+# 安装 PostgreSQL 16
+sudo apt install postgresql-16 -y
+
+# 启动服务
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+### 3. 配置 PostgreSQL
+
+```bash
+# 切换到 postgres 用户
+sudo -u postgres psql
+
+# 在 psql 中执行：
+ALTER USER postgres PASSWORD 'YOUR_SECURE_PASSWORD';
+CREATE DATABASE production;
+\q
+```
+
+### 4. 配置远程访问（可选，用于本地开发连接）
+
+```bash
+# 修改监听地址
+sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/16/main/postgresql.conf
+
+# 添加远程访问规则
+echo "host    all    all    0.0.0.0/0    md5" | sudo tee -a /etc/postgresql/16/main/pg_hba.conf
+
+# 重启 PostgreSQL
+sudo systemctl restart postgresql
+```
+
+**注意**: 远程访问需要开放 5432 端口，仅在需要本地开发连接时配置
+
+### 5. 创建项目目录
 
 ```bash
 sudo mkdir -p /www/wwwroot
 sudo chown -R ubuntu:ubuntu /www/wwwroot
 ```
 
-### 3. 上传代码（本地执行）
+### 6. 上传代码（本地执行）
 
 由于服务器访问 GitHub 较慢，推荐从本地上传：
 
@@ -153,7 +201,23 @@ rsync -avz \
   ./ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/
 ```
 
-### 4. 部署后端
+### 7. 配置后端环境变量
+
+```bash
+# 创建 .env 文件
+cat > /www/wwwroot/yunke-transit/backend/.env << 'EOF'
+# 数据库连接（服务器部署使用本地回环）
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@127.0.0.1:5432/production
+
+# 调试模式（生产环境设为 false）
+DEBUG=false
+
+# API 密钥
+API_KEYS=your-api-key-here
+EOF
+```
+
+### 8. 部署后端
 
 ```bash
 # SSH 到服务器
@@ -165,12 +229,12 @@ cd /www/wwwroot/yunke-transit/backend
 # 创建虚拟环境（指定 Python 3.11）
 ~/.local/bin/uv venv --python python3.11
 
-# 安装依赖（使用国内镜像）
+# 安装依赖（使用国内镜像，包含 PostgreSQL 驱动）
 source .venv/bin/activate
-~/.local/bin/uv pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+~/.local/bin/uv pip install -e . psycopg2-binary -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-### 5. 配置 systemd 服务
+### 9. 配置 systemd 服务
 
 创建服务文件：
 
@@ -205,7 +269,7 @@ sudo systemctl start yunke-backend
 sudo systemctl status yunke-backend
 ```
 
-### 6. 构建前端（本地执行）
+### 10. 构建前端（本地执行）
 
 由于服务器网络限制，在本地构建后上传：
 
@@ -220,7 +284,7 @@ rsync -avz \
   dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
 ```
 
-### 7. 配置 Nginx
+### 11. 配置 Nginx
 
 ```bash
 # SSH 到服务器后执行
@@ -256,7 +320,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 8. 验证部署
+### 12. 验证部署
 
 ```bash
 # 测试后端 API
@@ -378,24 +442,40 @@ rsync -avz \
 
 ## 备份策略
 
-### 数据库备份
+### PostgreSQL 数据库备份
 
 ```bash
-# 手动备份
-ssh -i claudeCode.pem ubuntu@124.220.15.80 \
-  "cp /www/wwwroot/yunke-transit/backend/app.db ~/backup/app_$(date +%Y%m%d).db"
+# 手动备份（在服务器上执行）
+sudo -u postgres pg_dump production > ~/backup/production_$(date +%Y%m%d).sql
 
 # 下载到本地
 scp -i claudeCode.pem \
-  ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/backend/app.db \
-  ./backup/app_$(date +%Y%m%d).db
+  ubuntu@124.220.15.80:~/backup/production_$(date +%Y%m%d).sql \
+  ./backup/
+
+# 远程执行备份并下载
+ssh -i claudeCode.pem ubuntu@124.220.15.80 \
+  "sudo -u postgres pg_dump production" > ./backup/production_$(date +%Y%m%d).sql
+```
+
+### 数据库恢复
+
+```bash
+# 恢复数据库
+sudo -u postgres psql production < ~/backup/production_20241208.sql
 ```
 
 ### 自动备份（使用 cron）
 
 ```bash
-# 每日凌晨2点备份
-0 2 * * * cp /www/wwwroot/yunke-transit/backend/app.db /home/ubuntu/backup/app_$(date +\%Y\%m\%d).db
+# 编辑 crontab
+crontab -e
+
+# 添加每日凌晨2点备份任务
+0 2 * * * sudo -u postgres pg_dump production > /home/ubuntu/backup/production_$(date +\%Y\%m\%d).sql
+
+# 清理 7 天前的备份
+0 3 * * * find /home/ubuntu/backup -name "production_*.sql" -mtime +7 -delete
 ```
 
 ## 故障排查
@@ -436,10 +516,36 @@ curl http://127.0.0.1:8847/api/v1/health
 tail -f /var/log/nginx/error.log
 ```
 
+### PostgreSQL 连接问题
+
+```bash
+# 检查 PostgreSQL 服务状态
+sudo systemctl status postgresql
+
+# 检查 PostgreSQL 日志
+sudo tail -f /var/log/postgresql/postgresql-16-main.log
+
+# 测试数据库连接
+sudo -u postgres psql -c "SELECT 1"
+
+# 检查数据库是否存在
+sudo -u postgres psql -l
+
+# 检查监听端口
+sudo ss -tlnp | grep 5432
+
+# 重启 PostgreSQL
+sudo systemctl restart postgresql
+```
+
 ## 安全注意事项
 
 1. **密钥安全**: `claudeCode.pem` 密钥文件不要提交到代码仓库
 2. **端口暴露**: 仅暴露必要端口（22、80、443）
 3. **1Panel 安全**: 8090 端口建议仅对管理员 IP 开放
-4. **定期更新**: 定期更新系统和依赖包
-5. **备份**: 定期备份数据库和配置文件
+4. **PostgreSQL 安全**:
+   - 生产环境使用 127.0.0.1 连接，不对外暴露 5432 端口
+   - 开发环境如需远程访问，务必限制 IP 白名单
+   - 使用强密码
+5. **定期更新**: 定期更新系统和依赖包
+6. **备份**: 定期备份 PostgreSQL 数据库

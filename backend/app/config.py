@@ -24,6 +24,23 @@ class Settings(BaseSettings):
     enable_security_audit: bool = True
     security_log_file: str = "logs/security.log"
 
+    # 调度器配置
+    scheduler_enabled: bool = True
+    timezone: str = "Asia/Shanghai"
+    max_execution_history_days: int = 30  # 执行历史保留天数
+
+    # 脚本文件夹配置
+    scripts_path: str = "scripts"  # 任务脚本文件夹路径（相对于 backend 目录）
+
+    # JWT 配置
+    jwt_secret_key: str = "yunke-transit-secret-key-change-in-production"
+    jwt_expire_hours: int = 24  # Token 过期时间(小时)
+
+    # AI 服务配置
+    kimi_api_key: str = ""  # Kimi (月之暗面) API 密钥
+    deepseek_api_key: str = ""  # DeepSeek API 密钥
+    default_ai_provider: str = "kimi"  # 默认 AI 服务: kimi / deepseek
+
     def get_api_keys_list(self) -> list[str]:
         """获取API密钥列表
 
@@ -37,9 +54,12 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # 忽略额外的环境变量
 
 
 settings = Settings()
+
+
 
 
 

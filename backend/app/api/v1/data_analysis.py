@@ -1,0 +1,397 @@
+"""数据分析 API 路由
+
+提供数据查询、同步、AI 分析等接口。
+"""
+
+from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from loguru import logger
+from sqlmodel import Session
+
+from app.database import get_session
+from app.models.analysis_result import (
+    AnalysisRequest,
+    AnalysisResultResponse,
+    ChatRequest,
+)
+from app.models.call_record import CallRecordResponse, CallRecordStats
+from app.schemas.response import ResponseModel
+from app.services import ai_analysis_service as ai_svc
+from app.services import data_sync_service as sync_svc
+
+router = APIRouter(prefix="/analysis", tags=["数据分析"])
+
+
+# ============ 数据查询接口 ============
+
+
+@router.get("/filter-options", response_model=ResponseModel)
+async def get_filter_options(
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """获取筛选选项（员工列表等）
+
+    Returns:
+        ResponseModel: 包含员工列表等筛选选项
+    """
+    staff_names = sync_svc.get_unique_staff_names(session)
+    return ResponseModel(
+        data={
+            "staff_names": staff_names,
+        }
+    )
+
+
+@router.get("/records", response_model=ResponseModel)
+async def get_records(
+    source: str | None = None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    department: str | None = None,
+    staff_name: str | None = None,
+    call_type: str | None = None,
+    call_result: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """获取通话记录列表
+
+    Args:
+        source: 数据来源筛选 (feishu / yunke)
+        start_time: 开始时间
+        end_time: 结束时间
+        department: 部门筛选
+        staff_name: 员工筛选
+        call_type: 通话类型筛选
+        call_result: 通话结果筛选
+        page: 页码
+        page_size: 每页数量
+
+    Returns:
+        ResponseModel: 包含记录列表和分页信息
+    """
+    offset = (page - 1) * page_size
+
+    records, total = sync_svc.get_call_records(
+        session=session,
+        source=source,
+        start_time=start_time,
+        end_time=end_time,
+        department=department,
+        staff_name=staff_name,
+        call_type=call_type,
+        call_result=call_result,
+        limit=page_size,
+        offset=offset,
+    )
+
+    return ResponseModel(
+        data={
+            "items": [CallRecordResponse.model_validate(r) for r in records],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size,
+        }
+    )
+
+
+@router.get("/records/stats", response_model=ResponseModel)
+async def get_records_stats(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """获取通话记录统计
+
+    Args:
+        start_time: 开始时间
+        end_time: 结束时间
+
+    Returns:
+        ResponseModel: 统计数据
+    """
+    stats = sync_svc.get_call_record_stats(
+        session=session,
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    return ResponseModel(data=CallRecordStats(**stats))
+
+
+# ============ 数据同步接口 ============
+
+
+@router.post("/sync", response_model=ResponseModel)
+async def sync_data(
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """手动触发数据同步
+
+    从所有配置的飞书数据表同步数据到本地数据库。
+
+    Returns:
+        ResponseModel: 同步结果
+    """
+    try:
+        result = await sync_svc.sync_all_feishu_tables(session)
+        return ResponseModel(
+            message=f"同步完成: 成功 {result['success']} 个，失败 {result['failed']} 个",
+            data=result,
+        )
+    except sync_svc.DataSyncError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/sync/yunke/{account_id}", response_model=ResponseModel)
+async def sync_yunke_data(
+    account_id: int,
+    start_time: str = Query(..., description="开始时间，格式 YYYY-MM-DD HH:mm"),
+    end_time: str = Query(..., description="结束时间，格式 YYYY-MM-DD HH:mm"),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """同步云客通话记录
+
+    从指定云客账号同步通话记录到本地数据库。
+    使用通话ID作为唯一标识，避免重复创建记录。
+
+    Args:
+        account_id: 云客账号 ID
+        start_time: 开始时间
+        end_time: 结束时间
+
+    Returns:
+        ResponseModel: 同步结果
+    """
+    try:
+        result = await sync_svc.sync_yunke_call_logs(
+            session=session,
+            account_id=account_id,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        return ResponseModel(
+            message=f"同步完成: 新增 {result['added']}，更新 {result['updated']}，跳过 {result['skipped']}",
+            data=result,
+        )
+    except sync_svc.DataSyncError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+# ============ AI 分析接口 ============
+
+
+@router.post("/summary", response_model=ResponseModel)
+async def generate_summary(
+    request: AnalysisRequest,
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """生成数据摘要
+
+    Args:
+        request: 分析请求参数
+
+    Returns:
+        ResponseModel: 摘要结果
+    """
+    try:
+        result = await ai_svc.generate_summary(
+            session=session,
+            start_time=request.date_start,
+            end_time=request.date_end,
+            filters=request.filters,
+            provider=request.ai_provider,
+            max_records=request.max_records,
+        )
+        return ResponseModel(data=AnalysisResultResponse.model_validate(result))
+    except ai_svc.AIAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/trend", response_model=ResponseModel)
+async def analyze_trend(
+    request: AnalysisRequest,
+    focus: str | None = None,
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """分析数据趋势
+
+    Args:
+        request: 分析请求参数
+        focus: 关注点
+
+    Returns:
+        ResponseModel: 趋势分析结果
+    """
+    try:
+        result = await ai_svc.analyze_trend(
+            session=session,
+            start_time=request.date_start,
+            end_time=request.date_end,
+            focus=focus,
+            provider=request.ai_provider,
+            max_records=request.max_records,
+        )
+        return ResponseModel(data=AnalysisResultResponse.model_validate(result))
+    except ai_svc.AIAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/anomaly", response_model=ResponseModel)
+async def detect_anomalies(
+    request: AnalysisRequest,
+    threshold: str | None = None,
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """检测数据异常
+
+    Args:
+        request: 分析请求参数
+        threshold: 异常阈值说明
+
+    Returns:
+        ResponseModel: 异常检测结果
+    """
+    try:
+        result = await ai_svc.detect_anomalies(
+            session=session,
+            start_time=request.date_start,
+            end_time=request.date_end,
+            threshold=threshold,
+            provider=request.ai_provider,
+            max_records=request.max_records,
+        )
+        return ResponseModel(data=AnalysisResultResponse.model_validate(result))
+    except ai_svc.AIAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/chat", response_model=ResponseModel)
+async def chat_with_data(
+    request: ChatRequest,
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """智能问答
+
+    基于数据回答用户问题。
+
+    Args:
+        request: 聊天请求参数
+
+    Returns:
+        ResponseModel: AI 回答
+    """
+    try:
+        # 转换历史记录格式
+        history = None
+        if request.history:
+            history = [{"role": msg.role, "content": msg.content} for msg in request.history]
+
+        result = await ai_svc.chat_with_data(
+            session=session,
+            question=request.question,
+            history=history,
+            provider=request.ai_provider,
+            context_records=request.context_records,
+        )
+        return ResponseModel(data=AnalysisResultResponse.model_validate(result))
+    except ai_svc.AIAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.get("/history", response_model=ResponseModel)
+async def get_analysis_history(
+    analysis_type: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """获取分析历史
+
+    Args:
+        analysis_type: 分析类型筛选
+        page: 页码
+        page_size: 每页数量
+
+    Returns:
+        ResponseModel: 历史记录列表
+    """
+    offset = (page - 1) * page_size
+
+    results, total = ai_svc.get_analysis_history(
+        session=session,
+        analysis_type=analysis_type,
+        limit=page_size,
+        offset=offset,
+    )
+
+    return ResponseModel(
+        data={
+            "items": [AnalysisResultResponse.model_validate(r) for r in results],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size,
+        }
+    )
+
+
+@router.get("/providers", response_model=ResponseModel)
+async def get_ai_providers() -> ResponseModel:
+    """获取可用的 AI 服务列表
+
+    Returns:
+        ResponseModel: AI 服务列表
+    """
+    from app.config import settings
+
+    providers = []
+
+    if settings.kimi_api_key:
+        providers.append(
+            {
+                "id": "kimi",
+                "name": "Kimi (月之暗面)",
+                "description": "超长上下文 200K，适合大数据分析",
+                "available": True,
+            }
+        )
+    else:
+        providers.append(
+            {
+                "id": "kimi",
+                "name": "Kimi (月之暗面)",
+                "description": "未配置 API 密钥",
+                "available": False,
+            }
+        )
+
+    if settings.deepseek_api_key:
+        providers.append(
+            {
+                "id": "deepseek",
+                "name": "DeepSeek",
+                "description": "性价比高，推理能力强",
+                "available": True,
+            }
+        )
+    else:
+        providers.append(
+            {
+                "id": "deepseek",
+                "name": "DeepSeek",
+                "description": "未配置 API 密钥",
+                "available": False,
+            }
+        )
+
+    return ResponseModel(
+        data={
+            "providers": providers,
+            "default": settings.default_ai_provider,
+        }
+    )

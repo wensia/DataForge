@@ -42,6 +42,7 @@ RELOGIN_ERROR_CODES = {
     LoginErrorCode.NOT_LOGGED_IN.value,
     "22003",  # 会话过期
     "22004",  # 登录失效
+    "302",  # 重定向，通常表示session过期
 }
 
 # 密码错误，不应重试
@@ -220,20 +221,26 @@ class YunkeApiClient(ABC):
         **kwargs,
     ) -> dict[str, Any]:
         """执行HTTP请求
-        
+
         Args:
             method: HTTP方法
             path: API路径
             headers: 额外请求头
             **kwargs: 传递给httpx的其他参数
-            
+
         Returns:
             dict: 响应数据
         """
         request_headers = self._get_headers()
         if headers:
             request_headers.update(headers)
-        
+
+        # 当使用files或data参数时，移除content-type让httpx自动设置
+        if "files" in kwargs or "data" in kwargs:
+            request_headers.pop("content-type", None)
+
+        logger.debug(f"请求cookies: {list(self.cookies.keys()) if self.cookies else 'None'}")
+
         async with httpx.AsyncClient(
             base_url=self.domain,
             timeout=DEFAULT_TIMEOUT,
@@ -304,9 +311,12 @@ class YunkeApiClient(ABC):
                 retry_count += 1
                 
                 if retry_count > self.max_retry:
-                    logger.error(f"登录重试次数已用尽: max_retry={self.max_retry}")
+                    error_msg = f"登录失效且重试失败 (code={e.code})"
+                    if e.message:
+                        error_msg += f": {e.message}"
+                    logger.error(f"登录重试次数已用尽: max_retry={self.max_retry}, error={error_msg}")
                     raise YunkeApiException(
-                        f"登录失效且重试失败: {e.message}",
+                        error_msg,
                         e.code,
                         is_login_required=True,
                     )
@@ -323,7 +333,7 @@ class YunkeApiClient(ABC):
                                 if isinstance(new_cookies, str):
                                     new_cookies = json.loads(new_cookies)
                                 self.cookies = new_cookies
-                                logger.info("自动登录成功，已更新cookies")
+                                logger.info(f"自动登录成功，已更新cookies: {list(new_cookies.keys())}")
                             
                             # 更新user_id
                             new_user_id = result.get("user_id") or result.get("data", {}).get("id")
@@ -374,6 +384,8 @@ class YunkeApiClient(ABC):
         if user_id:
             self.user_id = user_id
         logger.debug(f"更新凭证: user_id={user_id}, has_cookies={bool(cookies)}")
+
+
 
 
 

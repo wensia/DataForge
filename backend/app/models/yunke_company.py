@@ -1,6 +1,7 @@
 """云客公司模型"""
 
-from typing import TYPE_CHECKING, List
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -26,6 +27,11 @@ class YunkeCompany(BaseTable, table=True):
     company_name: str = Field(description="公司名称")
     domain: str = Field(default="", description="公司域名")
     user_center_domain: str = Field(default="", description="用户中心域名")
+    root_dept_id: Optional[str] = Field(default=None, description="根部门ID")
+    dept_tree: Optional[str] = Field(default=None, description="部门树JSON数据")
+    dept_updated_at: Optional[datetime] = Field(
+        default=None, description="部门数据更新时间"
+    )
 
     # 关联关系
     accounts: List["YunkeAccount"] = Relationship(back_populates="company")
@@ -48,3 +54,6 @@ class YunkeCompanyResponse(SQLModel):
     company_name: str
     domain: str
     user_center_domain: str
+    root_dept_id: Optional[str] = None
+    dept_tree: Optional[str] = None
+    dept_updated_at: Optional[datetime] = None

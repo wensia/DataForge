@@ -12,7 +12,15 @@ from app.api.v1 import router as api_v1_router
 from app.config import settings
 from app.database import init_db
 from app.middleware import APIKeyMiddleware
-from app.models import ApiKey, YunkeAccount, YunkeCompany  # noqa: F401 确保模型被导入
+from app.middleware.jwt_auth import JWTAuthMiddleware
+from app.models import (  # noqa: F401 确保模型被导入
+    ApiKey,
+    ScheduledTask,
+    TaskExecution,
+    User,
+    YunkeAccount,
+    YunkeCompany,
+)
 from app.schemas.response import ResponseModel
 
 
@@ -57,8 +65,33 @@ async def lifespan(app: FastAPI):
         logger.warning("未配置API密钥,所有需要验证的接口将无法访问!")
         logger.warning("请在.env文件中配置 API_KEYS=key1,key2,key3")
 
+    # 初始化调度器
+    if settings.scheduler_enabled:
+        from app.scheduler import (
+            discover_handlers,
+            init_scheduler,
+            shutdown_scheduler,
+            start_scheduler,
+        )
+        from app.services.task_service import init_default_tasks, sync_tasks_to_scheduler
+
+        logger.info("正在初始化任务调度器...")
+        init_scheduler()
+        discover_handlers()
+        start_scheduler()
+        init_default_tasks()
+        sync_tasks_to_scheduler()
+        logger.info("任务调度器启动完成")
+
     yield
+
     # 关闭时执行
+    if settings.scheduler_enabled:
+        from app.scheduler import shutdown_scheduler
+
+        logger.info("正在关闭任务调度器...")
+        shutdown_scheduler()
+
     logger.info("应用正在关闭...")
 
 
@@ -78,8 +111,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 添加API密钥验证中间件
+# 添加中间件 (注意顺序: 后添加的先执行)
+# JWT 中间件在 API 密钥中间件之前执行
 app.add_middleware(APIKeyMiddleware)
+app.add_middleware(JWTAuthMiddleware)
 
 
 # 全局异常处理

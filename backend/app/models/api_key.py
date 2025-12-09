@@ -27,6 +27,9 @@ class ApiKey(SQLModel, table=True):
     # 备注
     notes: Optional[str] = Field(default=None, description="备注信息")
 
+    # 用户关联
+    owner_id: Optional[int] = Field(default=None, foreign_key="users.id", description="所属用户ID")
+
 
 class ApiKeyCreate(SQLModel):
     """创建 API 密钥的请求模型"""
@@ -58,3 +61,4 @@ class ApiKeyResponse(SQLModel):
     last_used_at: Optional[datetime]
     usage_count: int
     notes: Optional[str]
+    owner_id: Optional[int] = None

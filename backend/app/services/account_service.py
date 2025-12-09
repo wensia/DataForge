@@ -315,9 +315,13 @@ async def auto_login(account_id: int) -> dict:
                 return {
                     "success": True,
                     "message": "登录成功",
+                    "cookies": login_result["cookies"],
+                    "user_id": account.user_id,
                     "data": {
                         "token": account.token,
                         "company": company.company_name,
+                        "id": account.user_id,
+                        "cookies": login_result["cookies"],
                     },
                 }
             else:

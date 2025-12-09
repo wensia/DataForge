@@ -1,343 +1,843 @@
 # 前端开发规则
 
-> Vue 3 + Vite + Naive UI
+> React 18 + Vite + shadcn/ui + TanStack
 
 ## 技术栈
 
 | 组件 | 技术 |
 |------|------|
-| 框架 | Vue 3 (Composition API) |
+| 框架 | React 18 (Hooks) |
 | 构建工具 | Vite |
-| UI 组件库 | Naive UI |
-| 图标库 | xicons |
-| 状态管理 | Pinia |
-| 路由 | Vue Router |
+| UI 组件库 | shadcn/ui |
+| 图标库 | Lucide React |
+| 状态管理 | TanStack Query |
+| 表格 | TanStack Table |
+| 路由 | TanStack Router |
+| 样式 | Tailwind CSS |
+| 格式化 | ESLint + Prettier |
 
 ## 项目结构
 
 ```
-frontend/
+frontend-react/
 ├── src/
-│   ├── main.ts              # 应用入口
-│   ├── App.vue              # 根组件
-│   ├── api/                 # API 请求
-│   │   ├── index.ts
-│   │   └── modules/
-│   ├── assets/              # 静态资源
-│   ├── components/          # 公共组件
-│   │   └── common/
-│   ├── composables/         # 组合式函数
-│   ├── layouts/             # 布局组件
-│   ├── router/              # 路由配置
-│   │   └── index.ts
-│   ├── stores/              # Pinia 状态管理
-│   │   └── index.ts
-│   ├── styles/              # 全局样式
-│   │   └── index.css
-│   ├── types/               # TypeScript 类型定义
-│   │   └── index.ts
-│   ├── utils/               # 工具函数
-│   │   └── index.ts
-│   └── views/               # 页面组件
-├── index.html
+│   ├── main.tsx              # 应用入口
+│   ├── routes.tsx            # 路由配置
+│   ├── components/           # shadcn/ui 组件
+│   │   ├── ui/               # 基础 UI 组件
+│   │   └── layout/           # 布局组件 (Header, Main, Sidebar)
+│   ├── features/             # 功能模块
+│   │   ├── analysis/         # 数据分析模块
+│   │   │   ├── index.tsx     # 页面组件
+│   │   │   ├── api/          # API Hooks
+│   │   │   ├── components/   # 模块专用组件
+│   │   │   └── types.ts      # 类型定义
+│   │   └── ...
+│   ├── hooks/                # 全局自定义 Hooks
+│   ├── lib/                  # 工具库
+│   │   ├── api-client.ts     # Axios 实例
+│   │   ├── utils.ts          # 工具函数
+│   │   └── types.ts          # 全局类型
+│   └── styles/               # 全局样式
+│       ├── index.css         # 入口样式
+│       └── theme.css         # 主题变量
+├── components.json           # shadcn/ui 配置
+├── tailwind.config.js
 ├── vite.config.ts
-├── tsconfig.json
 └── package.json
 ```
 
-## Naive UI 组件使用规范
+## shadcn/ui 使用规范
 
-### 默认配色和标准大小
-
-**所有组件必须使用 Naive UI 的默认配色和标准大小，不做自定义主题覆盖。**
-
-```vue
-<template>
-  <!-- ✅ 正确：使用默认配置 -->
-  <n-button>默认按钮</n-button>
-  <n-button type="primary">主要按钮</n-button>
-  <n-button type="info">信息按钮</n-button>
-  <n-button type="success">成功按钮</n-button>
-  <n-button type="warning">警告按钮</n-button>
-  <n-button type="error">错误按钮</n-button>
-  
-  <n-input placeholder="请输入" />
-  <n-select :options="options" />
-  
-  <!-- ❌ 错误：自定义尺寸和颜色 -->
-  <n-button size="large" color="#custom">自定义按钮</n-button>
-</template>
-```
-
-### 全局配置
-
-```typescript
-// main.ts
-import { createApp } from 'vue'
-import naive from 'naive-ui'
-import App from './App.vue'
-
-const app = createApp(App)
-app.use(naive)
-app.mount('#app')
-```
-
-### 按需引入组件
-
-```vue
-<script setup lang="ts">
-import { NButton, NInput, NCard, NSpace, NForm, NFormItem } from 'naive-ui'
-</script>
-```
-
-## xicons 图标库使用
-
-Naive UI 推荐使用 xicons 图标库。
-
-### 安装
+### 安装组件
 
 ```bash
-# Ionicons 5（推荐）
-pnpm add @vicons/ionicons5
-
-# 其他可选图标集
-pnpm add @vicons/antd
-pnpm add @vicons/material
-pnpm add @vicons/carbon
-pnpm add @vicons/tabler
+# 使用 CLI 安装组件
+npx shadcn@latest add button
+npx shadcn@latest add table
+npx shadcn@latest add dialog
 ```
 
-### 图标使用示例
+### 组件使用示例
 
-```vue
-<script setup lang="ts">
-import { NIcon, NButton } from 'naive-ui'
-import { HomeOutline, SettingsOutline, AddOutline } from '@vicons/ionicons5'
-</script>
+```tsx
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
-<template>
-  <!-- 单独使用图标 -->
-  <n-icon :component="HomeOutline" />
-  
-  <!-- 按钮中使用图标 -->
-  <n-button>
-    <template #icon>
-      <n-icon :component="SettingsOutline" />
-    </template>
-    设置
-  </n-button>
-  
-  <!-- 图标按钮 -->
-  <n-button circle>
-    <template #icon>
-      <n-icon :component="AddOutline" />
-    </template>
-  </n-button>
-</template>
+// 按钮变体
+<Button>默认按钮</Button>
+<Button variant="outline">线框按钮</Button>
+<Button variant="destructive">危险按钮</Button>
+<Button size="icon"><SearchIcon /></Button>
+
+// 下拉选择
+<Select value={value} onValueChange={setValue}>
+  <SelectTrigger className="w-[120px]">
+    <SelectValue placeholder="选择..." />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">全部</SelectItem>
+    <SelectItem value="option1">选项1</SelectItem>
+  </SelectContent>
+</Select>
 ```
 
-### 封装图标组件
+### 图标使用
 
-```vue
-<!-- components/common/Icon.vue -->
-<script setup lang="ts">
-import { NIcon } from 'naive-ui'
-import type { Component } from 'vue'
+使用 Lucide React 图标库：
 
-defineProps<{
-  icon: Component
-  size?: number
-}>()
-</script>
+```tsx
+import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
-<template>
-  <n-icon :size="size" :component="icon" />
-</template>
+<Button>
+  <Search className="mr-2 h-4 w-4" />
+  搜索
+</Button>
+
+// 加载状态
+<Button disabled>
+  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+  加载中
+</Button>
 ```
 
-## 统一响应类型
+## TanStack Query 规范
 
-与后端响应模型对应的 TypeScript 类型：
+### Query Keys 组织
 
 ```typescript
-// types/response.ts
-export interface ResponseModel<T = any> {
-  code: number
-  message: string
-  data: T
+// features/analysis/api/index.ts
+export const analysisKeys = {
+  all: ['analysis'] as const,
+  records: (params?: RecordsParams) => [...analysisKeys.all, 'records', params] as const,
+  stats: (params?: StatsParams) => [...analysisKeys.all, 'stats', params] as const,
+  providers: () => [...analysisKeys.all, 'providers'] as const,
 }
 ```
 
-## API 请求封装
+### useQuery Hook
 
 ```typescript
-// api/request.ts
-import axios from 'axios'
-import type { ResponseModel } from '@/types/response'
+import { useQuery } from '@tanstack/react-query'
+import apiClient from '@/lib/api-client'
+import type { ApiResponse } from '@/lib/types'
 
-const request = axios.create({
-  baseURL: '/api',
-  timeout: 10000,
+export function useRecords(params: RecordsParams = {}) {
+  return useQuery({
+    queryKey: analysisKeys.records(params),
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<PaginatedResponse<CallRecord>>>(
+        '/analysis/records',
+        { params }
+      )
+      return response.data.data
+    },
+  })
+}
+```
+
+### useMutation Hook
+
+```typescript
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+export function useSyncData() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post<ApiResponse<SyncResult>>('/analysis/sync')
+      return response.data.data
+    },
+    onSuccess: () => {
+      // 刷新相关查询
+      queryClient.invalidateQueries({ queryKey: analysisKeys.records() })
+      queryClient.invalidateQueries({ queryKey: analysisKeys.stats() })
+    },
+  })
+}
+```
+
+## TanStack Table 规范
+
+### 选择列（固定宽度）
+
+使用 `createSelectColumn<T>()` 工具函数创建固定宽度的多选列：
+
+```tsx
+import { createSelectColumn } from '@/components/data-table'
+
+export const columns: ColumnDef<MyData>[] = [
+  createSelectColumn<MyData>(),
+  // 其他列...
+]
+
+// 带额外配置（如响应式布局）
+createSelectColumn<MyData>({
+  meta: {
+    className: cn('max-md:sticky start-0 z-10'),
+  },
+})
+```
+
+**特性**：
+- 固定 40px 宽度，不可调整
+- 支持全选/取消全选
+- 支持单行选择
+- 禁用排序和隐藏
+
+**组件路径**: `@/components/data-table/select-column.tsx`
+
+### 列定义
+
+```typescript
+// features/analysis/components/data-table-columns.tsx
+import { ColumnDef } from '@tanstack/react-table'
+import { Badge } from '@/components/ui/badge'
+import type { CallRecord } from '../types'
+
+export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
+  return [
+    {
+      accessorKey: 'call_time',
+      header: '通话时间',
+      cell: ({ row }) => formatDate(row.getValue('call_time')),
+    },
+    {
+      accessorKey: 'call_type',
+      header: '类型',
+      cell: ({ row }) => {
+        const type = row.getValue('call_type') as string
+        const config = callTypeMap[type]
+        return <Badge variant={config?.variant}>{config?.label || type}</Badge>
+      },
+    },
+    {
+      id: 'actions',
+      header: '操作',
+      cell: ({ row }) => (
+        <Button size="sm" onClick={() => options.onPlayAudio(row.original.record_url)}>
+          播放
+        </Button>
+      ),
+    },
+  ]
+}
+```
+
+### 表格实例
+
+```typescript
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
+
+const table = useReactTable({
+  data: recordsData?.items || [],
+  columns,
+  getCoreRowModel: getCoreRowModel(),
 })
 
-// 请求拦截器
-request.interceptors.request.use(
-  (config) => {
-    // 添加 token 等
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
+// 渲染表格
+<Table>
+  <TableHeader>
+    {table.getHeaderGroups().map((headerGroup) => (
+      <TableRow key={headerGroup.id}>
+        {headerGroup.headers.map((header) => (
+          <TableHead key={header.id}>
+            {flexRender(header.column.columnDef.header, header.getContext())}
+          </TableHead>
+        ))}
+      </TableRow>
+    ))}
+  </TableHeader>
+  <TableBody>
+    {table.getRowModel().rows.map((row) => (
+      <TableRow key={row.id}>
+        {row.getVisibleCells().map((cell) => (
+          <TableCell key={cell.id}>
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        ))}
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
+```
 
-// 响应拦截器
-request.interceptors.response.use(
-  (response) => {
-    const res = response.data as ResponseModel
-    if (res.code !== 200) {
-      // 处理业务错误
-      console.error(res.message)
-      return Promise.reject(new Error(res.message))
+### 列宽拖拽调整
+
+使用 `ResizableTable` 组件实现列宽可拖拽调整：
+
+```tsx
+import { ResizableTable } from '@/components/data-table'
+
+// 1. 启用列宽调整
+const table = useReactTable({
+  data,
+  columns,
+  getCoreRowModel: getCoreRowModel(),
+  enableColumnResizing: true,
+  columnResizeMode: 'onChange',
+})
+
+// 2. 使用 ResizableTable 替代普通 Table
+<ResizableTable table={table} />
+```
+
+**列宽配置**：
+
+```tsx
+const columns: ColumnDef<MyData>[] = [
+  {
+    accessorKey: 'name',
+    header: '名称',
+    size: 150,           // 默认宽度
+    minSize: 100,        // 最小宽度
+    maxSize: 300,        // 最大宽度
+    enableResizing: true, // 默认为 true
+  },
+  {
+    id: 'select',
+    size: 40,
+    minSize: 40,
+    maxSize: 40,
+    enableResizing: false, // 禁用调整（固定宽度）
+  },
+]
+```
+
+**组件路径**: `@/components/data-table/resizable-table.tsx`
+
+## 数据表页面布局模板
+
+所有包含数据表的页面应使用统一的布局结构，确保表格正确滚动和分页组件一致。
+
+### 核心组件
+
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| `DataPageContent` | `@/components/layout/data-page-layout` | 数据页面内容布局 |
+| `SimplePagination` | `@/components/data-table` | 手动分页组件 |
+
+### 完整页面模板
+
+```tsx
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { DataPageContent } from '@/components/layout/data-page-layout'
+import { SimplePagination } from '@/components/data-table'
+
+export function DataTablePage() {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
+  const { data, isLoading } = useData({ page, page_size: pageSize })
+
+  return (
+    <>
+      <Header fixed>
+        <h1 className="text-xl font-semibold">页面标题</h1>
+        <div className="ms-auto flex items-center gap-2">
+          {/* 右侧操作按钮 */}
+        </div>
+      </Header>
+
+      <Main fixed className="min-h-0">
+        <DataPageContent
+          toolbar={
+            <>
+              {/* 筛选条件 */}
+              <Select>...</Select>
+              <Input placeholder="搜索..." />
+              <Button>查询</Button>
+              <div className="flex-1" />
+              {/* 右侧工具 */}
+              <Button variant="outline">刷新</Button>
+            </>
+          }
+          pagination={
+            data && (
+              <SimplePagination
+                page={page}
+                pageSize={pageSize}
+                total={data.total}
+                totalPages={data.pages}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+              />
+            )
+          }
+        >
+          {/* 表格内容 */}
+          <Table>
+            <TableHeader>...</TableHeader>
+            <TableBody>
+              {isLoading ? (
+                // 骨架屏
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+                  </TableRow>
+                ))
+              ) : data?.items.length ? (
+                // 数据行
+                data.items.map((item) => (
+                  <TableRow key={item.id}>...</TableRow>
+                ))
+              ) : (
+                // 空状态
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                    暂无数据
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DataPageContent>
+      </Main>
+    </>
+  )
+}
+```
+
+### 关键布局类
+
+```tsx
+// Main 组件必须添加这两个类
+<Main fixed className="min-h-0">
+
+// DataPageContent 内部结构（自动应用）
+<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+  {toolbar}
+  <div className="flex min-h-0 flex-1 flex-col rounded-md border shadow-sm overflow-hidden">
+    <div className="flex-1 overflow-auto">
+      {children}
+    </div>
+  </div>
+  {pagination}
+</div>
+```
+
+### SimplePagination Props
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `page` | `number` | 当前页码 |
+| `pageSize` | `number` | 每页条数 |
+| `total` | `number` | 总记录数 |
+| `totalPages` | `number` | 总页数 |
+| `onPageChange` | `(page: number) => void` | 页码变化回调 |
+| `onPageSizeChange` | `(size: number) => void` | 每页条数变化回调（可选） |
+| `pageSizeOptions` | `number[]` | 每页条数选项，默认 `[10, 20, 50, 100]` |
+
+### 简化布局（无分页）
+
+对于使用 TanStack Table 内置分页或无分页的页面：
+
+```tsx
+<Main fixed className="min-h-0">
+  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+    <div className="flex flex-wrap items-end justify-between gap-2">
+      {/* 工具栏 */}
+    </div>
+    <YourTableComponent />
+  </div>
+</Main>
+```
+
+### 已使用此模板的页面
+
+- `features/analysis/index.tsx` - 数据浏览
+- `features/task-executions/index.tsx` - 任务执行记录
+- `features/tasks/index.tsx` - 任务管理
+- `features/accounts/index.tsx` - 账号管理
+
+## 表格单元格截断与 Tooltip
+
+当表格列宽有限导致内容被截断时，使用 `TruncatedCell` 组件自动检测并显示完整内容的 Tooltip。
+
+### 组件
+
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| `TruncatedCell` | `@/components/data-table` | 表格专用截断组件 |
+| `TruncatedText` | `@/components/ui/truncated-text` | 通用截断组件 |
+
+### 在列定义中使用
+
+```tsx
+import { TruncatedCell } from '@/components/data-table'
+
+const columns: ColumnDef<MyData>[] = [
+  {
+    accessorKey: 'name',
+    header: '名称',
+    cell: ({ row }) => (
+      <TruncatedCell maxWidth={150}>
+        {row.getValue('name')}
+      </TruncatedCell>
+    ),
+  },
+  {
+    accessorKey: 'description',
+    header: '描述',
+    cell: ({ row }) => (
+      <TruncatedCell maxWidth={200}>
+        {row.getValue('description')}
+      </TruncatedCell>
+    ),
+  },
+  {
+    accessorKey: 'error_message',
+    header: '错误信息',
+    cell: ({ row }) => (
+      <TruncatedCell
+        maxWidth={250}
+        tooltipContent={<pre className="text-xs">{row.original.error_message}</pre>}
+      >
+        {row.original.error_message}
+      </TruncatedCell>
+    ),
+  },
+]
+```
+
+### TruncatedCell Props
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `children` | `ReactNode` | - | 显示的内容 |
+| `maxWidth` | `number` | `200` | 最大宽度（px） |
+| `tooltipContent` | `ReactNode` | `children` | 自定义 Tooltip 内容 |
+| `className` | `string` | - | 额外的 CSS 类 |
+
+### 工作原理
+
+组件会自动检测内容是否被截断（`scrollWidth > clientWidth`）：
+- **未截断**：正常显示文本
+- **已截断**：显示截断文本 + 悬浮 Tooltip
+
+### 通用场景
+
+对于非表格场景，使用 `TruncatedText` 组件：
+
+```tsx
+import { TruncatedText } from '@/components/ui/truncated-text'
+
+<TruncatedText className="max-w-[200px]">
+  这是一段很长的文本内容，可能会被截断...
+</TruncatedText>
+```
+
+## 全局样式配置
+
+### styles/index.css
+
+```css
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './theme.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* 移除所有焦点样式 */
+  *:focus,
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  html {
+    @apply overflow-x-hidden;
+  }
+
+  body {
+    @apply bg-background text-foreground min-h-svh w-full;
+  }
+
+  /* 按钮默认指针样式 */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* 移动端防止输入框缩放 */
+  @media screen and (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
     }
-    return res
-  },
-  (error) => {
-    return Promise.reject(error)
   }
-)
-
-export default request
-```
-
-## 组件开发规范
-
-1. **Composition API**: 统一使用 `<script setup>` 语法
-2. **TypeScript**: 所有代码使用 TypeScript 编写
-3. **组件命名**: 使用 PascalCase 命名组件文件
-4. **Props 定义**: 使用 `defineProps` 配合 TypeScript 类型
-5. **事件定义**: 使用 `defineEmits` 配合 TypeScript 类型
-
-### 组件模板
-
-```vue
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-import { NButton, NCard } from 'naive-ui'
-
-// Props 定义
-interface Props {
-  title: string
-  count?: number
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  count: 0,
-})
-
-// Emits 定义
-const emit = defineEmits<{
-  (e: 'update', value: number): void
-  (e: 'delete'): void
-}>()
-
-// 响应式数据
-const localCount = ref(props.count)
-
-// 计算属性
-const displayText = computed(() => `${props.title}: ${localCount.value}`)
-
-// 方法
-const handleUpdate = () => {
-  emit('update', localCount.value)
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-</script>
-
-<template>
-  <n-card :title="title">
-    <p>{{ displayText }}</p>
-    <n-button @click="handleUpdate">
-      更新
-    </n-button>
-  </n-card>
-</template>
-
-<style scoped>
-/* 组件样式 */
-</style>
 ```
 
-## 路由配置示例
+## 抽屉组件复用模式
 
-```typescript
-// router/index.ts
-import { createRouter, createWebHistory } from 'vue-router'
+### 新建/编辑/复制共用抽屉
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    {
-      path: '/',
-      name: 'Home',
-      component: () => import('@/views/Home.vue'),
-    },
-    {
-      path: '/about',
-      name: 'About',
-      component: () => import('@/views/About.vue'),
-    },
-  ],
-})
+使用 `isCopy` 属性区分复制模式和编辑模式：
 
-export default router
+```tsx
+// types
+type DialogType = 'add' | 'edit' | 'copy' | 'delete'
+
+// 抽屉组件
+interface MutateDrawerProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  currentRow?: MyData | null
+  isCopy?: boolean  // 区分复制和编辑
+}
+
+function MutateDrawer({ open, onOpenChange, currentRow, isCopy }: MutateDrawerProps) {
+  // 编辑模式：有 currentRow 且不是复制
+  const isUpdate = !!currentRow && !isCopy
+
+  // 表单默认值
+  const defaultValues = currentRow
+    ? {
+        ...currentRow,
+        name: isCopy ? `${currentRow.name}（副本）` : currentRow.name,
+      }
+    : { name: '' }
+
+  // 标题和描述
+  const title = isCopy ? '复制任务' : isUpdate ? '编辑任务' : '新建任务'
+  const description = isCopy
+    ? '基于现有任务创建副本'
+    : isUpdate
+      ? '修改任务配置'
+      : '创建新任务'
+
+  // 提交逻辑
+  const onSubmit = (data: FormData) => {
+    if (isUpdate) {
+      updateMutation.mutate({ id: currentRow.id, data })
+    } else {
+      createMutation.mutate(data)  // 新建和复制都走创建接口
+    }
+  }
+}
+
+// 调用方
+<MutateDrawer
+  open={type === 'edit' || type === 'copy'}
+  onOpenChange={(open) => !open && setType(null)}
+  currentRow={currentRow}
+  isCopy={type === 'copy'}  // 复制模式
+/>
 ```
 
-## Pinia 状态管理示例
+## 常用模式
 
-```typescript
-// stores/user.ts
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+### 1. 页面组件结构
 
-export const useUserStore = defineStore('user', () => {
-  // state
-  const user = ref<User | null>(null)
-  const token = ref<string>('')
+```tsx
+// features/analysis/index.tsx
+export function DataAnalysis() {
+  // 筛选状态
+  const [filters, setFilters] = useState<RecordsParams>({
+    page: 1,
+    page_size: 20,
+  })
+  const [sourceFilter, setSourceFilter] = useState<string>('')
 
-  // getters
-  const isLoggedIn = computed(() => !!token.value)
+  // API Hooks
+  const { data: recordsData, isLoading } = useRecords(filters)
+  const { data: filterOptions } = useFilterOptions()
+  const syncMutation = useSyncData()
 
-  // actions
-  const login = async (username: string, password: string) => {
-    // 登录逻辑
+  // 事件处理
+  const handleSearch = () => {
+    setFilters({
+      ...filters,
+      page: 1,
+      source: sourceFilter && sourceFilter !== 'all' ? sourceFilter : undefined,
+    })
   }
 
-  const logout = () => {
-    user.value = null
-    token.value = ''
-  }
+  return (
+    <>
+      <Header fixed>
+        <h1>数据浏览</h1>
+        <Button onClick={() => syncMutation.mutateAsync()}>
+          {syncMutation.isPending ? <Loader2 className="animate-spin" /> : null}
+          同步数据
+        </Button>
+      </Header>
 
-  return {
-    user,
-    token,
-    isLoggedIn,
-    login,
-    logout,
-  }
-})
+      <Main fixed className="min-h-0">
+        {/* 筛选器 */}
+        <div className="flex gap-2">
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>...</Select>
+          <Button onClick={handleSearch}>查询</Button>
+        </div>
+
+        {/* 数据表格 */}
+        <div className="flex-1 overflow-auto">
+          <Table>...</Table>
+        </div>
+
+        {/* 分页 */}
+        {recordsData && <Pagination ... />}
+      </Main>
+
+      {/* 弹窗 */}
+      <Dialog>...</Dialog>
+    </>
+  )
+}
 ```
 
-## 代码检查与格式化
+### 2. 筛选器模式
 
-使用 **Biome** 进行代码检查和格式化（替代 ESLint + Prettier）。
+```tsx
+// 下拉选择 + 类型映射
+const callTypeMap = {
+  inbound: { label: '呼入', variant: 'secondary' },
+  outbound: { label: '呼出', variant: 'default' },
+}
 
-### Biome 优势
+<Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
+  <SelectTrigger className="w-[100px]">
+    <SelectValue placeholder="类型" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">全部</SelectItem>
+    {Object.entries(callTypeMap).map(([key, { label }]) => (
+      <SelectItem key={key} value={key}>{label}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
 
-- 🚀 速度快 20-100 倍（Rust 编写）
-- 🔧 二合一工具（Linter + Formatter）
-- ⚙️ 零配置，开箱即用
+### 3. 分页组件模式
 
-### 常用命令
+```tsx
+import { getPageNumbers } from '@/lib/utils'
+
+// 分页按钮
+<div className="flex items-center gap-1">
+  <Button
+    variant="outline"
+    size="icon"
+    onClick={() => setFilters(prev => ({ ...prev, page: 1 }))}
+    disabled={currentPage <= 1}
+  >
+    <ChevronsLeft className="h-4 w-4" />
+  </Button>
+
+  {getPageNumbers(currentPage, totalPages).map((pageNumber, index) => (
+    <div key={`${pageNumber}-${index}`}>
+      {pageNumber === '...' ? (
+        <span className="px-2">...</span>
+      ) : (
+        <Button
+          variant={currentPage === pageNumber ? 'default' : 'outline'}
+          size="icon"
+          onClick={() => setFilters(prev => ({ ...prev, page: pageNumber as number }))}
+        >
+          {pageNumber}
+        </Button>
+      )}
+    </div>
+  ))}
+
+  <Button
+    variant="outline"
+    size="icon"
+    onClick={() => setFilters(prev => ({ ...prev, page: totalPages }))}
+    disabled={currentPage >= totalPages}
+  >
+    <ChevronsRight className="h-4 w-4" />
+  </Button>
+</div>
+```
+
+### 4. 加载骨架屏
+
+```tsx
+import { Skeleton } from '@/components/ui/skeleton'
+
+{isLoading ? (
+  Array.from({ length: 10 }).map((_, i) => (
+    <TableRow key={i}>
+      {columns.map((_, j) => (
+        <TableCell key={j}>
+          <Skeleton className="h-4 w-full" />
+        </TableCell>
+      ))}
+    </TableRow>
+  ))
+) : (
+  // 实际数据
+)}
+```
+
+### 5. 弹窗播放模式
+
+```tsx
+const [audioUrl, setAudioUrl] = useState<string | null>(null)
+const [showAudioModal, setShowAudioModal] = useState(false)
+
+const handlePlayAudio = useCallback(async (url: string) => {
+  try {
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    const blob = await proxyRecord(url)
+    setAudioUrl(URL.createObjectURL(blob))
+    setShowAudioModal(true)
+  } catch {
+    toast.error('获取录音失败')
+  }
+}, [audioUrl])
+
+<Dialog open={showAudioModal} onOpenChange={setShowAudioModal}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>播放录音</DialogTitle>
+    </DialogHeader>
+    {audioUrl && <audio src={audioUrl} controls autoPlay className="w-full" />}
+  </DialogContent>
+</Dialog>
+```
+
+## 常用命令
 
 ```bash
 # 安装依赖
@@ -355,54 +855,64 @@ pnpm preview
 # 代码检查
 pnpm lint
 
-# 代码检查 + 格式化（自动修复）
+# 代码格式化
 pnpm format
+
+# 添加 shadcn/ui 组件
+npx shadcn@latest add [component-name]
 ```
 
-### Biome 配置
+## API 客户端配置
 
-配置文件：`biome.json`
+```typescript
+// lib/api-client.ts
+import axios from 'axios'
 
-```json
-{
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "asNeeded"
-    }
+const apiClient = axios.create({
+  baseURL: '/api/v1',
+  timeout: 30000,
+})
+
+// 请求拦截器
+apiClient.interceptors.request.use((config) => {
+  // 从 localStorage 获取 API Key
+  const apiKey = localStorage.getItem('api_key')
+  if (apiKey) {
+    config.params = { ...config.params, api_key: apiKey }
   }
+  return config
+})
+
+// 响应拦截器
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // 处理未授权
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default apiClient
+```
+
+## 类型定义
+
+```typescript
+// lib/types.ts
+export interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
 }
-```
 
-## 依赖参考
-
-```json
-{
-  "dependencies": {
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.0",
-    "pinia": "^2.1.0",
-    "naive-ui": "^2.38.0",
-    "@vicons/ionicons5": "^0.12.0",
-    "axios": "^1.6.0"
-  },
-  "devDependencies": {
-    "vite": "^5.0.0",
-    "typescript": "^5.3.0",
-    "@vitejs/plugin-vue": "^5.0.0",
-    "@biomejs/biome": "^1.9.0"
-  }
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
 }
 ```
 
@@ -410,12 +920,13 @@ pnpm format
 
 在编写代码或修复 bug 时，优先查找官方文档：
 
-1. **Vue 3**: https://vuejs.org/
-2. **Naive UI**: https://www.naiveui.com/
-3. **Vite**: https://vitejs.dev/
-4. **xicons**: https://www.xicons.org/
-5. **Pinia**: https://pinia.vuejs.org/
-6. **Vue Router**: https://router.vuejs.org/
+1. **React**: https://react.dev/
+2. **shadcn/ui**: https://ui.shadcn.com/
+3. **TanStack Query**: https://tanstack.com/query/latest
+4. **TanStack Table**: https://tanstack.com/table/latest
+5. **TanStack Router**: https://tanstack.com/router/latest
+6. **Tailwind CSS**: https://tailwindcss.com/
+7. **Lucide Icons**: https://lucide.dev/
+8. **Vite**: https://vitejs.dev/
 
 遵循官方最佳实践和示例代码。
-

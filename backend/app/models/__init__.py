@@ -1,7 +1,70 @@
 """SQLModel 数据模型"""
 
+from app.models.analysis_result import (
+    AIProvider,
+    AnalysisRequest,
+    AnalysisResult,
+    AnalysisResultCreate,
+    AnalysisResultResponse,
+    AnalysisType,
+    ChatMessage,
+    ChatRequest,
+)
 from app.models.api_key import ApiKey, ApiKeyCreate, ApiKeyResponse, ApiKeyUpdate
 from app.models.base import BaseTable
+from app.models.call_record import (
+    CallRecord,
+    CallRecordCreate,
+    CallRecordResponse,
+    CallRecordStats,
+    CallRecordUpdate,
+    DataSource,
+)
+from app.models.feishu_bitable import (
+    FeishuBitable,
+    FeishuBitableCreate,
+    FeishuBitableResponse,
+    FeishuBitableUpdate,
+)
+from app.models.feishu_client import (
+    FeishuClient,
+    FeishuClientCreate,
+    FeishuClientResponse,
+    FeishuClientUpdate,
+)
+from app.models.feishu_config import (
+    FeishuConfig,
+    FeishuConfigCreate,
+    FeishuConfigResponse,
+    FeishuConfigUpdate,
+)
+from app.models.feishu_table import (
+    FeishuTable,
+    FeishuTableCreate,
+    FeishuTableResponse,
+    FeishuTableUpdate,
+)
+from app.models.task import (
+    ScheduledTask,
+    ScheduledTaskCreate,
+    ScheduledTaskResponse,
+    ScheduledTaskUpdate,
+    TaskStatus,
+    TaskType,
+)
+from app.models.task_execution import (
+    ExecutionStatus,
+    TaskExecution,
+    TaskExecutionDetailResponse,
+    TaskExecutionResponse,
+)
+from app.models.user import (
+    User,
+    UserCreate,
+    UserResponse,
+    UserRole,
+    UserUpdate,
+)
 from app.models.yunke_account import (
     YunkeAccount,
     YunkeAccountCreate,
@@ -13,13 +76,74 @@ from app.models.yunke_company import (
     YunkeCompanyCreate,
     YunkeCompanyResponse,
 )
+from app.models.ai_config import (
+    AIConfig,
+    AIConfigCreate,
+    AIConfigResponse,
+    AIConfigUpdate,
+    PROVIDER_PRESETS,
+)
+from app.models.user_preference import (
+    UserPreference,
+    UserPreferenceCreate,
+    UserPreferenceResponse,
+    UserPreferenceUpdate,
+)
+from app.models.asr_config import (
+    ASRConfig,
+    ASRConfigCreate,
+    ASRConfigResponse,
+    ASRConfigUpdate,
+    ASRProvider,
+    ASR_PROVIDER_PRESETS,
+)
 
 __all__ = [
+    "AIProvider",
+    "AnalysisRequest",
+    "AnalysisResult",
+    "AnalysisResultCreate",
+    "AnalysisResultResponse",
+    "AnalysisType",
     "ApiKey",
     "ApiKeyCreate",
     "ApiKeyResponse",
     "ApiKeyUpdate",
     "BaseTable",
+    "CallRecord",
+    "CallRecordCreate",
+    "CallRecordResponse",
+    "CallRecordStats",
+    "CallRecordUpdate",
+    "ChatMessage",
+    "ChatRequest",
+    "DataSource",
+    "ExecutionStatus",
+    "FeishuBitable",
+    "FeishuBitableCreate",
+    "FeishuBitableResponse",
+    "FeishuBitableUpdate",
+    "FeishuClient",
+    "FeishuClientCreate",
+    "FeishuClientResponse",
+    "FeishuClientUpdate",
+    "FeishuConfig",
+    "FeishuConfigCreate",
+    "FeishuConfigResponse",
+    "FeishuConfigUpdate",
+    "FeishuTable",
+    "FeishuTableCreate",
+    "FeishuTableResponse",
+    "FeishuTableUpdate",
+    "ScheduledTask",
+    "ScheduledTaskCreate",
+    "ScheduledTaskResponse",
+    "ScheduledTaskUpdate",
+    "TaskExecution",
+    "TaskExecutionDetailResponse",
+    "TaskExecutionResponse",
+    "TaskStatus",
+    "TaskType",
     "YunkeAccount",
     "YunkeAccountCreate",
     "YunkeAccountResponse",
@@ -27,4 +151,24 @@ __all__ = [
     "YunkeCompany",
     "YunkeCompanyCreate",
     "YunkeCompanyResponse",
+    "User",
+    "UserCreate",
+    "UserResponse",
+    "UserRole",
+    "UserUpdate",
+    "AIConfig",
+    "AIConfigCreate",
+    "AIConfigResponse",
+    "AIConfigUpdate",
+    "PROVIDER_PRESETS",
+    "UserPreference",
+    "UserPreferenceCreate",
+    "UserPreferenceResponse",
+    "UserPreferenceUpdate",
+    "ASRConfig",
+    "ASRConfigCreate",
+    "ASRConfigResponse",
+    "ASRConfigUpdate",
+    "ASRProvider",
+    "ASR_PROVIDER_PRESETS",
 ]
