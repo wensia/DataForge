@@ -12,6 +12,7 @@ import {
   FolderTree,
   MessageSquare,
   Mic,
+  UserRoundCog,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -81,6 +82,11 @@ export const sidebarData: SidebarData = {
           title: '智能问答',
           url: '/analysis/chat',
           icon: MessageSquare,
+        },
+        {
+          title: '员工映射',
+          url: '/analysis/staff-mapping',
+          icon: UserRoundCog,
         },
       ],
     },

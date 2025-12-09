@@ -96,8 +96,7 @@ export function SimplePagination({
             ) : (
               <Button
                 variant={page === pageNumber ? 'default' : 'outline'}
-                size='icon'
-                className='h-8 w-8'
+                className='h-8 min-w-11 px-2.5'
                 onClick={() => onPageChange(pageNumber as number)}
               >
                 {pageNumber}

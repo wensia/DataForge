@@ -55,7 +55,7 @@ async def get_records(
     call_type: str | None = None,
     call_result: str | None = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取通话记录列表
@@ -343,7 +343,7 @@ async def chat_with_data(
 async def get_analysis_history(
     analysis_type: str | None = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取分析历史

@@ -28,7 +28,7 @@ class Staff(BaseTable, table=True):
     __tablename__ = "staff"
     __table_args__ = (Index("ix_staff_name", "name", unique=True),)
 
-    name: str = Field(index=True, description="员工姓名（唯一标识）")
+    name: str = Field(description="员工姓名（唯一标识）")
     phone: str | None = Field(default=None, description="手机号（可选）")
     is_active: bool = Field(default=True, description="是否在职")
 
