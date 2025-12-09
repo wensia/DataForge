@@ -26,9 +26,9 @@ ASR_PROVIDER_PRESETS = {
         "fields": [
             {"key": "secret_id", "label": "SecretId", "required": True},
             {"key": "secret_key", "label": "SecretKey", "required": True},
-            {"key": "app_id", "label": "AppId", "required": True},
+            {"key": "app_id", "label": "AppId", "required": False, "hint": "实时语音识别需要，录音文件识别可不填"},
         ],
-        "doc_url": "https://cloud.tencent.com/document/product/1093",
+        "doc_url": "https://cloud.tencent.com/document/product/1093/37823",
     },
     ASRProvider.ALIBABA: {
         "name": "阿里云智能语音",
@@ -44,14 +44,16 @@ ASR_PROVIDER_PRESETS = {
         "fields": [
             {"key": "app_id", "label": "App ID", "required": True},
             {"key": "access_token", "label": "Access Token", "required": True},
+            {"key": "secret_key", "label": "Secret Key", "required": False, "hint": "部分接口可能需要"},
             {
                 "key": "cluster",
                 "label": "Cluster",
                 "required": False,
-                "default": "volc.bigasr.sauc.duration",
+                "default": "volc.bigasr.auc",
+                "hint": "录音文件识别: volc.bigasr.auc 或 volc.seedasr.auc",
             },
         ],
-        "doc_url": "https://www.volcengine.com/docs/6561/1354869",
+        "doc_url": "https://www.volcengine.com/docs/6561/1354868",
     },
 }
 

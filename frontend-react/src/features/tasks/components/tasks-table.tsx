@@ -4,7 +4,6 @@ import {
   flexRender,
   type ColumnSizingState,
   type Header,
-  type Row,
   type SortingState,
   type VisibilityState,
   getCoreRowModel,
@@ -30,15 +29,15 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
-import { useTasks, usePauseTask, useResumeTask } from '../api'
+import { useTasks, usePauseTask, useResumeTask, useRunTask } from '../api'
 import { statuses, categories } from '../data/data'
 import { type Task } from '../data/schema'
 import { DataTableBulkActions } from './data-table-bulk-actions'
@@ -50,6 +49,19 @@ const route = getRouteApi('/_authenticated/tasks/')
 export function TasksTable() {
   // 使用 API 获取数据
   const { data: tasks = [], isLoading, refetch, isRefetching } = useTasks()
+
+  // 右键菜单状态
+  const [contextTask, setContextTask] = useState<Task | null>(null)
+  const [contextMenuOpen, setContextMenuOpen] = useState(false)
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 })
+
+  // Tasks context for dialogs
+  const { setOpen, setCurrentRow } = useTasksContext()
+
+  // Task mutations
+  const pauseTask = usePauseTask()
+  const resumeTask = useResumeTask()
+  const runTask = useRunTask()
 
   // Local UI-only states
   const [rowSelection, setRowSelection] = useState({})
@@ -119,6 +131,75 @@ export function TasksTable() {
   useEffect(() => {
     ensurePageInRange(pageCount)
   }, [pageCount, ensurePageInRange])
+
+  // Handle right-click on row
+  const handleContextMenu = (e: MouseEvent, task: Task) => {
+    e.preventDefault()
+    setContextTask(task)
+    setContextMenuPosition({ x: e.clientX, y: e.clientY })
+    setContextMenuOpen(true)
+  }
+
+  // Context menu handlers
+  const handleRun = async () => {
+    if (!contextTask) return
+    try {
+      await runTask.mutateAsync(contextTask.id)
+      toast.success('任务已开始执行')
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '执行失败，请重试'
+      toast.error(message)
+    }
+    setContextMenuOpen(false)
+  }
+
+  const handlePause = async () => {
+    if (!contextTask) return
+    try {
+      await pauseTask.mutateAsync(contextTask.id)
+      toast.success('任务已暂停')
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '暂停失败，请重试'
+      toast.error(message)
+    }
+    setContextMenuOpen(false)
+  }
+
+  const handleResume = async () => {
+    if (!contextTask) return
+    try {
+      await resumeTask.mutateAsync(contextTask.id)
+      toast.success('任务已恢复')
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '恢复失败，请重试'
+      toast.error(message)
+    }
+    setContextMenuOpen(false)
+  }
+
+  const handleEdit = () => {
+    if (!contextTask) return
+    setCurrentRow(contextTask)
+    setOpen('update')
+    setContextMenuOpen(false)
+  }
+
+  const handleCopy = () => {
+    if (!contextTask) return
+    setCurrentRow(contextTask)
+    setOpen('copy')
+    setContextMenuOpen(false)
+  }
+
+  const handleDelete = () => {
+    if (!contextTask) return
+    setCurrentRow(contextTask)
+    setOpen('delete')
+    setContextMenuOpen(false)
+  }
 
   // 加载状态
   if (isLoading) {
@@ -197,6 +278,7 @@ export function TasksTable() {
           刷新
         </Button>
       </div>
+
       <div className='overflow-hidden rounded-md border'>
         <Table
           style={{
@@ -236,27 +318,30 @@ export function TasksTable() {
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TaskRowContextMenu key={row.id} row={row}>
-                  <TableRow data-state={row.getIsSelected() && 'selected'}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className={cn(
-                          cell.column.columnDef.meta?.className,
-                          cell.column.columnDef.meta?.tdClassName
-                        )}
-                        style={{
-                          width: cell.column.getSize(),
-                        }}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TaskRowContextMenu>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  onContextMenu={(e) => handleContextMenu(e, row.original)}
+                  className='cursor-context-menu'
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        cell.column.columnDef.meta?.className,
+                        cell.column.columnDef.meta?.tdClassName
+                      )}
+                      style={{
+                        width: cell.column.getSize(),
+                      }}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
               ))
             ) : (
               <TableRow>
@@ -271,6 +356,71 @@ export function TasksTable() {
           </TableBody>
         </Table>
       </div>
+
+      {/* 右键菜单 - 使用 DropdownMenu 模拟 */}
+      <DropdownMenu open={contextMenuOpen} onOpenChange={setContextMenuOpen} modal={false}>
+        <DropdownMenuTrigger asChild>
+          <div
+            className='fixed'
+            style={{
+              left: contextMenuPosition.x,
+              top: contextMenuPosition.y,
+              width: 0,
+              height: 0,
+            }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align='start' className='w-[160px]'>
+          <DropdownMenuItem onClick={handleRun} disabled={runTask.isPending}>
+            <Play className='mr-2 h-4 w-4' />
+            立即执行
+          </DropdownMenuItem>
+
+          {contextTask?.status === 'active' ? (
+            <DropdownMenuItem
+              onClick={handlePause}
+              disabled={pauseTask.isPending}
+            >
+              <Pause className='mr-2 h-4 w-4' />
+              暂停任务
+            </DropdownMenuItem>
+          ) : contextTask?.status === 'paused' ? (
+            <DropdownMenuItem
+              onClick={handleResume}
+              disabled={resumeTask.isPending}
+            >
+              <PlayCircle className='mr-2 h-4 w-4' />
+              恢复任务
+            </DropdownMenuItem>
+          ) : null}
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={handleEdit}>
+            <Edit className='mr-2 h-4 w-4' />
+            编辑
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={handleCopy}>
+            <Copy className='mr-2 h-4 w-4' />
+            复制
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            onClick={handleDelete}
+            className='text-destructive focus:text-destructive'
+            disabled={contextTask?.is_system}
+          >
+            删除
+            <DropdownMenuShortcut>
+              <Trash2 size={16} />
+            </DropdownMenuShortcut>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <DataTablePagination table={table} className='mt-auto' />
       <DataTableBulkActions table={table} />
     </div>

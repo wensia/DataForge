@@ -1,7 +1,7 @@
 /**
  * 数据浏览页面
  */
-import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   flexRender,
   getCoreRowModel,
@@ -65,36 +65,28 @@ import {
 } from './components/data-table-columns'
 import { callTypeMap, callResultMap, type RecordsParams, type CallRecord } from './types'
 
-// Memo 化的表格行组件，避免不必要的重新渲染
-const MemoizedTableRow = memo(function TableRow({
-  row,
-}: {
-  row: Row<CallRecord>
-}) {
+// 表格行组件
+function TableRow({ row }: { row: Row<CallRecord> }) {
   return (
     <tr
       data-state={row.getIsSelected() && 'selected'}
       className='hover:bg-muted/50 border-b transition-colors data-[state=selected]:bg-muted'
     >
       {row.getVisibleCells().map((cell) => (
-        <MemoizedTableCell key={cell.id} cell={cell} />
+        <TableCell key={cell.id} cell={cell} />
       ))}
     </tr>
   )
-})
+}
 
-// Memo 化的表格单元格组件
-const MemoizedTableCell = memo(function TableCell({
-  cell,
-}: {
-  cell: Cell<CallRecord, unknown>
-}) {
+// 表格单元格组件
+function TableCell({ cell }: { cell: Cell<CallRecord, unknown> }) {
   return (
     <td className='p-2 align-middle whitespace-nowrap'>
       {flexRender(cell.column.columnDef.cell, cell.getContext())}
     </td>
   )
-})
+}
 
 // 用户偏好键
 const PREFERENCE_KEY = 'analysis_table'

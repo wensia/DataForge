@@ -224,63 +224,75 @@ async def verify_alibaba(
 
 
 async def verify_volcengine(
-    app_id: str, access_token: str, cluster: str = "volc.bigasr.sauc.duration"
+    app_id: str, access_token: str, cluster: str = "volc.bigasr.auc"
 ) -> dict:
     """验证火山引擎 ASR 密钥
 
-    通过 WebSocket 握手验证密钥有效性。
+    通过提交一个空的录音文件识别任务来验证密钥有效性。
 
     Args:
         app_id: 火山引擎 App ID
         access_token: Access Token
-        cluster: 集群，默认 volc.bigasr.sauc.duration
+        cluster: 集群，默认 volc.bigasr.auc（录音文件识别）
 
     Returns:
         dict: {"success": bool, "message": str, "detail": ...}
     """
     try:
-        import websockets
-
-        # 火山引擎大模型 ASR WebSocket 地址
-        url = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel"
+        # 火山引擎录音文件识别 HTTP API
+        url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit"
 
         # 构造请求头
-        connect_id = str(uuid.uuid4())
         headers = {
             "X-Api-App-Key": app_id,
             "X-Api-Access-Key": access_token,
             "X-Api-Resource-Id": cluster,
-            "X-Api-Connect-Id": connect_id,
+            "Content-Type": "application/json",
         }
 
-        # 尝试 WebSocket 握手
-        async with websockets.connect(
-            url,
-            additional_headers=headers,
-            close_timeout=5,
-            open_timeout=10,
-        ) as ws:
-            # 握手成功，立即关闭
-            await ws.close()
+        # 发送一个空请求来验证密钥（会返回参数错误，但能验证密钥有效性）
+        payload = {"url": ""}
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            result = response.json()
+
+            # 检查响应
+            # 如果是认证失败，会返回 401/403 或特定错误码
+            if response.status_code == 401 or response.status_code == 403:
+                return {
+                    "success": False,
+                    "message": "密钥验证失败: 认证失败",
+                    "detail": result,
+                }
+
+            # 检查错误码
+            error_code = result.get("code", "")
+            error_msg = result.get("message", "")
+
+            # 认证相关错误
+            if "auth" in str(error_code).lower() or "auth" in error_msg.lower():
+                return {
+                    "success": False,
+                    "message": f"密钥验证失败: {error_msg}",
+                    "detail": result,
+                }
+
+            # 如果是参数错误（如 url 为空），说明密钥有效
+            # 常见错误码：参数错误、url 无效等
             return {
                 "success": True,
                 "message": "密钥验证成功",
                 "detail": {"app_id": app_id, "cluster": cluster},
             }
 
+    except httpx.TimeoutException:
+        return {"success": False, "message": "连接超时", "detail": None}
     except Exception as e:
         error_msg = str(e)
-        # 检查是否是认证失败
-        if "401" in error_msg or "403" in error_msg or "invalid" in error_msg.lower():
-            return {
-                "success": False,
-                "message": f"密钥验证失败: {error_msg}",
-                "detail": None,
-            }
-        # 其他连接错误
         return {
             "success": False,
-            "message": f"连接失败: {error_msg}",
+            "message": f"验证失败: {error_msg}",
             "detail": None,
         }
 

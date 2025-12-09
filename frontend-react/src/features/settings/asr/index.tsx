@@ -80,6 +80,7 @@ interface ProviderField {
   label: string
   required: boolean
   default?: string
+  hint?: string
 }
 
 /** 提供商预设 */
@@ -212,7 +213,7 @@ const providerOptions = [
 const formSchema = z.object({
   name: z.string().min(1, '名称不能为空'),
   provider: z.string().min(1, '请选择提供商'),
-  credentials: z.record(z.string()),
+  credentials: z.partialRecord(z.string(), z.string()),
   is_active: z.boolean().default(true),
   is_default: z.boolean().default(false),
   notes: z.string().optional(),
@@ -304,7 +305,17 @@ export function AsrSettings() {
 
   const onSubmit = async (data: AsrConfigForm) => {
     try {
-      await createConfig.mutateAsync(data)
+      // 过滤掉空值的 credentials
+      const filteredCredentials: Record<string, string> = {}
+      for (const [key, value] of Object.entries(data.credentials)) {
+        if (value && value.trim()) {
+          filteredCredentials[key] = value
+        }
+      }
+      await createConfig.mutateAsync({
+        ...data,
+        credentials: filteredCredentials,
+      })
       toast.success('ASR 配置创建成功，密钥已验证')
       setCreateDialogOpen(false)
       form.reset()
@@ -601,6 +612,9 @@ export function AsrSettings() {
                           className='font-mono'
                         />
                       </FormControl>
+                      {field.hint && (
+                        <FormDescription>{field.hint}</FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
