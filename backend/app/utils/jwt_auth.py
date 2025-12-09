@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import bcrypt
+from fastapi import Depends, HTTPException, Request
 from jose import JWTError, jwt
 from loguru import logger
 from pydantic import BaseModel
@@ -79,3 +80,38 @@ def decode_token(token: str) -> Optional[TokenPayload]:
     except JWTError as e:
         logger.warning(f"JWT 解码失败: {type(e).__name__}: {e}")
         return None
+
+
+def get_current_user(request: Request) -> TokenPayload:
+    """获取当前登录用户 (FastAPI 依赖)
+
+    从请求中获取已解析的用户信息。
+    需要配合 JWTAuthMiddleware 中间件使用。
+
+    Raises:
+        HTTPException: 未登录时抛出 401 错误
+    """
+    user_id = getattr(request.state, "user_id", None)
+    user_email = getattr(request.state, "user_email", None)
+    user_role = getattr(request.state, "user_role", None)
+
+    if not user_id or not user_email:
+        raise HTTPException(status_code=401, detail="未登录，请先登录")
+
+    return TokenPayload(
+        sub=user_id,
+        email=user_email,
+        role=user_role or "user",
+        exp=datetime.utcnow() + timedelta(hours=1),  # 占位
+    )
+
+
+def require_admin(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
+    """要求管理员权限 (FastAPI 依赖)
+
+    Raises:
+        HTTPException: 非管理员时抛出 403 错误
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+    return current_user

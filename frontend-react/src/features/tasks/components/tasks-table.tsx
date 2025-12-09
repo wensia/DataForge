@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 import { getRouteApi } from '@tanstack/react-router'
 import {
+  flexRender,
   type ColumnSizingState,
+  type Header,
+  type Row,
   type SortingState,
   type VisibilityState,
   getCoreRowModel,
@@ -12,7 +15,8 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Play, Pause, PlayCircle, Edit, Copy, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import { Button } from '@/components/ui/button'
@@ -25,11 +29,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { DataTablePagination, DataTableToolbar, ResizableTable } from '@/components/data-table'
-import { useTasks } from '../api'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
+import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
+import { useTasks, usePauseTask, useResumeTask } from '../api'
 import { statuses, categories } from '../data/data'
+import { type Task } from '../data/schema'
 import { DataTableBulkActions } from './data-table-bulk-actions'
 import { tasksColumns as columns } from './tasks-columns'
+import { useTasks as useTasksContext } from './tasks-provider'
 
 const route = getRouteApi('/_authenticated/tasks/')
 
@@ -183,9 +197,105 @@ export function TasksTable() {
           刷新
         </Button>
       </div>
-      <ResizableTable table={table} emptyText='暂无任务数据' />
+      <div className='overflow-hidden rounded-md border'>
+        <Table
+          style={{
+            width: table.getCenterTotalSize(),
+          }}
+        >
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      className={cn(
+                        'relative',
+                        header.column.columnDef.meta?.className,
+                        header.column.columnDef.meta?.thClassName
+                      )}
+                      style={{
+                        width: header.getSize(),
+                      }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      <ColumnResizer header={header} />
+                    </TableHead>
+                  )
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TaskRowContextMenu key={row.id} row={row}>
+                  <TableRow data-state={row.getIsSelected() && 'selected'}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn(
+                          cell.column.columnDef.meta?.className,
+                          cell.column.columnDef.meta?.tdClassName
+                        )}
+                        style={{
+                          width: cell.column.getSize(),
+                        }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TaskRowContextMenu>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className='h-24 text-center'
+                >
+                  暂无任务数据
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
       <DataTablePagination table={table} className='mt-auto' />
       <DataTableBulkActions table={table} />
     </div>
+  )
+}
+
+/** 列宽调整手柄组件 */
+function ColumnResizer<TData>({ header }: { header: Header<TData, unknown> }) {
+  if (!header.column.getCanResize()) {
+    return null
+  }
+
+  return (
+    <div
+      onDoubleClick={() => header.column.resetSize()}
+      onMouseDown={header.getResizeHandler()}
+      onTouchStart={header.getResizeHandler()}
+      className={cn(
+        'absolute top-0 right-0 h-full w-1 cursor-col-resize select-none touch-none',
+        'bg-transparent hover:bg-primary/50 transition-colors',
+        header.column.getIsResizing() && 'bg-primary'
+      )}
+      style={{
+        transform: 'translateX(50%)',
+      }}
+    />
   )
 }

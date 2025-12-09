@@ -14,7 +14,7 @@ import {
   type Cell,
 } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { CloudDownload, Search, Loader2, RotateCcw } from 'lucide-react'
+import { CloudDownload, Search, Loader2, RotateCcw, Trash2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { DataPageContent } from '@/components/layout/data-page-layout'
@@ -33,6 +33,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DataTableViewOptions } from '@/components/data-table/view-options'
 import { SimplePagination } from '@/components/data-table'
@@ -40,19 +50,20 @@ import {
   useRecords,
   useFilterOptions,
   useSyncData,
+  useDeleteRecords,
   proxyRecord,
   useUserPreference,
   useSaveUserPreference,
   type TablePreference,
 } from './api'
+import { useAuthStore } from '@/stores/auth-store'
 import {
   getColumns,
   columnNames,
   defaultColumnOrder,
   defaultColumnVisibility,
 } from './components/data-table-columns'
-import type { RecordsParams, CallRecord } from './types'
-import { callTypeMap, callResultMap } from './types'
+import { callTypeMap, callResultMap, type RecordsParams, type CallRecord } from './types'
 
 // Memo 化的表格行组件，避免不必要的重新渲染
 const MemoizedTableRow = memo(function TableRow({
@@ -103,7 +114,11 @@ export function DataAnalysis() {
   // UI 状态
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [showAudioModal, setShowAudioModal] = useState(false)
-  const [audioLoading, setAudioLoading] = useState(false)
+  const [_audioLoading, setAudioLoading] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // 权限检查
+  const isAdmin = useAuthStore((state) => state.auth.isAdmin())
 
   // 表格状态
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -126,6 +141,7 @@ export function DataAnalysis() {
   } = useRecords(filters)
   const { data: filterOptions } = useFilterOptions()
   const syncMutation = useSyncData()
+  const deleteMutation = useDeleteRecords()
 
   // 用户偏好
   const { data: savedPreference, isLoading: preferenceLoading } =
@@ -306,6 +322,21 @@ export function DataAnalysis() {
     }
   }
 
+  // 删除选中的记录
+  const handleDelete = async () => {
+    const selectedIds = Object.keys(rowSelection).map(Number)
+    if (selectedIds.length === 0) return
+
+    try {
+      const result = await deleteMutation.mutateAsync(selectedIds)
+      toast.success(`成功删除 ${result.deleted_count} 条记录`)
+      setRowSelection({})
+      setShowDeleteDialog(false)
+    } catch {
+      toast.error('删除失败')
+    }
+  }
+
   return (
     <>
       <Header fixed>
@@ -406,9 +437,26 @@ export function DataAnalysis() {
               <div className='flex-1' />
               <div className='flex items-center gap-2'>
                 {selectedRowCount > 0 && (
-                  <span className='text-muted-foreground text-sm'>
-                    已选择 {selectedRowCount} 行
-                  </span>
+                  <>
+                    <span className='text-muted-foreground text-sm'>
+                      已选择 {selectedRowCount} 行
+                    </span>
+                    {isAdmin && (
+                      <Button
+                        variant='destructive'
+                        size='sm'
+                        onClick={() => setShowDeleteDialog(true)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        {deleteMutation.isPending ? (
+                          <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                        ) : (
+                          <Trash2 className='mr-2 h-4 w-4' />
+                        )}
+                        删除
+                      </Button>
+                    )}
+                  </>
                 )}
                 <DataTableViewOptions table={table} columnNames={columnNames} />
               </div>
@@ -509,6 +557,33 @@ export function DataAnalysis() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 删除确认对话框 */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除选中的 {selectedRowCount} 条记录吗？此操作无法撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : null}
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

@@ -6,7 +6,7 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from loguru import logger
 from sqlmodel import Session
 
@@ -20,6 +20,7 @@ from app.models.call_record import CallRecordResponse, CallRecordStats
 from app.schemas.response import ResponseModel
 from app.services import ai_analysis_service as ai_svc
 from app.services import data_sync_service as sync_svc
+from app.utils.jwt_auth import TokenPayload, require_admin
 
 router = APIRouter(prefix="/analysis", tags=["数据分析"])
 
@@ -121,6 +122,41 @@ async def get_records_stats(
     )
 
     return ResponseModel(data=CallRecordStats(**stats))
+
+
+@router.delete("/records", response_model=ResponseModel)
+async def delete_records(
+    record_ids: list[int] = Body(..., embed=True, description="要删除的记录ID列表"),
+    session: Session = Depends(get_session),
+    current_user: TokenPayload = Depends(require_admin),
+) -> ResponseModel:
+    """批量删除通话记录
+
+    仅超级管理员可以执行此操作。
+
+    Args:
+        record_ids: 要删除的记录ID列表
+
+    Returns:
+        ResponseModel: 删除结果
+    """
+    if not record_ids:
+        raise HTTPException(status_code=400, detail="请选择要删除的记录")
+
+    if len(record_ids) > 1000:
+        raise HTTPException(status_code=400, detail="单次最多删除1000条记录")
+
+    deleted_count = sync_svc.delete_call_records(session, record_ids)
+
+    logger.info(
+        f"用户 {current_user.email} 删除了 {deleted_count} 条通话记录, "
+        f"请求ID列表: {record_ids[:10]}{'...' if len(record_ids) > 10 else ''}"
+    )
+
+    return ResponseModel(
+        message=f"成功删除 {deleted_count} 条记录",
+        data={"deleted_count": deleted_count},
+    )
 
 
 # ============ 数据同步接口 ============

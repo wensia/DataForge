@@ -124,6 +124,25 @@ export function useSyncData() {
   })
 }
 
+// 批量删除通话记录 (仅管理员)
+export function useDeleteRecords() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (recordIds: number[]) => {
+      const response = await apiClient.delete<
+        ApiResponse<{ deleted_count: number }>
+      >('/analysis/records', {
+        data: { record_ids: recordIds },
+      })
+      return response.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: analysisKeys.records() })
+      queryClient.invalidateQueries({ queryKey: analysisKeys.stats() })
+    },
+  })
+}
+
 // 生成数据摘要
 export function useGenerateSummary() {
   const queryClient = useQueryClient()

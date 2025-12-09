@@ -436,6 +436,36 @@ def get_call_record_stats(
     }
 
 
+def delete_call_records(session: Session, record_ids: list[int]) -> int:
+    """批量删除通话记录
+
+    Args:
+        session: 数据库会话
+        record_ids: 要删除的记录 ID 列表
+
+    Returns:
+        int: 实际删除的记录数
+    """
+    if not record_ids:
+        return 0
+
+    # 查询要删除的记录
+    records = session.exec(
+        select(CallRecord).where(CallRecord.id.in_(record_ids))
+    ).all()
+
+    deleted_count = len(records)
+
+    # 删除记录
+    for record in records:
+        session.delete(record)
+
+    session.commit()
+    logger.info(f"删除了 {deleted_count} 条通话记录")
+
+    return deleted_count
+
+
 # ============ 云客数据同步 ============
 
 

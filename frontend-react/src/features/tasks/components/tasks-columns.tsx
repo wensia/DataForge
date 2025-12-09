@@ -3,7 +3,6 @@ import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader, TruncatedCell, createSelectColumn } from '@/components/data-table'
 import { statuses, taskTypes, categories } from '../data/data'
 import { type Task } from '../data/schema'
-import { DataTableRowActions } from './data-table-row-actions'
 
 /** 格式化时间 */
 function formatDateTime(dateStr: string | null): string {
@@ -199,9 +198,5 @@ export const tasksColumns: ColumnDef<Task>[] = [
         <div className='text-sm'>{formatDateTime(row.getValue('next_run_at'))}</div>
       )
     },
-  },
-  {
-    id: 'actions',
-    cell: ({ row }) => <DataTableRowActions row={row} />,
   },
 ]
