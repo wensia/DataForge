@@ -6,6 +6,7 @@
 
 import json
 import logging
+import traceback
 from typing import Any
 
 from sqlmodel import Session, select
@@ -219,8 +220,14 @@ class ASRService:
             segments = await asr_client.transcribe(audio_url)
             task_log(f"  - ASR 返回 {len(segments)} 个语音片段")
         except Exception as e:
-            task_log(f"  - [ERROR] ASR 转写异常: {e}")
-            logger.error(f"ASR 转写失败: {e}")
+            # 获取完整的异常信息，包括类型和 traceback
+            error_type = type(e).__name__
+            error_msg = str(e) or "(无错误消息)"
+            tb_lines = traceback.format_exc().split("\n")[-5:-1]  # 取最后几行
+            tb_short = " | ".join(line.strip() for line in tb_lines if line.strip())
+            task_log(f"  - [ERROR] ASR 转写异常: [{error_type}] {error_msg}")
+            task_log(f"  - [ERROR] 调用栈: {tb_short}")
+            logger.error(f"ASR 转写失败: [{error_type}] {error_msg}\n{traceback.format_exc()}")
             return None
 
         # 4. 检查结果
