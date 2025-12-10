@@ -109,8 +109,8 @@ def task_log(*args: Any, print_console: bool | None = None) -> None:
                     except asyncio.QueueFull:
                         pass  # 队列满则跳过
 
-        # 实时保存到数据库（确保日志不会因为没有订阅者而丢失）
-        _persist_log_to_db(exec_id, log_line)
+        # 【已移除】实时保存到数据库 - 改为任务结束时批量写入
+        # _persist_log_to_db(exec_id, log_line)
 
     # 控制台输出
     should_print = print_console if print_console is not None else settings.debug
@@ -124,6 +124,36 @@ def get_execution_id() -> int | None:
         return _execution_id.get()
     except LookupError:
         return None
+
+
+def flush_logs_to_db(execution_id: int | None = None) -> None:
+    """
+    批量将缓冲区日志写入数据库
+
+    Args:
+        execution_id: 指定执行ID，None 则使用当前上下文
+    """
+    from app.models.task_execution import TaskExecution
+
+    exec_id = execution_id or get_execution_id()
+    if not exec_id:
+        return
+
+    # 获取当前缓冲区内容
+    log_content = get_log_output()
+    if not log_content:
+        return
+
+    with _db_write_lock:
+        try:
+            with Session(engine) as session:
+                execution = session.get(TaskExecution, exec_id)
+                if execution:
+                    execution.log_output = log_content
+                    session.add(execution)
+                    session.commit()
+        except Exception as e:
+            logger.warning(f"批量保存日志失败: {e}")
 
 
 def get_log_output() -> str:
@@ -144,6 +174,11 @@ def init_log_context(execution_id: int) -> None:
 def clear_log_context() -> None:
     """清空日志上下文（由执行器调用）"""
     exec_id = get_execution_id()
+
+    # 任务结束时，批量将日志写入数据库
+    if exec_id:
+        flush_logs_to_db(exec_id)
+
     # 通知所有订阅者任务已结束（线程安全）
     if exec_id:
         with _subscribers_lock:
