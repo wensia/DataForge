@@ -250,14 +250,19 @@ PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -t
 -- 总记录数和有转写的记录数
 SELECT
     COUNT(*) as 总记录数,
-    COUNT(transcript) as 有转写记录数
+    COUNT(transcript) as 有转写记录数,
+    ROUND(COUNT(transcript) * 100.0 / COUNT(*), 1) as 转写覆盖率
 FROM call_records;
 
--- 有转写记录的员工
-SELECT staff_name, COUNT(*) as 数量
+-- 员工通话统计（基于全部通话）
+SELECT
+    staff_name,
+    COUNT(*) as 总通话数,
+    COUNT(transcript) as 有转写数,
+    SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数
 FROM call_records
-WHERE transcript IS NOT NULL AND staff_name IS NOT NULL
-GROUP BY staff_name ORDER BY 数量 DESC;
+WHERE staff_name IS NOT NULL
+GROUP BY staff_name ORDER BY 总通话数 DESC;
 ```
 
 ---
@@ -272,30 +277,52 @@ GROUP BY staff_name ORDER BY 数量 DESC;
 ```sql
 -- 检查无员工名的通话数量
 SELECT COUNT(*) FROM call_records
-WHERE transcript IS NOT NULL AND staff_name IS NULL;
+WHERE staff_name IS NULL;
 ```
 
-### 问题2：转写内容显示为空
+### 问题2：员工有效率显示为0但实际有长通话
 
-**原因**：transcript 字段可能是空数组 `[]`
+**原因**：之前版本错误地只统计有转写的通话
 
-**解决**：
+**正确做法**：统计应基于全部通话，不依赖 transcript
 ```sql
--- 检查有效转写（非空数组）
-SELECT COUNT(*) FROM call_records
-WHERE transcript IS NOT NULL
-  AND jsonb_array_length(transcript) > 0;
+-- 正确的员工统计（不依赖转写）
+SELECT
+    staff_name,
+    COUNT(*) as 总通话数,
+    SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率
+FROM call_records
+WHERE staff_name = '耿雅恬'
+GROUP BY staff_name;
 ```
 
-### 问题3：时长统计不准确
+### 问题3：区分统计和质量分析
 
-**原因**：混淆了"全部通话"和"有转写通话"的统计范围
+**核心原则**：
+- **统计数据**（通话数、时长、有效率）→ 基于**全部通话**
+- **质量分析**（评分、话术分析）→ 基于**有转写的通话**
 
-**解决**：始终明确统计范围，在报告中注明"统计范围：X 条有转写的通话记录"
+在报告中明确标注数据来源范围
 
 ---
 
 ## 使用说明
+
+### 核心原则（重要）
+
+> **统计数据基于全部通话，质量分析基于有转写的通话**
+
+| 数据类型 | 是否依赖 transcript | 说明 |
+|:---------|:-------------------:|:-----|
+| 通话数量 | ❌ 否 | 统计全部通话 |
+| 通话时长 | ❌ 否 | 统计全部通话 |
+| 有效率 | ❌ 否 | 超1分钟数/总数 |
+| 员工排名 | ❌ 否 | 基于全部通话 |
+| 话术分析 | ✅ 是 | 需要转写内容 |
+| 质量评分 | ✅ 是 | 需要转写内容 |
+
+### 其他说明
 
 1. 所有查询都是只读的（SELECT），不会修改数据
 2. 转写格式：`[{start_time, end_time, speaker: 'staff'|'customer', text}]`
@@ -303,6 +330,7 @@ WHERE transcript IS NOT NULL
 4. 单次分析建议不超过 10 条完整通话
 5. 评分时需引用原文作为依据
 6. **生成报告前必须执行数据校验步骤**
+7. **员工统计查询不应包含 `transcript IS NOT NULL` 条件**
 
 ---
 

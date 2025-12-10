@@ -34,15 +34,16 @@ FROM call_records
 GROUP BY source;
 ```
 
-### 3. 有转写记录的员工统计
+### 3. 员工通话统计（基于全部通话）
 ```sql
 SELECT
     staff_name as 员工,
     COUNT(*) as 通话数,
     SUM(duration) as 总时长秒,
-    ROUND(AVG(duration)) as 平均时长秒
+    ROUND(AVG(duration)) as 平均时长秒,
+    COUNT(transcript) as 有转写数
 FROM call_records
-WHERE transcript IS NOT NULL AND staff_name IS NOT NULL
+WHERE staff_name IS NOT NULL
 GROUP BY staff_name
 ORDER BY 通话数 DESC;
 ```
@@ -279,8 +280,11 @@ ORDER BY 日期;
 
 ## 五、质量分析辅助查询
 
-### 1. 查找长通话（可能是优质案例）
+> **说明**：质量分析需要读取转写内容，因此这些查询保留 `transcript IS NOT NULL` 条件
+
+### 1. 查找长通话用于质量分析（需要转写）
 ```sql
+-- 找有转写的长通话进行质量分析
 SELECT
     id,
     staff_name,
@@ -294,42 +298,35 @@ ORDER BY duration DESC
 LIMIT 10;
 ```
 
-### 2. 查找短通话（可能需要改进）
+### 2. 查找所有长通话（统计用，不依赖转写）
 ```sql
+-- 统计所有长通话，不限制转写
 SELECT
     id,
     staff_name,
     call_time,
     duration,
-    call_result
+    call_result,
+    CASE WHEN transcript IS NOT NULL THEN '有' ELSE '无' END as 有转写
 FROM call_records
-WHERE transcript IS NOT NULL
-  AND duration < 60  -- 不足1分钟
-ORDER BY duration ASC
+WHERE duration > 300  -- 超过5分钟
+ORDER BY duration DESC
 LIMIT 10;
 ```
 
-### 3. 按通话结果筛选
+### 3. 按通话结果筛选（统计用）
 ```sql
--- 接通的通话
-SELECT id, staff_name, call_time, duration, transcript
+-- 接通的通话（不依赖转写）
+SELECT id, staff_name, call_time, duration
 FROM call_records
-WHERE transcript IS NOT NULL
-  AND call_result LIKE '%接通%'
-ORDER BY call_time DESC
-LIMIT 10;
-
--- 未接通的通话
-SELECT id, staff_name, call_time, duration, transcript
-FROM call_records
-WHERE transcript IS NOT NULL
-  AND call_result LIKE '%未接通%'
+WHERE call_result = '2'  -- 或其他表示接通的值
 ORDER BY call_time DESC
 LIMIT 10;
 ```
 
-### 4. 随机抽样分析
+### 4. 随机抽样分析（需要转写）
 ```sql
+-- 随机抽取有转写的通话进行质量分析
 SELECT
     id,
     staff_name,
@@ -347,7 +344,7 @@ LIMIT 5;
 
 ## 六、批量导出查询
 
-### 1. 导出员工通话列表（不含转写内容）
+### 1. 导出员工通话列表（全部通话）
 ```sql
 SELECT
     id,
@@ -356,14 +353,14 @@ SELECT
     duration,
     call_type,
     call_result,
-    customer_name
+    customer_name,
+    CASE WHEN transcript IS NOT NULL THEN '有' ELSE '无' END as 有转写
 FROM call_records
 WHERE staff_name = '{STAFF_NAME}'
-  AND transcript IS NOT NULL
 ORDER BY call_time DESC;
 ```
 
-### 2. 导出指定日期的通话
+### 2. 导出指定日期的通话（全部通话）
 ```sql
 SELECT
     id,
@@ -371,10 +368,10 @@ SELECT
     department,
     call_time,
     duration,
-    call_result
+    call_result,
+    CASE WHEN transcript IS NOT NULL THEN '有' ELSE '无' END as 有转写
 FROM call_records
 WHERE DATE(call_time) = '{DATE}'
-  AND transcript IS NOT NULL
 ORDER BY call_time;
 ```
 
@@ -504,30 +501,39 @@ if len(data) > 50:
 
 ## 八、问题排查查询
 
-### 1. 检查无员工名的通话
+### 1. 检查无员工名的通话（全部通话）
 
 ```sql
 SELECT COUNT(*) as 无员工名通话数
 FROM call_records
-WHERE transcript IS NOT NULL AND staff_name IS NULL;
+WHERE staff_name IS NULL;
 ```
 
-### 2. 检查空转写数组
+### 2. 检查转写覆盖情况
 
 ```sql
-SELECT COUNT(*) as 空转写数
+-- 统计有无转写的通话数量
+SELECT
+    CASE WHEN transcript IS NOT NULL THEN '有转写' ELSE '无转写' END as 类型,
+    COUNT(*) as 数量,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
 FROM call_records
-WHERE transcript IS NOT NULL
-  AND jsonb_array_length(transcript) = 0;
+GROUP BY 1;
 ```
 
-### 3. 检查有效转写数量
+### 3. 检查员工转写覆盖率
 
 ```sql
-SELECT COUNT(*) as 有效转写数
+-- 按员工统计转写覆盖率（排查数据偏差）
+SELECT
+    staff_name as 员工,
+    COUNT(*) as 总通话数,
+    COUNT(transcript) as 有转写数,
+    ROUND(COUNT(transcript) * 100.0 / COUNT(*), 1) as 转写率
 FROM call_records
-WHERE transcript IS NOT NULL
-  AND jsonb_array_length(transcript) > 0;
+WHERE staff_name IS NOT NULL
+GROUP BY staff_name
+ORDER BY 总通话数 DESC;
 ```
 
 ---
