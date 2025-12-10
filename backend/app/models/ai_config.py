@@ -67,7 +67,7 @@ class AIConfigResponse(SQLModel):
     id: int
     provider: str
     name: str
-    api_key: str
+    api_key_masked: str  # 脱敏后的 API 密钥
     base_url: str
     default_model: str | None
     is_active: bool
@@ -75,13 +75,20 @@ class AIConfigResponse(SQLModel):
     created_at: str
     updated_at: str
 
+    @staticmethod
+    def mask_api_key(api_key: str) -> str:
+        """脱敏 API 密钥，只显示前 8 位和后 4 位"""
+        if not api_key or len(api_key) <= 12:
+            return api_key[:4] + "****" if api_key else ""
+        return api_key[:8] + "****" + api_key[-4:]
+
     @classmethod
     def from_model(cls, config: AIConfig) -> "AIConfigResponse":
         return cls(
             id=config.id,
             provider=config.provider,
             name=config.name,
-            api_key=config.api_key,
+            api_key_masked=cls.mask_api_key(config.api_key),
             base_url=config.base_url,
             default_model=config.default_model,
             is_active=config.is_active,

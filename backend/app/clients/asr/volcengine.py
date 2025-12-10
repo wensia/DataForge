@@ -6,6 +6,7 @@
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 from typing import Any
@@ -15,6 +16,21 @@ import httpx
 from app.clients.asr.base import ASRClient, TranscriptSegment
 
 logger = logging.getLogger(__name__)
+
+# 全局请求限流器（每秒最多 N 个请求）
+_request_semaphore: asyncio.Semaphore | None = None
+_last_request_time: float = 0
+_MIN_REQUEST_INTERVAL = 0.5  # 最小请求间隔（秒）
+
+
+async def _rate_limited_request():
+    """请求前的限流等待"""
+    global _last_request_time
+    now = time.time()
+    elapsed = now - _last_request_time
+    if elapsed < _MIN_REQUEST_INTERVAL:
+        await asyncio.sleep(_MIN_REQUEST_INTERVAL - elapsed)
+    _last_request_time = time.time()
 
 
 class VolcengineASRClient(ASRClient):
@@ -81,12 +97,13 @@ class VolcengineASRClient(ASRClient):
             return "raw"
         return "mp3"  # 默认 mp3
 
-    async def submit_task(self, audio_url: str) -> str:
+    async def submit_task(self, audio_url: str, max_retries: int = 3) -> str:
         """
-        提交录音文件识别任务
+        提交录音文件识别任务（带重试和限流）
 
         Args:
             audio_url: 音频文件 URL
+            max_retries: 最大重试次数
 
         Returns:
             str: 请求 ID（用于查询结果）
@@ -111,64 +128,115 @@ class VolcengineASRClient(ASRClient):
             },
         }
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.SUBMIT_URL,
-                json=payload,
-                headers=self._build_headers(request_id),
-                timeout=30.0,
-            )
-            response.raise_for_status()
+        for attempt in range(max_retries + 1):
+            try:
+                # 请求前限流
+                await _rate_limited_request()
 
-            # 保存 logid 用于查询
-            self._last_logid = response.headers.get("X-Tt-Logid")
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self.SUBMIT_URL,
+                        json=payload,
+                        headers=self._build_headers(request_id),
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
 
-            # v3 API: 状态码在 response headers 中
-            status_code = response.headers.get("X-Api-Status-Code", "")
-            message = response.headers.get("X-Api-Message", "")
+                    # 保存 logid 用于查询
+                    self._last_logid = response.headers.get("X-Tt-Logid")
 
-            logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
+                    # v3 API: 状态码在 response headers 中
+                    status_code = response.headers.get("X-Api-Status-Code", "")
+                    message = response.headers.get("X-Api-Message", "")
 
-            if status_code != self.CODE_SUCCESS:
-                raise RuntimeError(f"火山引擎提交任务失败: {status_code} - {message}")
+                    logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
 
-            logger.info(f"火山引擎 ASR 任务已提交: {request_id}")
-            return request_id
+                    if status_code != self.CODE_SUCCESS:
+                        raise RuntimeError(
+                            f"火山引擎提交任务失败: {status_code} - {message}"
+                        )
 
-    async def query_task(self, request_id: str) -> tuple[str, dict[str, Any]]:
+                    logger.info(f"火山引擎 ASR 任务已提交: {request_id}")
+                    return request_id
+
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    # 429 Too Many Requests - 指数退避重试
+                    if attempt < max_retries:
+                        wait_time = (2**attempt) + random.uniform(0, 1)
+                        logger.warning(
+                            f"火山引擎提交 429 限流，{wait_time:.1f}秒后重试 "
+                            f"({attempt + 1}/{max_retries})"
+                        )
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"火山引擎提交429限流，重试{max_retries}次仍失败")
+                raise
+
+        # 不应该到达这里
+        raise RuntimeError("提交任务意外退出")
+
+    async def query_task(
+        self, request_id: str, max_retries: int = 3
+    ) -> tuple[str, dict[str, Any]]:
         """
-        查询任务结果
+        查询任务结果（带重试和限流）
 
         Args:
             request_id: 请求 ID
+            max_retries: 最大重试次数
 
         Returns:
             tuple[str, dict]: (状态码, 响应 body)
         """
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.QUERY_URL,
-                json={},  # v3 API 查询时请求体为空
-                headers=self._build_headers(request_id),
-                timeout=30.0,
-            )
-            response.raise_for_status()
+        for attempt in range(max_retries + 1):
+            try:
+                # 请求前限流
+                await _rate_limited_request()
 
-            # 更新 logid
-            if response.headers.get("X-Tt-Logid"):
-                self._last_logid = response.headers.get("X-Tt-Logid")
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self.QUERY_URL,
+                        json={},  # v3 API 查询时请求体为空
+                        headers=self._build_headers(request_id),
+                        timeout=30.0,
+                    )
+                    response.raise_for_status()
 
-            # v3 API: 状态码在 response headers 中
-            status_code = response.headers.get("X-Api-Status-Code", "")
-            body = response.json()
+                    # 更新 logid
+                    if response.headers.get("X-Tt-Logid"):
+                        self._last_logid = response.headers.get("X-Tt-Logid")
 
-            logger.debug(f"火山引擎查询: status={status_code}")
-            return status_code, body
+                    # v3 API: 状态码在 response headers 中
+                    status_code = response.headers.get("X-Api-Status-Code", "")
+                    body = response.json()
+
+                    logger.debug(f"火山引擎查询: status={status_code}")
+                    return status_code, body
+
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    # 429 Too Many Requests - 指数退避重试
+                    if attempt < max_retries:
+                        wait_time = (2**attempt) + random.uniform(0, 1)
+                        logger.warning(
+                            f"火山引擎 429 限流，{wait_time:.1f}秒后重试 "
+                            f"({attempt + 1}/{max_retries})"
+                        )
+                        await asyncio.sleep(wait_time)
+                        continue
+                    else:
+                        logger.error(f"火山引擎 429 限流，重试{max_retries}次后仍失败")
+                raise
+
+        # 不应该到达这里
+        raise RuntimeError("查询任务意外退出")
 
     async def wait_for_task(
         self,
         request_id: str,
-        poll_interval: float = 3.0,
+        poll_interval: float = 5.0,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
         """
@@ -176,13 +244,17 @@ class VolcengineASRClient(ASRClient):
 
         Args:
             request_id: 请求 ID
-            poll_interval: 轮询间隔（秒）
+            poll_interval: 轮询间隔（秒），默认 5 秒避免限流
             timeout: 超时时间（秒）
 
         Returns:
             dict: 识别结果
         """
         start_time = time.time()
+
+        # 添加随机初始延迟，避免多个任务同时轮询
+        initial_delay = random.uniform(0, 2.0)
+        await asyncio.sleep(initial_delay)
 
         while True:
             if time.time() - start_time > timeout:
