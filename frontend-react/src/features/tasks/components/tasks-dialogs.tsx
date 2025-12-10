@@ -31,8 +31,8 @@ export function TasksDialogs() {
     if (!currentRow) return
 
     try {
-      const result = await runTask.mutateAsync(currentRow.id)
-      toast.success(`任务已触发，执行 ID: ${result.execution_id}`)
+      await runTask.mutateAsync(currentRow.id)
+      toast.success('任务已加入执行队列')
       setOpen(null)
       setTimeout(() => {
         setCurrentRow(null)

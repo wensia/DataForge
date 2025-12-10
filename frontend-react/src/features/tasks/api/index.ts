@@ -206,7 +206,7 @@ export function useRunTask() {
   return useMutation({
     mutationFn: async (id: number) => {
       const response = await apiClient.post<
-        ApiResponse<{ execution_id: number }>
+        ApiResponse<{ task_id: number; message: string }>
       >(`/tasks/${id}/run`)
       return response.data.data
     },
