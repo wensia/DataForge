@@ -2,7 +2,9 @@
  * 录音详情弹窗组件
  *
  * 展示录音播放器和转写文本
+ * 支持音频播放进度同步高亮转写文本
  */
+import { useState, useRef } from 'react'
 import { Loader2, Volume2, FileText, Clock, User, Phone } from 'lucide-react'
 import {
   Dialog,
@@ -34,6 +36,17 @@ export function RecordDetailModal({
   audioUrl,
   audioLoading,
 }: RecordDetailModalProps) {
+  // 音频播放时间追踪
+  const [currentTime, setCurrentTime] = useState(0)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  // 处理音频时间更新
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime)
+    }
+  }
+
   if (!record) return null
 
   const hasTranscript = !!record.transcript
@@ -81,7 +94,14 @@ export function RecordDetailModal({
               </span>
             </div>
           ) : audioUrl ? (
-            <audio src={audioUrl} controls autoPlay={false} className='w-full' />
+            <audio
+              ref={audioRef}
+              src={audioUrl}
+              controls
+              autoPlay={false}
+              onTimeUpdate={handleTimeUpdate}
+              className='w-full'
+            />
           ) : (
             <div className='text-muted-foreground py-2 text-center text-sm'>
               无法加载录音
@@ -102,7 +122,10 @@ export function RecordDetailModal({
           </div>
           <div className='min-h-0 flex-1 overflow-y-auto rounded-lg border'>
             {hasTranscript ? (
-              <TranscriptViewer transcript={record.transcript!} />
+              <TranscriptViewer
+                transcript={record.transcript!}
+                currentTime={currentTime}
+              />
             ) : (
               <div className='text-muted-foreground flex h-32 items-center justify-center text-sm'>
                 暂无转写内容

@@ -345,26 +345,12 @@ export function DataAnalysis() {
         <div className='flex items-center gap-4'>
           <h1 className='text-xl font-semibold'>数据浏览</h1>
         </div>
-        <div className='flex items-center gap-2'>
-          {isSaving && (
-            <span className='text-muted-foreground text-xs flex items-center gap-1'>
-              <Loader2 className='h-3 w-3 animate-spin' />
-              保存中...
-            </span>
-          )}
-          <Button
-            variant='outline'
-            onClick={() => refetchRecords()}
-            disabled={recordsFetching}
-          >
-            {recordsFetching ? (
-              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-            ) : (
-              <RotateCcw className='mr-2 h-4 w-4' />
-            )}
-            刷新
-          </Button>
-        </div>
+        {isSaving && (
+          <span className='text-muted-foreground text-xs flex items-center gap-1'>
+            <Loader2 className='h-3 w-3 animate-spin' />
+            保存中...
+          </span>
+        )}
       </Header>
 
       <Main fixed className='min-h-0'>
@@ -480,15 +466,20 @@ export function DataAnalysis() {
                   </>
                 )}
                 <div className='flex-1' />
-                <DataTableViewOptions table={table} columnNames={columnNames} />
                 <Button
-                  variant='ghost'
+                  variant='outline'
                   size='sm'
-                  onClick={handleResetPreferences}
-                  title='重置为默认设置'
+                  onClick={() => refetchRecords()}
+                  disabled={recordsFetching}
+                  title='刷新数据'
                 >
-                  <RotateCcw className='h-4 w-4' />
+                  {recordsFetching ? (
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                  ) : (
+                    <RotateCcw className='h-4 w-4' />
+                  )}
                 </Button>
+                <DataTableViewOptions table={table} columnNames={columnNames} />
               </div>
             </div>
           }

@@ -5,7 +5,9 @@
  * 展示样式：聊天框式
  * - 客户消息：靠左显示（蓝色气泡）
  * - 员工消息：靠右显示（灰色气泡）
+ * - 支持根据音频播放进度高亮当前片段并自动滚动
  */
+import { useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { TranscriptSegment } from '../types'
 
@@ -37,12 +39,37 @@ function getSpeakerName(speaker: string): string {
 
 interface TranscriptViewerProps {
   transcript: TranscriptSegment[]
+  currentTime?: number // 当前音频播放时间（秒）
 }
 
 /**
  * 转写文本查看组件
  */
-export function TranscriptViewer({ transcript }: TranscriptViewerProps) {
+export function TranscriptViewer({
+  transcript,
+  currentTime = 0,
+}: TranscriptViewerProps) {
+  // 存储每个片段的 DOM 引用
+  const segmentRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  // 计算当前活动片段索引
+  const activeIndex = useMemo(() => {
+    if (!currentTime || currentTime === 0) return -1
+    return transcript.findIndex(
+      (seg) => currentTime >= seg.start_time && currentTime < seg.end_time
+    )
+  }, [transcript, currentTime])
+
+  // 当活动片段改变时，自动滚动到该片段
+  useEffect(() => {
+    if (activeIndex >= 0 && segmentRefs.current[activeIndex]) {
+      segmentRefs.current[activeIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    }
+  }, [activeIndex])
+
   if (!transcript || transcript.length === 0) {
     return (
       <div className='text-muted-foreground py-8 text-center text-sm'>
@@ -58,21 +85,27 @@ export function TranscriptViewer({ transcript }: TranscriptViewerProps) {
         const startTime = formatTime(seg.start_time)
         const endTime = formatTime(seg.end_time)
         const duration = (seg.end_time - seg.start_time).toFixed(1)
+        const isActive = index === activeIndex
 
         return (
           <div
             key={index}
+            ref={(el) => {
+              segmentRefs.current[index] = el
+            }}
             className={cn(
-              'flex',
+              'flex transition-all duration-300',
               isCustomer ? 'justify-start' : 'justify-end'
             )}
           >
             <div
               className={cn(
-                'flex max-w-[80%] flex-col gap-1 rounded-lg px-3 py-2',
+                'flex max-w-[80%] flex-col gap-1 rounded-lg px-3 py-2 transition-all duration-300',
                 isCustomer
                   ? 'bg-blue-50 dark:bg-blue-950'
-                  : 'bg-gray-100 dark:bg-gray-800'
+                  : 'bg-gray-100 dark:bg-gray-800',
+                isActive &&
+                  'scale-[1.02] shadow-lg shadow-primary/20 ring-1 ring-primary/50'
               )}
             >
               {/* 说话人和时间信息 */}
