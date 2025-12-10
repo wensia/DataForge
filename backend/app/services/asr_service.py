@@ -97,7 +97,7 @@ class ASRService:
             return VolcengineASRClient(
                 app_id=credentials.get("app_id", ""),
                 access_token=credentials.get("access_token", ""),
-                cluster=credentials.get("cluster", "volc_auc_common"),
+                cluster=credentials.get("cluster", "volc.bigasr.auc"),
             )
         else:
             raise ValueError(f"不支持的 ASR 提供商: {provider}")

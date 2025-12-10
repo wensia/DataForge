@@ -323,7 +323,7 @@ async def verify_asr_credentials(provider: str, credentials: dict) -> dict:
         return await verify_volcengine(
             app_id=credentials.get("app_id", ""),
             access_token=credentials.get("access_token", ""),
-            cluster=credentials.get("cluster", "volc.bigasr.sauc.duration"),
+            cluster=credentials.get("cluster", "volc.bigasr.auc"),
         )
     else:
         return {

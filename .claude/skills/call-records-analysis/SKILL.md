@@ -142,9 +142,49 @@ if len(data) > 50:
 "
 ```
 
-### 步骤7：生成报告文件
+### 步骤7：生成并保存报告文件（必须执行）
 
-报告保存路径：`reports/weekly-call-quality-report-{日期}.md`
+**报告必须保存为 Markdown 文件**，路径规范：
+
+```
+reports/weekly-call-quality-report-{YYYY-MM-DD}.md
+```
+
+示例：`reports/weekly-call-quality-report-2025-12-10.md`
+
+---
+
+## 报告保存规范（重要）
+
+### 必须保存报告的场景
+
+1. **周报分析**：用户询问"这周通话质量如何"等
+2. **员工分析**：用户要求分析某员工或全员表现
+3. **质量评估**：任何涉及评分、质量分析的请求
+
+### 报告文件命名规则
+
+| 报告类型 | 文件名格式 | 示例 |
+|:---------|:-----------|:-----|
+| 周报 | `weekly-call-quality-report-{日期}.md` | `weekly-call-quality-report-2025-12-10.md` |
+| 员工分析 | `staff-analysis-{员工名}-{日期}.md` | `staff-analysis-王莹旗-2025-12-10.md` |
+| 单条通话 | `call-analysis-{ID}-{日期}.md` | `call-analysis-253414-2025-12-10.md` |
+
+### 报告保存位置
+
+统一保存到项目根目录的 `reports/` 文件夹：
+
+```
+/Users/panyuhang/我的项目/编程/网站/DataForge/reports/
+```
+
+### 报告完成后必须告知用户
+
+分析完成后，必须输出：
+
+```
+📄 报告已保存至：reports/weekly-call-quality-report-2025-12-10.md
+```
 
 ---
 

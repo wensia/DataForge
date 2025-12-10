@@ -1,12 +1,11 @@
 """火山引擎 ASR 客户端
 
-使用火山引擎录音文件识别 API 进行语音转文字。
+使用火山引擎录音文件识别标准版 v3 API 进行语音转文字。
 文档: https://www.volcengine.com/docs/6561/1354868
 """
 
 import asyncio
 import logging
-import re
 import time
 import uuid
 from typing import Any
@@ -21,72 +20,81 @@ logger = logging.getLogger(__name__)
 class VolcengineASRClient(ASRClient):
     """火山引擎 ASR 客户端
 
-    使用录音文件识别 API（提交任务 + 轮询结果）
-    支持说话人分离，返回带时间戳的转写结果。
+    使用录音文件识别标准版 v3 API（提交任务 + 轮询结果）
+    支持双声道分离，返回带时间戳的转写结果。
     """
 
-    # API 地址
+    # API 地址 (v3 版本)
     API_HOST = "openspeech.bytedance.com"
-    SUBMIT_URL = f"https://{API_HOST}/api/v1/auc/submit"
-    QUERY_URL = f"https://{API_HOST}/api/v1/auc/query"
+    SUBMIT_URL = f"https://{API_HOST}/api/v3/auc/bigmodel/submit"
+    QUERY_URL = f"https://{API_HOST}/api/v3/auc/bigmodel/query"
+
+    # 状态码
+    CODE_SUCCESS = 20000000
+    CODE_PROCESSING = 20000001
 
     def __init__(
         self,
         app_id: str,
         access_token: str,
-        cluster: str = "volc_auc_common",
+        cluster: str = "volc.bigasr.auc",
     ):
         """
         初始化火山引擎 ASR 客户端
 
         Args:
-            app_id: 火山引擎 App ID
-            access_token: 火山引擎 Access Token
-            cluster: 集群配置，默认 volc_auc_common
+            app_id: 火山引擎 App ID (X-Api-App-Key)
+            access_token: 火山引擎 Access Token (X-Api-Access-Key)
+            cluster: 资源 ID (X-Api-Resource-Id)，默认 volc.bigasr.auc
         """
         self.app_id = app_id
         self.access_token = access_token
         self.cluster = cluster
 
-    def _build_headers(self) -> dict[str, str]:
+    def _build_headers(self, request_id: str | None = None) -> dict[str, str]:
         """构建请求头"""
         return {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer; {self.access_token}",
+            "X-Api-App-Key": self.app_id,
+            "X-Api-Access-Key": self.access_token,
+            "X-Api-Resource-Id": self.cluster,
+            "X-Api-Request-Id": request_id or str(uuid.uuid4()),
         }
 
-    async def submit_task(
-        self,
-        audio_url: str,
-        enable_diarization: bool = True,
-    ) -> str:
+    def _detect_audio_format(self, audio_url: str) -> str:
+        """从 URL 检测音频格式"""
+        url_lower = audio_url.lower()
+        if ".wav" in url_lower:
+            return "wav"
+        elif ".ogg" in url_lower:
+            return "ogg"
+        elif ".pcm" in url_lower or ".raw" in url_lower:
+            return "raw"
+        return "mp3"  # 默认 mp3
+
+    async def submit_task(self, audio_url: str) -> str:
         """
         提交录音文件识别任务
 
         Args:
             audio_url: 音频文件 URL
-            enable_diarization: 是否启用说话人分离
 
         Returns:
-            str: 任务 ID
+            str: 请求 ID（用于查询结果）
         """
-        task_id = str(uuid.uuid4())
+        request_id = str(uuid.uuid4())
 
         payload = {
-            "app": {
-                "appid": self.app_id,
-                "cluster": self.cluster,
-            },
-            "user": {
-                "uid": "dataforge-user",
-            },
+            "user": {"uid": "dataforge-user"},
             "audio": {
+                "format": self._detect_audio_format(audio_url),
                 "url": audio_url,
-                "format": "mp3",  # 自动检测，这里填默认值
             },
-            "additions": {
-                "use_itn": "True",  # 智能数字转换
-                "with_speaker_info": "True" if enable_diarization else "False",
+            "request": {
+                "model_name": "bigmodel",
+                "enable_itn": True,  # 数字规范化
+                "enable_punc": True,  # 标点符号
+                "enable_channel_split": True,  # 双声道分离
             },
         }
 
@@ -94,45 +102,38 @@ class VolcengineASRClient(ASRClient):
             response = await client.post(
                 self.SUBMIT_URL,
                 json=payload,
-                headers=self._build_headers(),
-                params={"appid": self.app_id},
+                headers=self._build_headers(request_id),
                 timeout=30.0,
             )
             response.raise_for_status()
             result = response.json()
 
-            if result.get("code") != 0:
+            code = result.get("code", 0)
+            if code != self.CODE_SUCCESS:
                 raise RuntimeError(
-                    f"火山引擎 API 错误: {result.get('code')} - {result.get('message')}"
+                    f"火山引擎提交任务失败: {code} - {result.get('message')}"
                 )
 
-            # 获取任务 ID（火山引擎返回的是 resp.id）
-            resp_id = result.get("resp", {}).get("id") or result.get("id") or task_id
-            logger.info(f"火山引擎 ASR 任务已提交: {resp_id}")
-            return resp_id
+            # 返回的 id 或使用请求时的 request_id
+            task_id = result.get("id") or request_id
+            logger.info(f"火山引擎 ASR 任务已提交: {task_id}")
+            return task_id
 
-    async def query_task(self, task_id: str) -> dict[str, Any]:
+    async def query_task(self, request_id: str) -> dict[str, Any]:
         """
         查询任务结果
 
         Args:
-            task_id: 任务 ID
+            request_id: 请求 ID
 
         Returns:
             dict: 任务结果
         """
-        payload = {
-            "appid": self.app_id,
-            "cluster": self.cluster,
-            "id": task_id,
-        }
-
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 self.QUERY_URL,
-                json=payload,
-                headers=self._build_headers(),
-                params={"appid": self.app_id},
+                json={},  # v3 API 查询时请求体为空
+                headers=self._build_headers(request_id),
                 timeout=30.0,
             )
             response.raise_for_status()
@@ -140,7 +141,7 @@ class VolcengineASRClient(ASRClient):
 
     async def wait_for_task(
         self,
-        task_id: str,
+        request_id: str,
         poll_interval: float = 3.0,
         timeout: float = 600.0,
     ) -> dict[str, Any]:
@@ -148,7 +149,7 @@ class VolcengineASRClient(ASRClient):
         等待任务完成
 
         Args:
-            task_id: 任务 ID
+            request_id: 请求 ID
             poll_interval: 轮询间隔（秒）
             timeout: 超时时间（秒）
 
@@ -156,50 +157,25 @@ class VolcengineASRClient(ASRClient):
             dict: 识别结果
         """
         start_time = time.time()
+
         while True:
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"ASR 任务超时: {task_id}")
+                raise TimeoutError(f"ASR 任务超时: {request_id}")
 
-            result = await self.query_task(task_id)
+            result = await self.query_task(request_id)
             code = result.get("code", -1)
 
-            # code: 0=成功, 1000=处理中, 其他=失败
-            if code == 0:
-                logger.info(f"火山引擎 ASR 任务完成: {task_id}")
+            if code == self.CODE_SUCCESS:
+                logger.info(f"火山引擎 ASR 任务完成: {request_id}")
                 return result
-            elif code == 1000:
-                # 任务还在处理中
-                logger.debug(f"ASR 任务处理中: {task_id}")
+            elif code == self.CODE_PROCESSING:
+                logger.debug(f"ASR 任务处理中: {request_id}")
             else:
                 raise RuntimeError(
-                    f"ASR 任务失败: {result.get('code')} - {result.get('message')}"
+                    f"ASR 任务失败: {code} - {result.get('message')}"
                 )
 
             await asyncio.sleep(poll_interval)
-
-    # 匹配文本中的时间戳和声道格式: [分:秒.毫秒,分:秒.毫秒,声道]
-    # 例如: [0:0.700,0:1.650,0] 或 [1:7.740,1:9.110,1]
-    TEXT_PREFIX_PATTERN = re.compile(r"^\[(\d+):(\d+\.?\d*),(\d+):(\d+\.?\d*),(\d+)\]\s*")
-
-    def _parse_text_with_channel(self, raw_text: str) -> tuple[str, str | None]:
-        """
-        解析文本中的声道信息
-
-        火山引擎返回的文本格式可能包含时间戳前缀:
-        [0:0.700,0:1.650,0]  喂，你好。
-
-        Args:
-            raw_text: 原始文本
-
-        Returns:
-            tuple[str, str | None]: (纯净文本, 声道ID)
-        """
-        match = self.TEXT_PREFIX_PATTERN.match(raw_text)
-        if match:
-            channel_id = match.group(5)  # 第5个分组是声道ID
-            clean_text = raw_text[match.end() :].strip()
-            return clean_text, channel_id
-        return raw_text.strip(), None
 
     def _parse_result(
         self,
@@ -211,49 +187,42 @@ class VolcengineASRClient(ASRClient):
 
         Args:
             result: 火山引擎返回的识别结果
-            speaker_labels: 说话人标签映射
+            speaker_labels: 说话人标签映射（可选）
 
         Returns:
             list[TranscriptSegment]: 转写片段列表
         """
         segments = []
         speaker_labels = speaker_labels or {}
-        # 声道映射：0=客户, 1=员工（根据实际录音系统）
-        default_labels = {"0": "customer", "1": "staff"}
 
-        # 获取识别结果
-        resp = result.get("resp", {})
-        utterances = resp.get("utterances", [])
+        # v3 API: 声道映射 1=左声道(客户), 2=右声道(员工)
+        default_labels = {"1": "customer", "2": "staff"}
+
+        # v3 API 结果路径: result.utterances
+        utterances = result.get("result", {}).get("utterances", [])
 
         for utterance in utterances:
-            raw_text = utterance.get("text", "")
-
-            # 尝试从文本中解析声道信息
-            clean_text, text_channel = self._parse_text_with_channel(raw_text)
-
-            # 优先使用文本中的声道，其次使用 utterance 的 speaker 字段
-            if text_channel is not None:
-                speaker_id = text_channel
-            else:
-                speaker_id = str(utterance.get("speaker", 0))
+            # 获取声道 ID（默认 1）
+            channel_id = str(utterance.get("channel_id", 1))
 
             # 映射声道到说话人标签
             speaker = speaker_labels.get(
-                f"channel_{speaker_id}",
-                default_labels.get(speaker_id, "staff"),
+                f"channel_{channel_id}",
+                default_labels.get(channel_id, "customer"),
             )
 
             # 时间戳（毫秒 -> 秒）
             start_time = utterance.get("start_time", 0) / 1000
             end_time = utterance.get("end_time", 0) / 1000
+            text = utterance.get("text", "").strip()
 
-            if clean_text:
+            if text:
                 segments.append(
                     TranscriptSegment(
                         start_time=start_time,
                         end_time=end_time,
                         speaker=speaker,
-                        text=clean_text,
+                        text=text,
                     )
                 )
 
@@ -277,10 +246,10 @@ class VolcengineASRClient(ASRClient):
             list[TranscriptSegment]: 转写结果片段列表
         """
         # 1. 提交任务
-        task_id = await self.submit_task(audio_url, enable_diarization=True)
+        request_id = await self.submit_task(audio_url)
 
         # 2. 等待完成
-        result = await self.wait_for_task(task_id)
+        result = await self.wait_for_task(request_id)
 
         # 3. 解析结果
         return self._parse_result(result, speaker_labels)
