@@ -141,7 +141,9 @@ class VolcengineASRClient(ASRClient):
         for attempt in range(max_retries + 1):
             try:
                 # 请求前限流
+                logger.debug("[volcengine] submit_task 开始限流等待...")
                 await _rate_limited_request()
+                logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
@@ -360,10 +362,15 @@ class VolcengineASRClient(ASRClient):
             list[TranscriptSegment]: 转写结果片段列表
         """
         # 1. 提交任务
+        logger.info("[volcengine] transcribe 开始，提交任务...")
         request_id = await self.submit_task(audio_url)
+        logger.info(f"[volcengine] 任务已提交，request_id={request_id}")
 
         # 2. 等待完成
+        logger.info("[volcengine] 开始等待任务完成...")
         result = await self.wait_for_task(request_id)
+        result_keys = list(result.keys()) if result else "None"
+        logger.info(f"[volcengine] 任务完成，结果 keys: {result_keys}")
 
         # 3. 解析结果
         return self._parse_result(result, speaker_labels)

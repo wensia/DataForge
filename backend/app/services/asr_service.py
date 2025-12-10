@@ -217,7 +217,9 @@ class ASRService:
 
         # 3. 执行转写
         try:
+            task_log("  - [DEBUG] 开始调用 ASR transcribe...")
             segments = await asr_client.transcribe(audio_url)
+            task_log("  - [DEBUG] ASR transcribe 返回")
             task_log(f"  - ASR 返回 {len(segments)} 个语音片段")
         except Exception as e:
             # 获取完整的异常信息，包括类型和 traceback
@@ -227,7 +229,8 @@ class ASRService:
             tb_short = " | ".join(line.strip() for line in tb_lines if line.strip())
             task_log(f"  - [ERROR] ASR 转写异常: [{error_type}] {error_msg}")
             task_log(f"  - [ERROR] 调用栈: {tb_short}")
-            logger.error(f"ASR 转写失败: [{error_type}] {error_msg}\n{traceback.format_exc()}")
+            tb = traceback.format_exc()
+            logger.error(f"ASR 转写失败: [{error_type}] {error_msg}\n{tb}")
             return None
 
         # 4. 检查结果
