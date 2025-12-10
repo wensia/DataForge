@@ -11,8 +11,8 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.clients.asr import (
-    ASRClient,
     AlibabaASRClient,
+    ASRClient,
     TencentASRClient,
     TranscriptSegment,
     VolcengineASRClient,
@@ -47,7 +47,7 @@ class ASRService:
             list[ASRConfig]: 启用的配置列表
         """
         with Session(engine) as session:
-            statement = select(ASRConfig).where(ASRConfig.is_active == True)
+            statement = select(ASRConfig).where(ASRConfig.is_active)
             return list(session.exec(statement).all())
 
     def get_config_options(self) -> list[dict[str, Any]]:

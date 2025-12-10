@@ -171,9 +171,7 @@ class VolcengineASRClient(ASRClient):
             elif code == self.CODE_PROCESSING:
                 logger.debug(f"ASR 任务处理中: {request_id}")
             else:
-                raise RuntimeError(
-                    f"ASR 任务失败: {code} - {result.get('message')}"
-                )
+                raise RuntimeError(f"ASR 任务失败: {code} - {result.get('message')}")
 
             await asyncio.sleep(poll_interval)
 

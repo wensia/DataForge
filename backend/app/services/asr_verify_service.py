@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -39,7 +39,7 @@ async def verify_tencent(secret_id: str, secret_key: str, app_id: str) -> dict:
 
         # 签名时间
         timestamp = int(time.time())
-        date = datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime("%Y-%m-%d")
+        date = datetime.fromtimestamp(timestamp, tz=UTC).strftime("%Y-%m-%d")
 
         # 拼接规范请求串
         http_request_method = "POST"
@@ -105,9 +105,10 @@ async def verify_tencent(secret_id: str, secret_key: str, app_id: str) -> dict:
                     error_code = error.get("Code", "")
                     # AuthFailure 表示密钥无效，其他错误（如任务不存在）表示密钥有效
                     if "AuthFailure" in error_code or "SecretId" in error_code:
+                        err_msg = error.get("Message", error_code)
                         return {
                             "success": False,
-                            "message": f"密钥验证失败: {error.get('Message', error_code)}",
+                            "message": f"密钥验证失败: {err_msg}",
                             "detail": error,
                         }
                     # 其他错误说明密钥有效（只是请求参数有问题）
@@ -153,7 +154,7 @@ async def verify_alibaba(
         url = "https://nls-meta.cn-shanghai.aliyuncs.com/"
 
         # 构造签名
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         nonce = str(uuid.uuid4())
 
         # 公共请求参数
