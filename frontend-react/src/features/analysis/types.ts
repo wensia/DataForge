@@ -100,6 +100,7 @@ export interface RecordsParams {
   staff_name?: string
   call_type?: string
   call_result?: string
+  callee?: string
   page?: number
   page_size?: number
 }

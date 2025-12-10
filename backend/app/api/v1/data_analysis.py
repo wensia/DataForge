@@ -54,6 +54,7 @@ async def get_records(
     staff_name: str | None = None,
     call_type: str | None = None,
     call_result: str | None = None,
+    callee: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
     session: Session = Depends(get_session),
@@ -68,6 +69,7 @@ async def get_records(
         staff_name: 员工筛选
         call_type: 通话类型筛选
         call_result: 通话结果筛选
+        callee: 被叫号码筛选（模糊匹配）
         page: 页码
         page_size: 每页数量
 
@@ -89,6 +91,7 @@ async def get_records(
         staff_name=staff_name,
         call_type=call_type,
         call_result=call_result,
+        callee=callee,
         limit=page_size,
         offset=offset,
     )

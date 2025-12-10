@@ -99,6 +99,7 @@ export function DataAnalysis() {
   const [callResultFilter, setCallResultFilter] = useState<string>('')
   const [staffNameFilter, setStaffNameFilter] = useState<string>('')
   const [departmentFilter, setDepartmentFilter] = useState('')
+  const [calleeFilter, setCalleeFilter] = useState('')
   const [startTime, setStartTime] = useState<Date | undefined>(undefined)
   const [endTime, setEndTime] = useState<Date | undefined>(undefined)
 
@@ -218,6 +219,7 @@ export function DataAnalysis() {
     setCallResultFilter('')
     setStaffNameFilter('')
     setDepartmentFilter('')
+    setCalleeFilter('')
     setStartTime(undefined)
     setEndTime(undefined)
     setFilters({ page: 1, page_size: filters.page_size || 20 })
@@ -309,6 +311,7 @@ export function DataAnalysis() {
           ? staffNameFilter
           : undefined,
       department: departmentFilter || undefined,
+      callee: calleeFilter || undefined,
       start_time: startTime ? format(startTime, 'yyyy-MM-dd') : undefined,
       end_time: endTime ? format(endTime, 'yyyy-MM-dd') : undefined,
     })
@@ -417,6 +420,12 @@ export function DataAnalysis() {
                   placeholder='部门'
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className='w-[120px]'
+                />
+                <Input
+                  placeholder='被叫号码'
+                  value={calleeFilter}
+                  onChange={(e) => setCalleeFilter(e.target.value)}
                   className='w-[120px]'
                 />
                 <FilterDatePicker
