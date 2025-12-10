@@ -25,6 +25,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8847',
         changeOrigin: true,
+        timeout: 0, // 禁用超时
       },
     },
   },

@@ -5,7 +5,6 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
-from typing import Optional
 
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -36,8 +35,8 @@ from app.scheduler.registry import get_handler
 
 
 def get_all_tasks(
-    status: Optional[str] = None,
-    category: Optional[str] = None,
+    status: str | None = None,
+    category: str | None = None,
     page: int = 1,
     size: int = 20,
 ) -> list[ScheduledTask]:
@@ -65,13 +64,13 @@ def get_all_categories() -> list[str]:
         return [c for c in categories if c]
 
 
-def get_task_by_id(task_id: int) -> Optional[ScheduledTask]:
+def get_task_by_id(task_id: int) -> ScheduledTask | None:
     """根据 ID 获取任务"""
     with Session(engine) as session:
         return session.get(ScheduledTask, task_id)
 
 
-def get_task_by_name(name: str) -> Optional[ScheduledTask]:
+def get_task_by_name(name: str) -> ScheduledTask | None:
     """根据名称获取任务"""
     with Session(engine) as session:
         statement = select(ScheduledTask).where(ScheduledTask.name == name)
@@ -93,7 +92,7 @@ def create_task(data: ScheduledTaskCreate) -> ScheduledTask:
         return task
 
 
-def update_task(task_id: int, data: ScheduledTaskUpdate) -> Optional[ScheduledTask]:
+def update_task(task_id: int, data: ScheduledTaskUpdate) -> ScheduledTask | None:
     """更新任务"""
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
@@ -205,6 +204,9 @@ async def run_task_now(task_id: int) -> dict:
                 _run_task_background(task_id, handler, execution_id, kwargs)
             )
 
+            # 让出控制权，确保 API 立即返回
+            await asyncio.sleep(0)
+
             return {
                 "success": True,
                 "message": "任务已触发",
@@ -254,7 +256,7 @@ def get_task_executions(
         return list(executions)
 
 
-def get_execution_by_id(execution_id: int) -> Optional[TaskExecutionDetailResponse]:
+def get_execution_by_id(execution_id: int) -> TaskExecutionDetailResponse | None:
     """获取执行详情"""
     with Session(engine) as session:
         execution = session.get(TaskExecution, execution_id)
@@ -264,8 +266,8 @@ def get_execution_by_id(execution_id: int) -> Optional[TaskExecutionDetailRespon
 
 
 def get_all_executions(
-    task_id: Optional[int] = None,
-    status: Optional[str] = None,
+    task_id: int | None = None,
+    status: str | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[dict], int]:
@@ -321,7 +323,9 @@ def get_all_executions(
                 "id": row.id,
                 "task_id": row.task_id,
                 "task_name": row.task_name,
-                "status": row.status.value if hasattr(row.status, "value") else row.status,
+                "status": (
+                    row.status.value if hasattr(row.status, "value") else row.status
+                ),
                 "trigger_type": row.trigger_type,
                 "started_at": row.started_at.isoformat() if row.started_at else None,
                 "finished_at": row.finished_at.isoformat() if row.finished_at else None,
@@ -498,8 +502,8 @@ def cancel_execution(execution_id: int) -> dict:
 
 
 async def get_all_tasks_async(
-    status: Optional[str] = None,
-    category: Optional[str] = None,
+    status: str | None = None,
+    category: str | None = None,
     page: int = 1,
     size: int = 20,
 ) -> list[ScheduledTask]:
@@ -517,7 +521,7 @@ async def get_all_categories_async() -> list[str]:
     return await loop.run_in_executor(_db_executor, get_all_categories)
 
 
-async def get_task_by_id_async(task_id: int) -> Optional[ScheduledTask]:
+async def get_task_by_id_async(task_id: int) -> ScheduledTask | None:
     """异步根据 ID 获取任务"""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
@@ -527,17 +531,17 @@ async def get_task_by_id_async(task_id: int) -> Optional[ScheduledTask]:
 
 
 async def get_all_executions_async(
-    task_id: Optional[int] = None,
-    status: Optional[str] = None,
+    task_id: int | None = None,
+    status: str | None = None,
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[dict], int]:
     """异步获取所有执行记录"""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        _db_executor,
-        partial(get_all_executions, task_id=task_id, status=status, page=page, size=size),
+    func = partial(
+        get_all_executions, task_id=task_id, status=status, page=page, size=size
     )
+    return await loop.run_in_executor(_db_executor, func)
 
 
 async def get_task_executions_async(
@@ -555,7 +559,7 @@ async def get_task_executions_async(
 
 async def get_execution_by_id_async(
     execution_id: int,
-) -> Optional[TaskExecutionDetailResponse]:
+) -> TaskExecutionDetailResponse | None:
     """异步获取执行详情"""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
