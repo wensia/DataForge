@@ -11,7 +11,7 @@ FRONTEND_PORT=3691
 # 项目路径
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$PROJECT_DIR/backend"
-FRONTEND_DIR="$PROJECT_DIR/frontend"
+FRONTEND_DIR="$PROJECT_DIR/frontend-react"
 
 # PID 文件
 BACKEND_PID_FILE="$PROJECT_DIR/.backend.pid"
