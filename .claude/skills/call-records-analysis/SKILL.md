@@ -31,31 +31,179 @@ PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -c
 - 改进建议生成
 - 详见 [SCORING.md](SCORING.md)
 
-## 分析流程
+---
 
-### 单条通话分析
+## 周报生成流程（重要）
 
-1. **获取转写内容**
+生成周报时，必须按以下步骤执行，确保数据准确：
+
+### 步骤1：查询总览数据
+
+```sql
+-- 本周通话总览
+SELECT
+    COUNT(*) as 总通话数,
+    COUNT(transcript) as 有转写数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长秒
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days';
+```
+
+### 步骤2：查询员工明细（仅有转写的）
+
+```sql
+-- 员工通话统计（核心数据）
+SELECT
+    staff_name as 员工,
+    COUNT(*) as 通话数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长秒,
+    SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND staff_name IS NOT NULL
+GROUP BY staff_name
+ORDER BY 超1分钟数 DESC, 通话数 DESC;
+```
+
+### 步骤3：数据校验（必须执行）
+
+```sql
+-- 验证汇总数据（确保员工明细加总 = 总数）
+SELECT
+    COUNT(*) as 有转写通话总数,
+    SUM(duration) as 总时长秒,
+    COUNT(DISTINCT staff_name) as 员工数
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND staff_name IS NOT NULL;
+```
+
+**校验要点**：
+- 员工通话数之和 = 有转写通话总数
+- 员工总时长之和 = 有转写总时长
+- 如不一致，检查是否遗漏 `staff_name IS NOT NULL` 条件
+
+### 步骤4：时长分布统计
+
+```sql
+-- 时长分布（仅有转写的）
+SELECT
+    CASE
+        WHEN duration < 30 THEN '1. 0-30秒'
+        WHEN duration < 60 THEN '2. 30-60秒'
+        WHEN duration < 180 THEN '3. 1-3分钟'
+        WHEN duration < 300 THEN '4. 3-5分钟'
+        WHEN duration < 600 THEN '5. 5-10分钟'
+        ELSE '6. 10分钟以上'
+    END as 时长区间,
+    COUNT(*) as 数量,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+GROUP BY 1
+ORDER BY 1;
+```
+
+### 步骤5：抽取长通话进行质量分析
+
+```sql
+-- 获取超过5分钟的深度通话（用于质量抽样）
+SELECT id, staff_name, call_time, duration, call_result
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND duration > 300
+ORDER BY duration DESC
+LIMIT 10;
+```
+
+### 步骤6：获取转写内容并格式化
+
+```bash
+# 获取单条转写并格式化输出
+PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -t -A -c "
+SELECT transcript FROM call_records WHERE id = {ID};
+" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for seg in data[:50]:  # 显示前50段
+    speaker = '【员工】' if seg.get('speaker') == 'staff' else '【客户】'
+    print(f\"{speaker} {seg.get('text', '')}\")
+if len(data) > 50:
+    print(f'\\n... 共 {len(data)} 段对话')
+"
+```
+
+### 步骤7：生成报告文件
+
+报告保存路径：`reports/weekly-call-quality-report-{日期}.md`
+
+---
+
+## 报告输出规范
+
+### 表格对齐格式
+
+```markdown
+| 排名 | 员工 | 通话数 | 总时长 | 平均时长 | 超1分钟数 | 有效率 | 评价 |
+|:----:|:-----|-------:|-------:|---------:|----------:|-------:|:-----|
+| 1 | 杨珺 | 78 | 3,252 秒 | 41.7 秒 | 11 | 14.1% | 良好 |
+```
+
+**格式说明**：
+- `:----:` 居中对齐（排名）
+- `:-----` 左对齐（文本）
+- `-----:` 右对齐（数字）
+
+### 评价标准
+
+| 有效率 | 评价 |
+|-------:|:-----|
+| ≥ 40% | ⭐ 优秀 |
+| 20-40% | 良好 |
+| 10-20% | 合格 |
+| 5-10% | 待改进 |
+| < 5% | ⚠️ 待改进 |
+
+### 严重程度标识
+
+- 🔴 严重问题
+- 🟡 中等问题
+- 🟢 轻微问题
+
+---
+
+## 单条通话分析流程
+
+### 1. 获取转写内容
+
 ```bash
 PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -t -A -c \
 "SELECT id, staff_name, call_time, duration, call_result, transcript FROM call_records WHERE id = {ID};"
 ```
 
-2. **格式化对话**：将 JSON 转写转为可读对话格式
+### 2. 格式化对话
 
-3. **按 SCORING.md 标准评分**：逐项打分并记录扣分项
+将 JSON 转写转为可读对话格式（见步骤6）
 
-4. **生成分析报告**：包含评分、扣分项、亮点、改进建议
+### 3. 按 SCORING.md 标准评分
 
-### 批量分析
+逐项打分并记录扣分项
 
-1. 筛选目标记录（员工/时间范围）
-2. 逐条分析并汇总
-3. 生成统计报告和排名
+### 4. 生成分析报告
 
-## 数据概况
+包含评分、扣分项、亮点、改进建议
 
-查询当前数据状态：
+---
+
+## 数据概况查询
+
 ```sql
 -- 总记录数和有转写的记录数
 SELECT
@@ -70,6 +218,41 @@ WHERE transcript IS NOT NULL AND staff_name IS NOT NULL
 GROUP BY staff_name ORDER BY 数量 DESC;
 ```
 
+---
+
+## 常见问题排查
+
+### 问题1：员工数据加总与总数不一致
+
+**原因**：部分通话 `staff_name` 为 NULL
+
+**解决**：
+```sql
+-- 检查无员工名的通话数量
+SELECT COUNT(*) FROM call_records
+WHERE transcript IS NOT NULL AND staff_name IS NULL;
+```
+
+### 问题2：转写内容显示为空
+
+**原因**：transcript 字段可能是空数组 `[]`
+
+**解决**：
+```sql
+-- 检查有效转写（非空数组）
+SELECT COUNT(*) FROM call_records
+WHERE transcript IS NOT NULL
+  AND jsonb_array_length(transcript) > 0;
+```
+
+### 问题3：时长统计不准确
+
+**原因**：混淆了"全部通话"和"有转写通话"的统计范围
+
+**解决**：始终明确统计范围，在报告中注明"统计范围：X 条有转写的通话记录"
+
+---
+
 ## 使用说明
 
 1. 所有查询都是只读的（SELECT），不会修改数据
@@ -77,6 +260,9 @@ GROUP BY staff_name ORDER BY 数量 DESC;
 3. 时长单位为秒，可转换：`/60` 分钟，`/3600` 小时
 4. 单次分析建议不超过 10 条完整通话
 5. 评分时需引用原文作为依据
+6. **生成报告前必须执行数据校验步骤**
+
+---
 
 ## 相关文档
 

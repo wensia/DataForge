@@ -376,6 +376,155 @@ ORDER BY call_time;
 
 ---
 
+## 七、周报专用查询（重要）
+
+> 生成周报时按顺序执行以下查询，确保数据准确
+
+### 1. 本周通话总览
+
+```sql
+SELECT
+    COUNT(*) as 总通话数,
+    COUNT(transcript) as 有转写数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长秒
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days';
+```
+
+### 2. 员工通话统计（核心数据）
+
+```sql
+SELECT
+    staff_name as 员工,
+    COUNT(*) as 通话数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长秒,
+    SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND staff_name IS NOT NULL
+GROUP BY staff_name
+ORDER BY 超1分钟数 DESC, 通话数 DESC;
+```
+
+### 3. 数据校验（必须执行）
+
+```sql
+-- 验证员工明细加总 = 总数
+SELECT
+    COUNT(*) as 有转写通话总数,
+    SUM(duration) as 总时长秒,
+    COUNT(DISTINCT staff_name) as 员工数
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND staff_name IS NOT NULL;
+```
+
+**校验要点**：
+- 员工通话数之和 = 有转写通话总数
+- 员工总时长之和 = 有转写总时长
+- 如不一致，检查 `staff_name IS NOT NULL` 条件
+
+### 4. 时长分布统计
+
+```sql
+SELECT
+    CASE
+        WHEN duration < 30 THEN '1. 0-30秒'
+        WHEN duration < 60 THEN '2. 30-60秒'
+        WHEN duration < 180 THEN '3. 1-3分钟'
+        WHEN duration < 300 THEN '4. 3-5分钟'
+        WHEN duration < 600 THEN '5. 5-10分钟'
+        ELSE '6. 10分钟以上'
+    END as 时长区间,
+    COUNT(*) as 数量,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+GROUP BY 1
+ORDER BY 1;
+```
+
+### 5. 每日通话统计
+
+```sql
+SELECT
+    DATE(call_time) as 日期,
+    COUNT(*) as 通话数,
+    COUNT(transcript) as 有转写数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY DATE(call_time)
+ORDER BY 日期 DESC;
+```
+
+### 6. 深度通话列表（用于质量抽样）
+
+```sql
+SELECT id, staff_name, call_time, duration, call_result
+FROM call_records
+WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
+  AND transcript IS NOT NULL
+  AND duration > 300  -- 超过5分钟
+ORDER BY duration DESC
+LIMIT 10;
+```
+
+### 7. 获取转写并格式化输出
+
+```bash
+PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -t -A -c "
+SELECT transcript FROM call_records WHERE id = {ID};
+" | python3 -c "
+import json, sys
+data = json.loads(sys.stdin.read())
+for seg in data[:50]:
+    speaker = '【员工】' if seg.get('speaker') == 'staff' else '【客户】'
+    print(f\"{speaker} {seg.get('text', '')}\")
+if len(data) > 50:
+    print(f'\\n... 共 {len(data)} 段对话')
+"
+```
+
+---
+
+## 八、问题排查查询
+
+### 1. 检查无员工名的通话
+
+```sql
+SELECT COUNT(*) as 无员工名通话数
+FROM call_records
+WHERE transcript IS NOT NULL AND staff_name IS NULL;
+```
+
+### 2. 检查空转写数组
+
+```sql
+SELECT COUNT(*) as 空转写数
+FROM call_records
+WHERE transcript IS NOT NULL
+  AND jsonb_array_length(transcript) = 0;
+```
+
+### 3. 检查有效转写数量
+
+```sql
+SELECT COUNT(*) as 有效转写数
+FROM call_records
+WHERE transcript IS NOT NULL
+  AND jsonb_array_length(transcript) > 0;
+```
+
+---
+
 ## 使用说明
 
 1. **参数替换**：将 `{ID}`、`{STAFF_NAME}`、`{LIMIT}` 等占位符替换为实际值
@@ -386,3 +535,4 @@ ORDER BY call_time;
    - 默认：表格形式，带表头
    - `-t -A`：无表头，适合脚本处理
    - `-F','`：CSV 格式输出
+6. **周报生成**：必须按顺序执行第七节的查询，并进行数据校验
