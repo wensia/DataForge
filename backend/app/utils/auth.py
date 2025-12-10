@@ -3,38 +3,14 @@
 import json
 import secrets
 from datetime import datetime
-from typing import Optional
 
-import redis
 from loguru import logger
 from sqlmodel import Session, select
 
 from app.config import settings
 from app.database import engine
 from app.models.api_key import ApiKey
-
-# Redis 客户端（延迟初始化）
-_redis_client: Optional[redis.Redis] = None
-
-
-def get_redis_client() -> Optional[redis.Redis]:
-    """获取 Redis 客户端（单例模式）"""
-    global _redis_client
-    if _redis_client is None and settings.redis_url:
-        try:
-            _redis_client = redis.from_url(
-                settings.redis_url,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
-            )
-            # 测试连接
-            _redis_client.ping()
-            logger.info("Redis 连接成功")
-        except Exception as e:
-            logger.warning(f"Redis 连接失败，将使用数据库直接验证: {e}")
-            _redis_client = None
-    return _redis_client
+from app.utils.redis_client import get_redis_client
 
 
 class APIKeyValidator:
@@ -59,7 +35,9 @@ class APIKeyValidator:
         """生成缓存键"""
         return f"{self.CACHE_KEY_PREFIX}{api_key[:8]}"  # 只用前8字符作为键
 
-    def _get_from_cache(self, api_key: str) -> Optional[tuple[bool, str | None, dict | None]]:
+    def _get_from_cache(
+        self, api_key: str
+    ) -> tuple[bool, str | None, dict | None] | None:
         """从 Redis 缓存获取验证结果"""
         redis_client = get_redis_client()
         if not redis_client:
@@ -81,8 +59,8 @@ class APIKeyValidator:
         self,
         api_key: str,
         is_valid: bool,
-        error: Optional[str],
-        metadata: Optional[dict],
+        error: str | None,
+        metadata: dict | None,
     ) -> None:
         """将验证结果写入 Redis 缓存"""
         redis_client = get_redis_client()
@@ -120,8 +98,8 @@ class APIKeyValidator:
             logger.warning(f"Redis 使用统计记录失败: {e}")
 
     def validate(
-        self, api_key: Optional[str]
-    ) -> tuple[bool, Optional[str], Optional[dict[str, str]]]:
+        self, api_key: str | None
+    ) -> tuple[bool, str | None, dict[str, str] | None]:
         """验证API密钥
 
         Args:
@@ -154,7 +132,7 @@ class APIKeyValidator:
 
     def _validate_from_db(
         self, api_key: str
-    ) -> tuple[bool, Optional[str], Optional[dict[str, str]]]:
+    ) -> tuple[bool, str | None, dict[str, str] | None]:
         """从数据库验证密钥（不更新使用统计）"""
         # 1. 优先从数据库验证
         with Session(engine) as session:
@@ -208,7 +186,7 @@ class APIKeyValidator:
 
     def log_validation_attempt(
         self,
-        api_key: Optional[str],
+        api_key: str | None,
         is_valid: bool,
         request_info: dict[str, str],
     ):

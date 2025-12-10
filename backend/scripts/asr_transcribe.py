@@ -20,6 +20,8 @@
     }
 """
 
+import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlmodel import Session, select
@@ -29,6 +31,37 @@ from app.models import CallRecord
 from app.scheduler import task_log
 from app.services.asr_service import asr_service
 from scripts._utils import normalize_time_param
+
+
+@dataclass
+class ConcurrentStats:
+    """线程安全的统计计数器"""
+
+    success_count: int = 0
+    failed_count: int = 0
+    skipped_count: int = 0
+    error_records: list = field(default_factory=list)
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+
+    async def inc_success(self) -> int:
+        async with self._lock:
+            self.success_count += 1
+            return self.success_count
+
+    async def inc_failed(self, error_info: dict | None = None) -> None:
+        async with self._lock:
+            self.failed_count += 1
+            if error_info:
+                self.error_records.append(error_info)
+
+    async def inc_skipped(self) -> None:
+        async with self._lock:
+            self.skipped_count += 1
+
+    async def get_success_count(self) -> int:
+        async with self._lock:
+            return self.success_count
+
 
 # 任务元信息
 TASK_INFO = {
@@ -78,6 +111,81 @@ def _get_records_to_transcribe(
         return list(session.exec(statement).all())
 
 
+async def _process_single_record(
+    record: CallRecord,
+    asr_config_id: int,
+    stats: ConcurrentStats,
+    max_records: int,
+    semaphore: asyncio.Semaphore,
+) -> bool:
+    """处理单条记录 (并发安全)
+
+    Args:
+        record: 通话记录
+        asr_config_id: ASR 配置 ID
+        stats: 统计计数器
+        max_records: 最大成功数量限制
+        semaphore: 并发信号量
+
+    Returns:
+        bool: 是否应该继续处理 (False 表示已达到 max_records)
+    """
+    async with semaphore:
+        # 检查是否已达到最大成功数量
+        if max_records > 0:
+            current_success = await stats.get_success_count()
+            if current_success >= max_records:
+                return False
+
+        try:
+            # 1. 检查录音 URL
+            record_url = asr_service.extract_record_url(record.raw_data)
+            if not record_url:
+                task_log(f"[Record {record.id}] 无录音，跳过")
+                await stats.inc_skipped()
+                return True
+
+            # 2. 执行转写
+            task_log(f"[Record {record.id}] 转写: {record.caller} -> {record.callee}")
+            transcript = await asr_service.transcribe_record(
+                record=record,
+                asr_config_id=asr_config_id,
+                staff_name=record.staff_name,
+            )
+
+            # 3. 处理结果
+            if transcript:
+                asr_service.update_record_transcript(record.id, transcript)
+                current = await stats.inc_success()
+                max_display = max_records if max_records > 0 else "∞"
+                task_log(f"[Record {record.id}] ✓ 转写成功 ({current}/{max_display})")
+            else:
+                await stats.inc_failed(
+                    {
+                        "id": record.id,
+                        "caller": record.caller,
+                        "callee": record.callee,
+                        "duration": record.duration,
+                        "error": "转写结果为空（可能是空音频或无语音内容）",
+                    }
+                )
+                task_log(f"[Record {record.id}] ✗ 转写结果为空")
+
+        except Exception as e:
+            await stats.inc_failed(
+                {
+                    "id": record.id,
+                    "caller": record.caller,
+                    "callee": record.callee,
+                    "duration": record.duration,
+                    "error": str(e),
+                }
+            )
+            task_log(f"[Record {record.id}] ✗ 转写异常: {e}")
+
+        return True
+
+
 async def run(
     asr_config_id: int,
     start_time: datetime,
@@ -86,6 +194,7 @@ async def run(
     min_duration: int = 0,
     batch_size: int = 10,
     max_records: int = 0,
+    concurrency: int = 5,
 ) -> dict:
     """ASR 语音识别任务入口
 
@@ -97,6 +206,7 @@ async def run(
         min_duration: 最小通话时长（秒），只处理时长>=此值的记录，默认 0 不限制
         batch_size: 每批处理数量，默认 10
         max_records: 最大识别成功数量，达到此数量后停止处理，0 表示不限制
+        concurrency: 并发数，默认 5
 
     Returns:
         dict: 执行结果
@@ -105,12 +215,13 @@ async def run(
     start_time = normalize_time_param(start_time)
     end_time = normalize_time_param(end_time)
 
-    task_log(f"开始 ASR 语音识别任务")
+    task_log("开始 ASR 语音识别任务")
     task_log(f"时间范围: {start_time} ~ {end_time}")
     task_log(f"ASR 配置 ID: {asr_config_id}")
     task_log(f"跳过已有转写: {skip_existing}")
     task_log(f"最小通话时长: {min_duration} 秒")
     task_log(f"每批处理数量: {batch_size}")
+    task_log(f"并发数: {concurrency}")
 
     # 验证 ASR 配置
     asr_config = asr_service.get_config(asr_config_id)
@@ -146,93 +257,66 @@ async def run(
             "skipped": 0,
         }
 
-    # 统计
-    success_count = 0
-    failed_count = 0
-    skipped_count = 0
-    error_records = []
+    # 创建并发控制和统计
+    semaphore = asyncio.Semaphore(concurrency)
+    stats = ConcurrentStats()
 
     # 分批处理
-    reached_max = False
     for i in range(0, total_count, batch_size):
-        if reached_max:
+        # 检查是否已达到 max_records
+        if max_records > 0 and await stats.get_success_count() >= max_records:
+            task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
             break
 
         batch = records[i : i + batch_size]
         batch_num = i // batch_size + 1
-        task_log(f"处理第 {batch_num} 批（{len(batch)} 条）")
+        task_log(f"处理第 {batch_num} 批（{len(batch)} 条，并发 {concurrency}）")
 
-        for record in batch:
-            # 检查是否已达到最大成功数量
-            if max_records > 0 and success_count >= max_records:
-                task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
-                reached_max = True
-                break
+        # 并发执行本批次所有任务
+        tasks = [
+            _process_single_record(
+                record=record,
+                asr_config_id=asr_config_id,
+                stats=stats,
+                max_records=max_records,
+                semaphore=semaphore,
+            )
+            for record in batch
+        ]
 
-            try:
-                # 检查是否有录音 URL
-                record_url = asr_service.extract_record_url(record.raw_data)
-                if not record_url:
-                    task_log(f"记录 {record.id} 无录音，跳过")
-                    skipped_count += 1
-                    continue
+        # 等待本批次完成
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # 执行转写
-                task_log(f"转写记录 {record.id}: {record.caller} -> {record.callee}")
-                transcript = await asr_service.transcribe_record(
-                    record=record,
-                    asr_config_id=asr_config_id,
-                    staff_name=record.staff_name,
-                )
-
-                if transcript:
-                    # 保存结果
-                    asr_service.update_record_transcript(record.id, transcript)
-                    success_count += 1
-                    task_log(f"✓ 记录 {record.id} 转写成功 ({success_count}/{max_records if max_records > 0 else '∞'})")
-                else:
-                    failed_count += 1
-                    error_records.append({
-                        "id": record.id,
-                        "caller": record.caller,
-                        "callee": record.callee,
-                        "duration": record.duration,
-                        "error": "转写结果为空（可能是空音频或无语音内容）",
-                    })
-                    task_log(f"✗ 记录 {record.id} 转写结果为空")
-
-            except Exception as e:
-                failed_count += 1
-                error_msg = str(e)
-                error_records.append({
-                    "id": record.id,
-                    "caller": record.caller,
-                    "callee": record.callee,
-                    "duration": record.duration,
-                    "error": error_msg,
-                })
-                task_log(f"✗ 记录 {record.id} 转写异常: {error_msg}")
+        # 检查是否有任务返回 False (达到 max_records)
+        if False in results:
+            task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
+            break
 
         # 批次间日志
-        if not reached_max:
-            task_log(
-                f"已完成: {success_count} 成功, {failed_count} 失败, {skipped_count} 跳过"
-            )
+        task_log(
+            f"批次完成: {stats.success_count} 成功, "
+            f"{stats.failed_count} 失败, {stats.skipped_count} 跳过"
+        )
 
     # 最终统计
+    msg = (
+        f"转写完成: {stats.success_count} 成功, "
+        f"{stats.failed_count} 失败, {stats.skipped_count} 跳过"
+    )
     result = {
         "status": "completed",
-        "message": f"转写完成: {success_count} 成功, {failed_count} 失败, {skipped_count} 跳过",
+        "message": msg,
         "total": total_count,
-        "success": success_count,
-        "failed": failed_count,
-        "skipped": skipped_count,
+        "success": stats.success_count,
+        "failed": stats.failed_count,
+        "skipped": stats.skipped_count,
         "asr_config": asr_config.name,
         "time_range": f"{start_time} ~ {end_time}",
+        "concurrency": concurrency,
     }
 
-    if error_records:
-        result["errors"] = error_records[:20]  # 只保留前20条错误
+    if stats.error_records:
+        result["errors"] = stats.error_records[:20]  # 只保留前20条错误
 
     task_log(f"ASR 语音识别任务完成: {result['message']}")
     return result

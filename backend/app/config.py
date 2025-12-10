@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Redis 配置
     redis_url: str = ""  # Redis 连接 URL
     api_key_cache_ttl: int = 300  # API 密钥缓存过期时间(秒)
+    record_cache_ttl: int = 180  # 录音缓存过期时间(秒)
 
     class Config:
         env_file = ".env"
@@ -49,9 +50,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-
-
-
-
-
