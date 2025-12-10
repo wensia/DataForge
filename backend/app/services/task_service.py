@@ -177,8 +177,97 @@ def resume_task(task_id: int) -> bool:
         return True
 
 
+def validate_task_for_run(task_id: int) -> dict:
+    """验证任务是否可以执行（仅读取，不写入数据库）
+
+    用于 API 端点快速验证，不阻塞事件循环
+    """
+    with Session(engine) as session:
+        task = session.get(ScheduledTask, task_id)
+        if not task:
+            return {"success": False, "message": "任务不存在"}
+
+        try:
+            # 验证处理函数存在
+            get_handler(task.handler_path)
+            kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
+
+            return {
+                "success": True,
+                "handler_path": task.handler_path,
+                "handler_kwargs": kwargs,
+            }
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+
+def run_task_in_background(
+    task_id: int,
+    handler_path: str,
+    handler_kwargs: dict,
+) -> None:
+    """在后台执行任务（由 FastAPI BackgroundTasks 调用）
+
+    注意：这是同步函数，在独立线程中执行，不会阻塞事件循环
+    """
+    # 创建新的事件循环执行异步任务
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(
+            _execute_task_async(task_id, handler_path, handler_kwargs)
+        )
+    finally:
+        loop.close()
+
+
+async def _execute_task_async(
+    task_id: int,
+    handler_path: str,
+    handler_kwargs: dict,
+) -> None:
+    """实际执行任务的异步函数（在后台线程的事件循环中运行）"""
+    from app.scheduler.executor import execute_task_with_execution
+
+    # 在后台线程中创建执行记录
+    with Session(engine) as session:
+        execution = TaskExecution(
+            task_id=task_id,
+            status=ExecutionStatus.PENDING,
+            trigger_type="manual",
+        )
+        session.add(execution)
+        session.commit()
+        session.refresh(execution)
+        execution_id = execution.id
+
+    # 获取处理函数并执行
+    handler = get_handler(handler_path)
+
+    try:
+        await execute_task_with_execution(
+            task_id=task_id,
+            handler=handler,
+            execution_id=execution_id,
+            trigger_type="manual",
+            **handler_kwargs,
+        )
+    except Exception as e:
+        logger.error(f"后台执行任务 #{task_id} 失败: {e}")
+
+
+# ============================================================================
+# 旧版函数（保留以兼容定时调度器调用）
+# ============================================================================
+
+
 async def run_task_now(task_id: int) -> dict:
-    """立即执行任务（后台异步执行，立即返回）"""
+    """立即执行任务（旧版，用于定时调度器）
+
+    注意：此函数包含同步数据库操作，不适合在 API 端点中使用。
+    API 端点应使用 validate_task_for_run + run_task_in_background 组合。
+    """
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -223,7 +312,7 @@ async def _run_task_background(
     execution_id: int,
     kwargs: dict,
 ) -> None:
-    """后台执行任务的辅助函数"""
+    """后台执行任务的辅助函数（旧版）"""
     from app.scheduler.executor import execute_task_with_execution
 
     try:

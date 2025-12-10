@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, Query
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
@@ -17,9 +17,9 @@ from app.models.task_execution import (
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
 )
-from app.schemas.response import ResponseModel
 from app.scheduler import subscribe_log, unsubscribe_log
 from app.scheduler.registry import get_registered_handlers
+from app.schemas.response import ResponseModel
 from app.services import task_service
 
 router = APIRouter(prefix="/tasks", tags=["任务管理"])
@@ -138,12 +138,25 @@ async def delete_task(task_id: int):
 
 
 @router.post("/{task_id}/run", response_model=ResponseModel)
-async def run_task(task_id: int):
-    """手动触发任务执行"""
-    result = await task_service.run_task_now(task_id)
-    if result["success"]:
-        return ResponseModel.success(data=result, message="任务已触发")
-    return ResponseModel.error(code=400, message=result["message"])
+async def run_task(task_id: int, background_tasks: BackgroundTasks):
+    """手动触发任务执行（立即返回，后台执行）"""
+    # 仅验证任务存在和处理函数有效，不做数据库写入
+    result = task_service.validate_task_for_run(task_id)
+    if not result["success"]:
+        return ResponseModel.error(code=400, message=result["message"])
+
+    # 添加到 FastAPI 后台任务队列（在独立线程执行，不阻塞事件循环）
+    background_tasks.add_task(
+        task_service.run_task_in_background,
+        task_id=task_id,
+        handler_path=result["handler_path"],
+        handler_kwargs=result["handler_kwargs"],
+    )
+
+    return ResponseModel.success(
+        data={"task_id": task_id, "message": "任务已加入执行队列"},
+        message="任务已触发",
+    )
 
 
 @router.post("/{task_id}/pause", response_model=ResponseModel)
@@ -173,7 +186,9 @@ async def get_task_executions(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
 ):
     """获取任务执行历史"""
-    executions = await task_service.get_task_executions_async(task_id, page=page, size=size)
+    executions = await task_service.get_task_executions_async(
+        task_id, page=page, size=size
+    )
     return ResponseModel.success(data=executions)
 
 
@@ -182,7 +197,7 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
     # 检查执行记录是否存在
     execution = await task_service.get_execution_by_id_async(execution_id)
     if not execution:
-        yield f'data: {{"error": "执行记录不存在"}}\n\n'
+        yield 'data: {"error": "执行记录不存在"}\n\n'
         return
 
     # 【重要】无论任务状态如何，先发送已有的日志
@@ -210,16 +225,18 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                 if log_line is None:
                     # 任务结束信号
                     # 重新获取执行记录以获取最终状态
-                    execution = await task_service.get_execution_by_id_async(execution_id)
+                    execution = await task_service.get_execution_by_id_async(
+                        execution_id
+                    )
                     status = execution.status.value if execution else "unknown"
                     yield f'data: {{"status": "{status}", "finished": true}}\n\n'
                     break
                 # 转义 JSON 特殊字符
                 escaped = log_line.replace("\\", "\\\\").replace('"', '\\"')
                 yield f'data: {{"log": "{escaped}"}}\n\n'
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # 发送心跳保持连接
-                yield f": heartbeat\n\n"
+                yield ": heartbeat\n\n"
     finally:
         unsubscribe_log(execution_id, queue)
 
