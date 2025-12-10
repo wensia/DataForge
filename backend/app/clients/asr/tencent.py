@@ -253,7 +253,8 @@ class TencentASRClient(ASRClient):
         """
         segments = []
         speaker_labels = speaker_labels or {}
-        default_labels = {"0": "staff", "1": "customer"}
+        # 声道映射：0=客户, 1=员工（根据实际录音系统）
+        default_labels = {"0": "customer", "1": "staff"}
 
         # 获取详细结果（含时间戳）- 注意处理 None 的情况
         result_detail = result.get("ResultDetail") or []

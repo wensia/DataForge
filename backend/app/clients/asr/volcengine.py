@@ -218,8 +218,8 @@ class VolcengineASRClient(ASRClient):
         """
         segments = []
         speaker_labels = speaker_labels or {}
-        # 默认声道映射：0=员工(坐席), 1=客户
-        default_labels = {"0": "staff", "1": "customer"}
+        # 声道映射：0=客户, 1=员工（根据实际录音系统）
+        default_labels = {"0": "customer", "1": "staff"}
 
         # 获取识别结果
         resp = result.get("resp", {})

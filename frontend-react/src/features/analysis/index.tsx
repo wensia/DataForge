@@ -129,6 +129,7 @@ export function DataAnalysis() {
   const {
     data: recordsData,
     isLoading: recordsLoading,
+    isFetching: recordsFetching,
     refetch: refetchRecords,
   } = useRecords(filters)
   const { data: filterOptions } = useFilterOptions()
@@ -354,9 +355,9 @@ export function DataAnalysis() {
           <Button
             variant='outline'
             onClick={() => refetchRecords()}
-            disabled={recordsLoading}
+            disabled={recordsFetching}
           >
-            {recordsLoading ? (
+            {recordsFetching ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <RotateCcw className='mr-2 h-4 w-4' />
