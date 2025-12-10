@@ -132,6 +132,11 @@ def _process_feishu_record(
     # 映射字段
     mapped_data = _map_feishu_fields(fields, field_mapping)
 
+    # 验证必填字段：call_time
+    if mapped_data.get("call_time") is None:
+        logger.warning(f"跳过飞书记录 {record_id}: 缺少通话时间")
+        return "skipped"
+
     if existing:
         # 更新现有记录
         for key, value in mapped_data.items():
@@ -576,6 +581,11 @@ def _process_yunke_call_log(session: Session, record: dict) -> str:
 
     # 映射云客字段到本地字段
     mapped_data = _map_yunke_fields(record)
+
+    # 验证必填字段：call_time
+    if mapped_data.get("call_time") is None:
+        logger.warning(f"跳过云客记录 {call_id}: 缺少通话时间")
+        return "skipped"
 
     if existing:
         # 更新现有记录

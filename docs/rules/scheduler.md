@@ -182,15 +182,55 @@ False
 # None
 None
 
-# datetime 表达式
-datetime.datetime.now()
-datetime.datetime(2024, 1, 1)
-datetime.datetime.now() - datetime.timedelta(days=7)
+# datetime 表达式（推荐写法）
+datetime.now()                              # 当前时间
+datetime(2024, 1, 1)                        # 指定日期时间
+datetime.combine(date.today(), time.min)    # 今天 00:00:00
+datetime.combine(date.today() + timedelta(days=1), time.min)  # 明天 00:00:00
+
+# date 表达式
+date.today()                                # 今天
+date.today() + timedelta(days=7)            # 7 天后
+date.today() - timedelta(days=30)           # 30 天前
+
+# time 表达式
+time.min                                    # 00:00:00
+time.max                                    # 23:59:59.999999
+time(8, 30, 0)                              # 08:30:00
+
+# timedelta 表达式
+timedelta(days=7)                           # 7 天
+timedelta(hours=6)                          # 6 小时
+timedelta(minutes=30)                       # 30 分钟
+
+# 旧写法兼容（自动转换）
+datetime.datetime.now()                     # 自动转换为 datetime.now()
+datetime.timedelta(days=7)                  # 自动转换为 timedelta(days=7)
 
 # 简单表达式
 1 + 2
 len([1, 2, 3])
 ```
+
+### safe_eval 支持的模块和类
+
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `datetime` | 类 | `datetime.datetime` 类，支持 `now()`, `combine()` 等 |
+| `date` | 类 | `datetime.date` 类，支持 `today()` |
+| `time` | 类 | `datetime.time` 类，支持 `min`, `max` |
+| `timedelta` | 类 | `datetime.timedelta` 类 |
+| `json` | 模块 | JSON 模块 |
+
+### 兼容性说明
+
+为了兼容旧代码，`safe_eval` 会自动将 `datetime.datetime` 替换为 `datetime`：
+
+| 旧写法 | 自动转换为 |
+|--------|-----------|
+| `datetime.datetime.now()` | `datetime.now()` |
+| `datetime.datetime(2024, 1, 1)` | `datetime(2024, 1, 1)` |
+| `datetime.datetime.combine(...)` | `datetime.combine(...)` |
 
 ### 脚本规范要点
 

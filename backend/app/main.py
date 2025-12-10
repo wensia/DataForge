@@ -57,14 +57,6 @@ async def lifespan(app: FastAPI):
     # 配置安全审计日志
     setup_security_logging()
 
-    # 显示API密钥验证状态
-    key_count = len(settings.get_api_keys_list())
-    if key_count > 0:
-        logger.info(f"API密钥验证已启用,共加载 {key_count} 个密钥")
-    else:
-        logger.warning("未配置API密钥,所有需要验证的接口将无法访问!")
-        logger.warning("请在.env文件中配置 API_KEYS=key1,key2,key3")
-
     # 初始化调度器
     if settings.scheduler_enabled:
         from app.scheduler import (

@@ -15,7 +15,9 @@ import {
   Eye,
   Terminal,
   X,
+  StopCircle,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -48,7 +50,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { DataTableColumnHeader, SimplePagination } from '@/components/data-table'
-import { useAllExecutions, useTasks } from '@/features/tasks/api'
+import { useAllExecutions, useTasks, useCancelExecution } from '@/features/tasks/api'
 import type { TaskExecution } from '@/features/tasks/data/schema'
 import { ExecutionDetailDialog } from './components/execution-detail-dialog'
 
@@ -105,6 +107,9 @@ export function TaskExecutions() {
 
   // 获取任务列表（用于筛选）
   const { data: tasks = [] } = useTasks()
+
+  // 取消执行
+  const cancelMutation = useCancelExecution()
 
   // 获取执行记录（服务端分页）
   const {
@@ -344,20 +349,55 @@ export function TaskExecutions() {
     {
       id: 'actions',
       header: '操作',
-      cell: ({ row }) => (
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={(e) => {
-            e.stopPropagation()
-            setSelectedExecution(row.original)
-            setDetailOpen(true)
-          }}
-        >
-          <Eye className='mr-1 h-4 w-4' />
-          详情
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const execution = row.original
+        const canCancel =
+          execution.status === 'running' || execution.status === 'pending'
+
+        return (
+          <div className='flex items-center gap-1'>
+            {canCancel && (
+              <Button
+                variant='ghost'
+                size='sm'
+                className='text-destructive hover:text-destructive'
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  try {
+                    await cancelMutation.mutateAsync(execution.id)
+                    toast.success('任务已取消')
+                    refetch()
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error ? error.message : '取消失败'
+                    )
+                  }
+                }}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? (
+                  <Loader2 className='mr-1 h-4 w-4 animate-spin' />
+                ) : (
+                  <StopCircle className='mr-1 h-4 w-4' />
+                )}
+                取消
+              </Button>
+            )}
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedExecution(execution)
+                setDetailOpen(true)
+              }}
+            >
+              <Eye className='mr-1 h-4 w-4' />
+              详情
+            </Button>
+          </div>
+        )
+      },
     },
   ]
 

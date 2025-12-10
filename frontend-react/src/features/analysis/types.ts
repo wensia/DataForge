@@ -2,6 +2,17 @@
  * 数据分析类型定义
  */
 
+/**
+ * ASR 转写片段
+ * 与后端 TranscriptSegment 数据结构对应
+ */
+export interface TranscriptSegment {
+  start_time: number // 开始时间（秒）
+  end_time: number // 结束时间（秒）
+  speaker: 'staff' | 'customer' | string // 说话人标识
+  text: string // 转写文本
+}
+
 export interface CallRecord {
   id: number
   source: string
@@ -15,7 +26,7 @@ export interface CallRecord {
   customer_name: string | null
   staff_name: string | null
   department: string | null
-  transcript: string | null
+  transcript: TranscriptSegment[] | null
   raw_data: Record<string, unknown>
   created_at: string
   updated_at: string
@@ -150,5 +161,8 @@ export function formatDate(dateStr: string | null): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }

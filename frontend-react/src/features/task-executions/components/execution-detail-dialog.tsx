@@ -282,7 +282,7 @@ export function ExecutionDetailDialog({
             className='bg-muted/50 h-[300px] rounded-md border'
             ref={scrollRef}
           >
-            <div className='p-4'>
+            <div className='min-h-[268px] p-4'>
               {isLoadingDetail ? (
                 <div className='space-y-2'>
                   <Skeleton className='h-4 w-full' />

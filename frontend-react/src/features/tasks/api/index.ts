@@ -241,3 +241,17 @@ export function useResumeTask() {
     },
   })
 }
+
+// 取消执行中的任务
+export function useCancelExecution() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (executionId: number) => {
+      const response = await apiClient.post(`/tasks/executions/${executionId}/cancel`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.all })
+    },
+  })
+}

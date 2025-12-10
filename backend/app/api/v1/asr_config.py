@@ -106,6 +106,30 @@ def get_asr_provider_presets():
     return ResponseModel(data=presets)
 
 
+@router.get("/options", response_model=ResponseModel)
+def get_asr_config_options(
+    session: Session = Depends(get_session),
+):
+    """获取 ASR 配置下拉选项
+
+    返回所有启用的 ASR 配置，用于任务参数中的下拉框选择。
+    """
+    query = select(ASRConfig).where(ASRConfig.is_active == True)
+    configs = session.exec(query).all()
+
+    options = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "provider": c.provider,
+            "label": f"{c.name} ({c.provider})",
+        }
+        for c in configs
+    ]
+
+    return ResponseModel(data=options)
+
+
 @router.get("/{config_id}", response_model=ResponseModel)
 def get_asr_config(
     config_id: int,

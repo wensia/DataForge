@@ -13,13 +13,16 @@ import {
   type Row,
   type Cell,
 } from '@tanstack/react-table'
+import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { CloudDownload, Search, Loader2, RotateCcw, Trash2 } from 'lucide-react'
+import { Search, Loader2, RotateCcw, Trash2, FilterX } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { DataPageContent } from '@/components/layout/data-page-layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FilterDatePicker } from '@/components/filter-date-picker'
+import { SearchableSelect } from '@/components/searchable-select'
 import {
   Select,
   SelectContent,
@@ -27,12 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +46,6 @@ import { SimplePagination } from '@/components/data-table'
 import {
   useRecords,
   useFilterOptions,
-  useSyncData,
   useDeleteRecords,
   proxyRecord,
   useUserPreference,
@@ -63,6 +59,7 @@ import {
   defaultColumnOrder,
   defaultColumnVisibility,
 } from './components/data-table-columns'
+import { RecordDetailModal } from './components/record-detail-modal'
 import { callTypeMap, callResultMap, type RecordsParams, type CallRecord } from './types'
 
 // 表格行组件
@@ -102,11 +99,14 @@ export function DataAnalysis() {
   const [callResultFilter, setCallResultFilter] = useState<string>('')
   const [staffNameFilter, setStaffNameFilter] = useState<string>('')
   const [departmentFilter, setDepartmentFilter] = useState('')
+  const [startTime, setStartTime] = useState<Date | undefined>(undefined)
+  const [endTime, setEndTime] = useState<Date | undefined>(undefined)
 
   // UI 状态
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [showAudioModal, setShowAudioModal] = useState(false)
-  const [_audioLoading, setAudioLoading] = useState(false)
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<CallRecord | null>(null)
+  const [showRecordModal, setShowRecordModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // 权限检查
@@ -132,7 +132,6 @@ export function DataAnalysis() {
     refetch: refetchRecords,
   } = useRecords(filters)
   const { data: filterOptions } = useFilterOptions()
-  const syncMutation = useSyncData()
   const deleteMutation = useDeleteRecords()
 
   // 用户偏好
@@ -211,45 +210,54 @@ export function DataAnalysis() {
     toast.success('已重置为默认设置')
   }, [])
 
-  // 播放录音
-  const handlePlayAudio = useCallback(
-    async (url: string) => {
-      setAudioLoading(true)
-      try {
-        if (audioUrl) {
-          URL.revokeObjectURL(audioUrl)
+  // 重置筛选条件
+  const handleResetFilters = useCallback(() => {
+    setSourceFilter('')
+    setCallTypeFilter('')
+    setCallResultFilter('')
+    setStaffNameFilter('')
+    setDepartmentFilter('')
+    setStartTime(undefined)
+    setEndTime(undefined)
+    setFilters({ page: 1, page_size: filters.page_size || 20 })
+    toast.success('已重置筛选条件')
+  }, [filters.page_size])
+
+  // 打开录音详情弹窗
+  const handleOpenRecordModal = useCallback(
+    async (record: CallRecord) => {
+      setSelectedRecord(record)
+      setShowRecordModal(true)
+      setAudioUrl(null)
+
+      // 加载录音
+      const recordUrl = record.raw_data?.['录音地址'] as string | undefined
+      if (recordUrl) {
+        setAudioLoading(true)
+        try {
+          // 释放之前的 URL
+          if (audioUrl) {
+            URL.revokeObjectURL(audioUrl)
+          }
+          const blob = await proxyRecord(recordUrl)
+          setAudioUrl(URL.createObjectURL(blob))
+        } catch {
+          toast.error('获取录音失败')
+        } finally {
+          setAudioLoading(false)
         }
-        const blob = await proxyRecord(url)
-        setAudioUrl(URL.createObjectURL(blob))
-        setShowAudioModal(true)
-      } catch {
-        toast.error('获取录音失败')
-      } finally {
-        setAudioLoading(false)
       }
     },
     [audioUrl]
   )
 
-  // 复制 URL
-  const handleCopyUrl = useCallback(async (url: string) => {
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success('已复制到剪贴板')
-    } catch {
-      toast.error('复制失败')
-    }
-  }, [])
-
-  // 表格列 - 不依赖 audioLoading 避免频繁重新计算
+  // 表格列
   const columns = useMemo(
     () =>
       getColumns({
-        onPlayAudio: handlePlayAudio,
-        onCopyUrl: handleCopyUrl,
-        audioLoading: false, // 按钮状态在组件内部管理
+        onOpenRecordModal: handleOpenRecordModal,
       }),
-    [handlePlayAudio, handleCopyUrl]
+    [handleOpenRecordModal]
   )
 
   // 稳定的数据引用，避免不必要的表格重渲染
@@ -300,18 +308,9 @@ export function DataAnalysis() {
           ? staffNameFilter
           : undefined,
       department: departmentFilter || undefined,
+      start_time: startTime ? format(startTime, 'yyyy-MM-dd') : undefined,
+      end_time: endTime ? format(endTime, 'yyyy-MM-dd') : undefined,
     })
-  }
-
-  // 同步数据
-  const handleSync = async () => {
-    try {
-      await syncMutation.mutateAsync()
-      toast.success('同步完成')
-      refetchRecords()
-    } catch {
-      toast.error('同步失败')
-    }
   }
 
   // 删除选中的记录
@@ -323,7 +322,6 @@ export function DataAnalysis() {
       const result = await deleteMutation.mutateAsync(selectedIds)
       if (result.deleted_count === 0) {
         toast.warning('没有记录被删除，数据可能已更新，正在刷新...')
-        refetchRecords()
       } else if (result.deleted_count < selectedIds.length) {
         toast.success(
           `成功删除 ${result.deleted_count} 条记录（${selectedIds.length - result.deleted_count} 条已不存在）`
@@ -331,8 +329,10 @@ export function DataAnalysis() {
       } else {
         toast.success(`成功删除 ${result.deleted_count} 条记录`)
       }
+      // 清除选中状态和关闭对话框
       setRowSelection({})
       setShowDeleteDialog(false)
+      // mutation 的 onSuccess 会自动刷新数据，无需手动调用 refetchRecords
     } catch {
       toast.error('删除失败')
     }
@@ -353,15 +353,15 @@ export function DataAnalysis() {
           )}
           <Button
             variant='outline'
-            onClick={handleSync}
-            disabled={syncMutation.isPending}
+            onClick={() => refetchRecords()}
+            disabled={recordsLoading}
           >
-            {syncMutation.isPending ? (
+            {recordsLoading ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
-              <CloudDownload className='mr-2 h-4 w-4' />
+              <RotateCcw className='mr-2 h-4 w-4' />
             )}
-            同步数据
+            刷新
           </Button>
         </div>
       </Header>
@@ -369,73 +369,92 @@ export function DataAnalysis() {
       <Main fixed className='min-h-0'>
         <DataPageContent
           toolbar={
-            <>
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className='w-[100px]'>
-                  <SelectValue placeholder='来源' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>全部</SelectItem>
-                  <SelectItem value='feishu'>飞书</SelectItem>
-                  <SelectItem value='yunke'>云客</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
-                <SelectTrigger className='w-[100px]'>
-                  <SelectValue placeholder='类型' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>全部</SelectItem>
-                  {Object.entries(callTypeMap).map(([key, { label }]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={callResultFilter}
-                onValueChange={setCallResultFilter}
-              >
-                <SelectTrigger className='w-[100px]'>
-                  <SelectValue placeholder='结果' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>全部</SelectItem>
-                  {Object.entries(callResultMap).map(([key, { label }]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={staffNameFilter}
-                onValueChange={setStaffNameFilter}
-              >
-                <SelectTrigger className='w-[120px]'>
-                  <SelectValue placeholder='员工' />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='all'>全部</SelectItem>
-                  {filterOptions?.staff_names.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                placeholder='部门'
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className='w-[120px]'
-              />
-              <Button onClick={handleSearch}>
-                <Search className='mr-2 h-4 w-4' />
-                查询
-              </Button>
-              <div className='flex-1' />
+            <div className='flex w-full flex-col gap-3'>
+              {/* 筛选条件行 */}
+              <div className='flex items-center gap-2'>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger className='w-[100px]'>
+                    <SelectValue placeholder='来源' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>全部</SelectItem>
+                    <SelectItem value='feishu'>飞书</SelectItem>
+                    <SelectItem value='yunke'>云客</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
+                  <SelectTrigger className='w-[100px]'>
+                    <SelectValue placeholder='类型' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>全部</SelectItem>
+                    {Object.entries(callTypeMap).map(([key, { label }]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={callResultFilter}
+                  onValueChange={setCallResultFilter}
+                >
+                  <SelectTrigger className='w-[100px]'>
+                    <SelectValue placeholder='结果' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='all'>全部</SelectItem>
+                    {Object.entries(callResultMap).map(([key, { label }]) => (
+                      <SelectItem key={key} value={key}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <SearchableSelect
+                  value={staffNameFilter}
+                  onValueChange={setStaffNameFilter}
+                  options={[
+                    { value: 'all', label: '全部' },
+                    ...(filterOptions?.staff_names.map((name) => ({
+                      value: name,
+                      label: name,
+                    })) || []),
+                  ]}
+                  placeholder='员工'
+                  searchPlaceholder='搜索员工...'
+                  emptyText='未找到员工'
+                  className='w-[120px]'
+                />
+                <Input
+                  placeholder='部门'
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className='w-[120px]'
+                />
+                <FilterDatePicker
+                  selected={startTime}
+                  onSelect={setStartTime}
+                  placeholder='开始日期'
+                  className='w-[140px]'
+                />
+                <FilterDatePicker
+                  selected={endTime}
+                  onSelect={setEndTime}
+                  placeholder='结束日期'
+                  className='w-[140px]'
+                />
+                <div className='flex-1' />
+                <Button onClick={handleSearch}>
+                  <Search className='mr-2 h-4 w-4' />
+                  查询
+                </Button>
+                <Button variant='outline' onClick={handleResetFilters}>
+                  <FilterX className='mr-2 h-4 w-4' />
+                  重置
+                </Button>
+              </div>
+              {/* 操作栏 */}
               <div className='flex items-center gap-2'>
                 {selectedRowCount > 0 && (
                   <>
@@ -459,17 +478,18 @@ export function DataAnalysis() {
                     )}
                   </>
                 )}
+                <div className='flex-1' />
                 <DataTableViewOptions table={table} columnNames={columnNames} />
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={handleResetPreferences}
+                  title='重置为默认设置'
+                >
+                  <RotateCcw className='h-4 w-4' />
+                </Button>
               </div>
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={handleResetPreferences}
-                title='重置为默认设置'
-              >
-                <RotateCcw className='h-4 w-4' />
-              </Button>
-            </>
+            </div>
           }
           pagination={
             recordsData && (
@@ -547,17 +567,14 @@ export function DataAnalysis() {
         </DataPageContent>
       </Main>
 
-      {/* 录音播放弹窗 */}
-      <Dialog open={showAudioModal} onOpenChange={setShowAudioModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>播放录音</DialogTitle>
-          </DialogHeader>
-          {audioUrl && (
-            <audio src={audioUrl} controls autoPlay className='w-full' />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* 录音详情弹窗 */}
+      <RecordDetailModal
+        open={showRecordModal}
+        onOpenChange={setShowRecordModal}
+        record={selectedRecord}
+        audioUrl={audioUrl}
+        audioLoading={audioLoading}
+      />
 
       {/* 删除确认对话框 */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

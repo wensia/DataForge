@@ -33,7 +33,7 @@ async def get_tasks(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
 ):
     """获取所有定时任务"""
-    tasks = task_service.get_all_tasks(
+    tasks = await task_service.get_all_tasks_async(
         status=status, category=category, page=page, size=size
     )
     return ResponseModel.success(data=tasks)
@@ -42,7 +42,7 @@ async def get_tasks(
 @router.get("/categories", response_model=ResponseModel[list[str]])
 async def get_categories():
     """获取所有已使用的任务分类"""
-    categories = task_service.get_all_categories()
+    categories = await task_service.get_all_categories_async()
     return ResponseModel.success(data=categories)
 
 
@@ -61,7 +61,7 @@ async def get_all_executions(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
 ):
     """获取所有任务的执行记录"""
-    executions, total = task_service.get_all_executions(
+    executions, total = await task_service.get_all_executions_async(
         task_id=task_id, status=status, page=page, size=size
     )
     return ResponseModel.success(
@@ -75,16 +75,29 @@ async def get_all_executions(
 )
 async def get_execution_detail(execution_id: int):
     """获取执行详情"""
-    execution = task_service.get_execution_by_id(execution_id)
+    execution = await task_service.get_execution_by_id_async(execution_id)
     if not execution:
         return ResponseModel.error(code=404, message="执行记录不存在")
     return ResponseModel.success(data=execution)
 
 
+@router.post("/executions/{execution_id}/cancel", response_model=ResponseModel)
+async def cancel_execution(execution_id: int):
+    """取消执行中的任务
+
+    将运行中或等待中的任务标记为已取消状态。
+    注意：这只是标记状态变更，无法真正终止已在运行的后台任务。
+    """
+    result = await task_service.cancel_execution_async(execution_id)
+    if result["success"]:
+        return ResponseModel.success(message=result["message"])
+    return ResponseModel.error(code=400, message=result["message"])
+
+
 @router.get("/{task_id}", response_model=ResponseModel[ScheduledTaskResponse])
 async def get_task(task_id: int):
     """获取单个任务详情"""
-    task = task_service.get_task_by_id(task_id)
+    task = await task_service.get_task_by_id_async(task_id)
     if not task:
         return ResponseModel.error(code=404, message="任务不存在")
     return ResponseModel.success(data=task)
@@ -160,14 +173,14 @@ async def get_task_executions(
     size: int = Query(20, ge=1, le=100, description="每页数量"),
 ):
     """获取任务执行历史"""
-    executions = task_service.get_task_executions(task_id, page=page, size=size)
+    executions = await task_service.get_task_executions_async(task_id, page=page, size=size)
     return ResponseModel.success(data=executions)
 
 
 async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
     """SSE 日志流生成器"""
     # 检查执行记录是否存在
-    execution = task_service.get_execution_by_id(execution_id)
+    execution = await task_service.get_execution_by_id_async(execution_id)
     if not execution:
         yield f'data: {{"error": "执行记录不存在"}}\n\n'
         return
@@ -197,7 +210,7 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                 if log_line is None:
                     # 任务结束信号
                     # 重新获取执行记录以获取最终状态
-                    execution = task_service.get_execution_by_id(execution_id)
+                    execution = await task_service.get_execution_by_id_async(execution_id)
                     status = execution.status.value if execution else "unknown"
                     yield f'data: {{"status": "{status}", "finished": true}}\n\n'
                     break

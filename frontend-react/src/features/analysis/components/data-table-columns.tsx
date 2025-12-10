@@ -8,15 +8,13 @@ import { DataTableColumnHeader, createSelectColumn } from '@/components/data-tab
 import { callTypeMap, callResultMap, formatDate, type CallRecord } from '../types'
 
 interface ColumnOptions {
-  onPlayAudio: (url: string) => void
-  onCopyUrl: (url: string) => void
-  audioLoading: boolean
+  onOpenRecordModal: (record: CallRecord) => void
 }
 
 // 列名映射（用于显示中文名）
 export const columnNames: Record<string, string> = {
   select: '选择',
-  call_time: '日期',
+  call_time: '通话时间',
   caller: '主叫',
   callee: '被叫',
   duration: '时长',
@@ -68,12 +66,12 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
     {
       accessorKey: 'call_time',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title='日期' />
+        <DataTableColumnHeader column={column} title='通话时间' />
       ),
       cell: ({ row }) => formatDate(row.original.call_time),
       enableSorting: true,
       enableHiding: true,
-      size: 110,
+      size: 160,
     },
     {
       accessorKey: 'caller',
@@ -189,11 +187,17 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='转写文本' />
       ),
-      cell: ({ row }) => (
-        <span className='block max-w-[200px] truncate'>
-          {row.original.transcript || '-'}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const transcript = row.original.transcript
+        if (!transcript || transcript.length === 0) return '-'
+        // 显示第一条文本的摘要
+        const firstText = transcript[0]?.text || ''
+        return (
+          <span className='block max-w-[200px] truncate' title={firstText}>
+            {`[${transcript.length}句] ${firstText}`}
+          </span>
+        )
+      },
       enableSorting: false,
       enableHiding: true,
     },
@@ -204,30 +208,28 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
         const recordUrl = row.original.raw_data?.['录音地址'] as
           | string
           | undefined
-        if (!recordUrl) return '-'
+        const hasTranscript = !!row.original.transcript
+
+        // 无录音
+        if (!recordUrl) {
+          return <span className='text-muted-foreground'>-</span>
+        }
+
+        // 有录音，根据是否有转写结果显示不同样式
         return (
-          <div className='flex gap-1'>
-            <Button
-              variant='outline'
-              size='sm'
-              disabled={options.audioLoading}
-              onClick={() => options.onPlayAudio(recordUrl)}
-            >
-              播放
-            </Button>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => options.onCopyUrl(recordUrl)}
-            >
-              复制
-            </Button>
-          </div>
+          <Button
+            variant={hasTranscript ? 'default' : 'outline'}
+            size='sm'
+            className={hasTranscript ? 'bg-green-600 hover:bg-green-700' : ''}
+            onClick={() => options.onOpenRecordModal(row.original)}
+          >
+            {hasTranscript ? '已转写' : '录音'}
+          </Button>
         )
       },
       enableSorting: false,
       enableHiding: true,
-      size: 120,
+      size: 100,
     },
   ]
 }

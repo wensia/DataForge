@@ -20,7 +20,10 @@ function parseDefaultValue(
   type: string
 ): unknown {
   if (defaultStr === null || defaultStr === 'None') {
-    return type === 'bool' ? false : type === 'int' || type === 'float' ? 0 : ''
+    if (type === 'bool') return false
+    if (type === 'int' || type === 'float') return 0
+    if (type === 'datetime') return '' // datetime 默认为空字符串
+    return ''
   }
 
   // 去除引号
@@ -35,6 +38,15 @@ function parseDefaultValue(
       return trimmed.toLowerCase() === 'true'
     case 'str':
       // 去除字符串引号 'hello' -> hello
+      if (
+        (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+        (trimmed.startsWith('"') && trimmed.endsWith('"'))
+      ) {
+        return trimmed.slice(1, -1)
+      }
+      return trimmed
+    case 'datetime':
+      // datetime 类型，返回原始字符串（去除引号）
       if (
         (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
         (trimmed.startsWith('"') && trimmed.endsWith('"'))
@@ -139,6 +151,31 @@ function ParamField({
           />
         </div>
       )
+
+    case 'datetime': {
+      // 将 datetime 字符串转换为 datetime-local 格式
+      const dateValue = value
+        ? String(value).replace(' ', 'T').slice(0, 16)
+        : ''
+      return (
+        <div className='space-y-2'>
+          <Label>
+            {name}
+            {required && <span className='text-destructive ml-1'>*</span>}
+          </Label>
+          <Input
+            type='datetime-local'
+            value={dateValue}
+            onChange={(e) => {
+              // 转换为 "YYYY-MM-DD HH:mm" 格式，与后端 datetime 兼容
+              const val = e.target.value.replace('T', ' ')
+              onChange(val)
+            }}
+            disabled={disabled}
+          />
+        </div>
+      )
+    }
 
     case 'dict':
     case 'list':

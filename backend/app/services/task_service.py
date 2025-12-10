@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 from typing import Optional
@@ -14,6 +15,9 @@ from sqlmodel import Session, select
 
 from app.config import settings
 from app.database import engine
+
+# 数据库操作线程池（避免同步操作阻塞事件循环）
+_db_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="db_task_")
 from app.models.task import (
     ScheduledTask,
     ScheduledTaskCreate,
@@ -265,12 +269,27 @@ def get_all_executions(
     page: int = 1,
     size: int = 20,
 ) -> tuple[list[dict], int]:
-    """获取所有任务的执行记录（带任务名称）"""
+    """获取所有任务的执行记录（带任务名称）
+
+    优化：只选择列表视图需要的字段，不包含 log_output 和 error_traceback 等大文本字段
+    """
+    from sqlmodel import func
+
     with Session(engine) as session:
-        # 构建查询
-        statement = select(TaskExecution, ScheduledTask.name.label("task_name")).join(
-            ScheduledTask, TaskExecution.task_id == ScheduledTask.id
-        )
+        # 构建查询 - 只选择需要的列（不包含大文本字段）
+        statement = select(
+            TaskExecution.id,
+            TaskExecution.task_id,
+            TaskExecution.status,
+            TaskExecution.trigger_type,
+            TaskExecution.started_at,
+            TaskExecution.finished_at,
+            TaskExecution.duration_ms,
+            TaskExecution.result,
+            TaskExecution.error_message,
+            TaskExecution.created_at,
+            ScheduledTask.name.label("task_name"),
+        ).join(ScheduledTask, TaskExecution.task_id == ScheduledTask.id)
 
         # 筛选条件
         if task_id:
@@ -279,8 +298,6 @@ def get_all_executions(
             statement = statement.where(TaskExecution.status == status)
 
         # 计算总数
-        from sqlmodel import func
-
         count_statement = select(func.count()).select_from(TaskExecution)
         if task_id:
             count_statement = count_statement.where(TaskExecution.task_id == task_id)
@@ -299,19 +316,19 @@ def get_all_executions(
 
         # 转换为字典列表
         executions = []
-        for execution, task_name in results:
+        for row in results:
             exec_dict = {
-                "id": execution.id,
-                "task_id": execution.task_id,
-                "task_name": task_name,
-                "status": execution.status.value if hasattr(execution.status, "value") else execution.status,
-                "trigger_type": execution.trigger_type,
-                "started_at": execution.started_at.isoformat() if execution.started_at else None,
-                "finished_at": execution.finished_at.isoformat() if execution.finished_at else None,
-                "duration_ms": execution.duration_ms,
-                "result": execution.result,
-                "error_message": execution.error_message,
-                "created_at": execution.created_at.isoformat() if execution.created_at else None,
+                "id": row.id,
+                "task_id": row.task_id,
+                "task_name": row.task_name,
+                "status": row.status.value if hasattr(row.status, "value") else row.status,
+                "trigger_type": row.trigger_type,
+                "started_at": row.started_at.isoformat() if row.started_at else None,
+                "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+                "duration_ms": row.duration_ms,
+                "result": row.result,
+                "error_message": row.error_message,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
             }
             executions.append(exec_dict)
 
@@ -431,3 +448,126 @@ def _create_trigger(task: ScheduledTask):
     elif task.task_type == TaskType.DATE and task.run_date:
         return DateTrigger(run_date=task.run_date)
     return None
+
+
+def cancel_execution(execution_id: int) -> dict:
+    """取消执行中的任务
+
+    将运行中或等待中的任务标记为已取消状态。
+    注意：这只是标记状态变更，无法真正终止已在运行的后台任务。
+
+    Args:
+        execution_id: 执行记录 ID
+
+    Returns:
+        dict: {"success": bool, "message": str}
+    """
+    with Session(engine) as session:
+        execution = session.get(TaskExecution, execution_id)
+        if not execution:
+            return {"success": False, "message": "执行记录不存在"}
+
+        # 只能取消运行中或等待中的任务
+        if execution.status not in [ExecutionStatus.RUNNING, ExecutionStatus.PENDING]:
+            return {
+                "success": False,
+                "message": f"无法取消状态为 {execution.status.value} 的任务",
+            }
+
+        # 更新状态
+        execution.status = ExecutionStatus.CANCELLED
+        execution.finished_at = datetime.now()
+        execution.error_message = "任务被手动取消"
+
+        # 计算执行时长
+        if execution.started_at:
+            execution.duration_ms = int(
+                (execution.finished_at - execution.started_at).total_seconds() * 1000
+            )
+
+        session.add(execution)
+        session.commit()
+
+        logger.info(f"任务执行 #{execution_id} 已被取消")
+        return {"success": True, "message": "任务已取消"}
+
+
+# ============================================================================
+# 异步版本函数（使用线程池避免阻塞事件循环）
+# ============================================================================
+
+
+async def get_all_tasks_async(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+) -> list[ScheduledTask]:
+    """异步获取所有任务"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(get_all_tasks, status=status, category=category, page=page, size=size),
+    )
+
+
+async def get_all_categories_async() -> list[str]:
+    """异步获取所有任务分类"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_db_executor, get_all_categories)
+
+
+async def get_task_by_id_async(task_id: int) -> Optional[ScheduledTask]:
+    """异步根据 ID 获取任务"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(get_task_by_id, task_id),
+    )
+
+
+async def get_all_executions_async(
+    task_id: Optional[int] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    size: int = 20,
+) -> tuple[list[dict], int]:
+    """异步获取所有执行记录"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(get_all_executions, task_id=task_id, status=status, page=page, size=size),
+    )
+
+
+async def get_task_executions_async(
+    task_id: int,
+    page: int = 1,
+    size: int = 20,
+) -> list[TaskExecution]:
+    """异步获取任务执行历史"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(get_task_executions, task_id, page=page, size=size),
+    )
+
+
+async def get_execution_by_id_async(
+    execution_id: int,
+) -> Optional[TaskExecutionDetailResponse]:
+    """异步获取执行详情"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(get_execution_by_id, execution_id),
+    )
+
+
+async def cancel_execution_async(execution_id: int) -> dict:
+    """异步取消执行"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(cancel_execution, execution_id),
+    )

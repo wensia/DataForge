@@ -74,6 +74,10 @@ async def get_records(
     Returns:
         ResponseModel: 包含记录列表和分页信息
     """
+    # 如果 end_time 只有日期（时间为零点），设置为当天末尾
+    if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
+        end_time = end_time.replace(hour=23, minute=59, second=59)
+
     offset = (page - 1) * page_size
 
     records, total = sync_svc.get_call_records(

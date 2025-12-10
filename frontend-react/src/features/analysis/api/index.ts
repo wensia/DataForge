@@ -137,8 +137,8 @@ export function useDeleteRecords() {
       return response.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: analysisKeys.records() })
-      queryClient.invalidateQueries({ queryKey: analysisKeys.stats() })
+      // 使用 refetchQueries 强制立即刷新数据，而不是仅标记为过期
+      queryClient.refetchQueries({ queryKey: analysisKeys.all })
     },
   })
 }

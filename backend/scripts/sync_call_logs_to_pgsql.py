@@ -24,7 +24,6 @@ from app.database import engine
 from app.models import CallRecord, YunkeAccount, YunkeCompany
 from app.scheduler import task_log
 from app.services.account_service import auto_login
-
 from scripts._utils import normalize_time_param
 
 # 任务元信息
@@ -106,8 +105,15 @@ FIELD_MAPPING = [
 def _parse_datetime(dt_str: str) -> datetime | None:
     """解析日期时间字符串为 datetime 对象
 
+    支持多种格式:
+    - "YYYY-MM-DD HH:mm:ss"
+    - "YYYY-MM-DD HH:mm"
+    - "YYYY/MM/DD HH:mm:ss"
+    - "YYYY/MM/DD HH:mm"
+    - 时间戳（秒或毫秒）
+
     Args:
-        dt_str: 日期时间字符串，格式 "YYYY-MM-DD HH:mm:ss"
+        dt_str: 日期时间字符串或时间戳
 
     Returns:
         datetime | None: datetime 对象，解析失败返回 None
@@ -115,13 +121,67 @@ def _parse_datetime(dt_str: str) -> datetime | None:
     if not dt_str:
         return None
 
-    try:
-        return datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
-    except ValueError:
+    # 如果是字符串，尝试多种格式解析
+    if isinstance(dt_str, str):
+        formats = [
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+            "%Y/%m/%d %H:%M:%S",
+            "%Y/%m/%d %H:%M",
+        ]
+
+        for fmt in formats:
+            try:
+                return datetime.strptime(dt_str, fmt)
+            except ValueError:
+                continue
+
+        # 尝试解析时间戳（字符串形式）
         try:
-            return datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-        except ValueError:
-            return None
+            ts = int(dt_str)
+            if ts > 1e12:  # 毫秒时间戳
+                ts = ts / 1000
+            return datetime.fromtimestamp(ts)
+        except (ValueError, TypeError, OSError):
+            pass
+
+    # 如果是数字（时间戳）
+    elif isinstance(dt_str, (int, float)):
+        try:
+            ts = dt_str
+            if ts > 1e12:  # 毫秒时间戳
+                ts = ts / 1000
+            return datetime.fromtimestamp(ts)
+        except (ValueError, TypeError, OSError):
+            pass
+
+    return None
+
+
+def _get_call_time(record: dict) -> datetime | None:
+    """获取通话时间，支持多字段后备
+
+    优先级:
+    1. startCallTime - 通话开始时间
+    2. createdTime - 记录创建时间
+
+    Args:
+        record: 云客通话记录
+
+    Returns:
+        datetime | None: 通话时间，无法解析时返回 None
+    """
+    # 优先使用 startCallTime
+    call_time = _parse_datetime(record.get("startCallTime", ""))
+    if call_time:
+        return call_time
+
+    # 后备: 使用 createdTime
+    call_time = _parse_datetime(record.get("createdTime", ""))
+    if call_time:
+        return call_time
+
+    return None
 
 
 def _convert_record(record: dict, field_mapping: list[dict]) -> dict:
@@ -200,6 +260,7 @@ async def run(
         "total_fetched": 0,
         "new_records": 0,
         "skipped_records": 0,
+        "skipped_no_call_time": 0,  # 无法解析通话时间而跳过的记录数
         "failed_records": 0,
         "start_time": start_time,
         "end_time": end_time,
@@ -316,6 +377,7 @@ async def run(
         task_log("开始批量写入数据库...")
 
         total_created = 0
+        skipped_no_call_time = 0  # 无法解析通话时间的记录数
         batch_size = 500
 
         for i in range(0, len(new_records), batch_size):
@@ -325,7 +387,15 @@ async def run(
             try:
                 # 构建批量插入数据
                 values = []
+                batch_skipped_no_time = 0
                 for record in batch:
+                    # 获取通话时间（支持后备字段）
+                    call_time = _get_call_time(record)
+                    if call_time is None:
+                        # 跳过无法解析通话时间的记录
+                        batch_skipped_no_time += 1
+                        continue
+
                     mapped_data = _convert_record(record, FIELD_MAPPING)
                     values.append(
                         {
@@ -333,10 +403,12 @@ async def run(
                             "record_id": str(record.get("id", "")),
                             "caller": str(record.get("simPhone", "")) or None,
                             "callee": str(record.get("callNumber", "")) or None,
-                            "call_time": _parse_datetime(record.get("startCallTime", "")),
+                            "call_time": call_time,
                             "duration": record.get("callSeconds"),
                             "call_type": (
-                                "outbound" if record.get("incomingCall") == 0 else "inbound"
+                                "outbound"
+                                if record.get("incomingCall") == 0
+                                else "inbound"
                             ),
                             "call_result": str(record.get("callStatus", "")) or None,
                             "customer_name": record.get("planCustomerName") or None,
@@ -345,6 +417,14 @@ async def run(
                             "raw_data": mapped_data,
                         }
                     )
+
+                # 记录本批次跳过的无时间记录
+                skipped_no_call_time += batch_skipped_no_time
+
+                # 如果本批次所有记录都被跳过，继续下一批
+                if not values:
+                    task_log(f"批次 {batch_num}: {batch_skipped_no_time} 条无时间跳过")
+                    continue
 
                 # 使用 PostgreSQL INSERT ... ON CONFLICT DO NOTHING
                 stmt = pg_insert(CallRecord).values(values)
@@ -355,12 +435,13 @@ async def run(
                 session.commit()
 
                 # rowcount 返回实际插入的行数
-                inserted = result_proxy.rowcount if result_proxy.rowcount >= 0 else len(batch)
+                rowcount = result_proxy.rowcount
+                inserted = rowcount if rowcount >= 0 else len(batch)
                 total_created += inserted
                 skipped = len(batch) - inserted
                 if skipped > 0:
                     result["skipped_records"] += skipped
-                task_log(f"批次 {batch_num} 完成: 插入 {inserted} 条, 跳过 {skipped} 条")
+                task_log(f"批次 {batch_num}: 插入 {inserted}, 跳过 {skipped}")
 
             except Exception as e:
                 session.rollback()
@@ -368,12 +449,14 @@ async def run(
                 task_log(f"批次 {batch_num} 写入失败: {e}")
 
         result["new_records"] = total_created
+        result["skipped_no_call_time"] = skipped_no_call_time
 
         # ========== 6. 完成 ==========
         task_log(
             f"同步完成: 总计 {result['total_fetched']}, "
             f"新增 {result['new_records']}, "
-            f"跳过 {result['skipped_records']}, "
+            f"跳过(重复) {result['skipped_records']}, "
+            f"跳过(无时间) {result['skipped_no_call_time']}, "
             f"失败 {result['failed_records']}"
         )
 

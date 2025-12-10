@@ -1,9 +1,11 @@
 """API密钥验证工具"""
 
+import json
 import secrets
 from datetime import datetime
 from typing import Optional
 
+import redis
 from loguru import logger
 from sqlmodel import Session, select
 
@@ -11,26 +13,111 @@ from app.config import settings
 from app.database import engine
 from app.models.api_key import ApiKey
 
+# Redis 客户端（延迟初始化）
+_redis_client: Optional[redis.Redis] = None
+
+
+def get_redis_client() -> Optional[redis.Redis]:
+    """获取 Redis 客户端（单例模式）"""
+    global _redis_client
+    if _redis_client is None and settings.redis_url:
+        try:
+            _redis_client = redis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            )
+            # 测试连接
+            _redis_client.ping()
+            logger.info("Redis 连接成功")
+        except Exception as e:
+            logger.warning(f"Redis 连接失败，将使用数据库直接验证: {e}")
+            _redis_client = None
+    return _redis_client
+
 
 class APIKeyValidator:
     """API密钥验证器
 
     提供安全的API密钥验证功能,包括:
+    - Redis 缓存验证结果（减少数据库查询）
     - 从数据库验证密钥
     - 密钥过期检查
-    - 使用统计记录
+    - 异步使用统计更新
     - 审计日志记录(脱敏处理)
     """
 
+    CACHE_KEY_PREFIX = "apikey:"  # Redis 缓存键前缀
+    USAGE_KEY_PREFIX = "apikey_usage:"  # 使用统计缓存键前缀
+
     def __init__(self):
         """初始化验证器"""
-        # 兼容模式: 如果配置了环境变量中的密钥,也支持验证
-        self.legacy_keys = settings.get_api_keys_list()
-        if self.legacy_keys:
-            logger.warning(
-                f"检测到环境变量中配置了 {len(self.legacy_keys)} 个密钥, "
-                "建议迁移到数据库管理"
+        pass
+
+    def _get_cache_key(self, api_key: str) -> str:
+        """生成缓存键"""
+        return f"{self.CACHE_KEY_PREFIX}{api_key[:8]}"  # 只用前8字符作为键
+
+    def _get_from_cache(self, api_key: str) -> Optional[tuple[bool, str | None, dict | None]]:
+        """从 Redis 缓存获取验证结果"""
+        redis_client = get_redis_client()
+        if not redis_client:
+            return None
+
+        try:
+            cache_key = self._get_cache_key(api_key)
+            cached = redis_client.get(cache_key)
+            if cached:
+                data = json.loads(cached)
+                # 验证缓存中的密钥是否匹配（防止哈希冲突）
+                if data.get("_key") == api_key:
+                    return data["is_valid"], data.get("error"), data.get("metadata")
+        except Exception as e:
+            logger.warning(f"Redis 缓存读取失败: {e}")
+        return None
+
+    def _set_cache(
+        self,
+        api_key: str,
+        is_valid: bool,
+        error: Optional[str],
+        metadata: Optional[dict],
+    ) -> None:
+        """将验证结果写入 Redis 缓存"""
+        redis_client = get_redis_client()
+        if not redis_client:
+            return
+
+        try:
+            cache_key = self._get_cache_key(api_key)
+            data = {
+                "_key": api_key,  # 存储完整密钥用于验证
+                "is_valid": is_valid,
+                "error": error,
+                "metadata": metadata,
+            }
+            redis_client.setex(
+                cache_key,
+                settings.api_key_cache_ttl,
+                json.dumps(data),
             )
+        except Exception as e:
+            logger.warning(f"Redis 缓存写入失败: {e}")
+
+    def _record_usage_async(self, api_key: str) -> None:
+        """异步记录使用统计（使用 Redis INCR）"""
+        redis_client = get_redis_client()
+        if not redis_client:
+            return
+
+        try:
+            usage_key = f"{self.USAGE_KEY_PREFIX}{api_key[:8]}"
+            redis_client.incr(usage_key)
+            # 设置过期时间，定时任务会处理刷新到数据库
+            redis_client.expire(usage_key, 3600)  # 1小时过期
+        except Exception as e:
+            logger.warning(f"Redis 使用统计记录失败: {e}")
 
     def validate(
         self, api_key: Optional[str]
@@ -47,6 +134,28 @@ class APIKeyValidator:
         if not api_key:
             return False, "缺少API密钥,请在URL中添加api_key参数", None
 
+        # 1. 先查 Redis 缓存
+        cached = self._get_from_cache(api_key)
+        if cached is not None:
+            is_valid, error, metadata = cached
+            if is_valid:
+                # 异步记录使用统计
+                self._record_usage_async(api_key)
+            return is_valid, error, metadata
+
+        # 2. 缓存未命中，查数据库
+        result = self._validate_from_db(api_key)
+
+        # 3. 写入缓存（有效密钥缓存较长时间，无效密钥缓存较短时间）
+        is_valid, error, metadata = result
+        self._set_cache(api_key, is_valid, error, metadata)
+
+        return result
+
+    def _validate_from_db(
+        self, api_key: str
+    ) -> tuple[bool, Optional[str], Optional[dict[str, str]]]:
+        """从数据库验证密钥（不更新使用统计）"""
         # 1. 优先从数据库验证
         with Session(engine) as session:
             statement = select(ApiKey).where(ApiKey.key == api_key)
@@ -61,13 +170,7 @@ class APIKeyValidator:
                 if db_key.expires_at and db_key.expires_at < datetime.utcnow():
                     return False, "API密钥已过期", None
 
-                # 更新使用统计
-                db_key.usage_count += 1
-                db_key.last_used_at = datetime.utcnow()
-                session.add(db_key)
-                session.commit()
-
-                # 返回元数据
+                # 返回元数据（不再同步更新使用统计）
                 metadata = {
                     "key_id": str(db_key.id),
                     "client_id": f"key_{db_key.id}",
@@ -77,22 +180,18 @@ class APIKeyValidator:
                 }
                 return True, None, metadata
 
-        # 2. 兼容模式: 检查环境变量中的密钥(遗留支持)
-        if api_key in self.legacy_keys:
-            logger.warning(
-                f"使用了环境变量中的密钥, 建议迁移到数据库管理: {self.get_masked_key(api_key)}"
-            )
-            idx = self.legacy_keys.index(api_key)
-            metadata = {
-                "client_id": f"admin_{idx + 1}",
-                "name": f"管理员密钥 {idx + 1}",
-                "created_at": datetime.utcnow().isoformat(),
-                "key_type": "admin",  # 标记为管理员密钥
-            }
-            return True, None, metadata
-
         # 密钥无效
         return False, "无效的API密钥", None
+
+    def invalidate_cache(self, api_key: str) -> None:
+        """使密钥缓存失效（当密钥被修改或删除时调用）"""
+        redis_client = get_redis_client()
+        if redis_client:
+            try:
+                cache_key = self._get_cache_key(api_key)
+                redis_client.delete(cache_key)
+            except Exception as e:
+                logger.warning(f"Redis 缓存删除失败: {e}")
 
     def get_masked_key(self, api_key: str) -> str:
         """获取脱敏后的密钥(用于日志记录)

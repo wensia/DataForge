@@ -43,7 +43,7 @@ class CallRecord(BaseTable, table=True):
     # 核心字段（便于查询和统计）
     caller: str | None = Field(default=None, description="主叫号码/人员")
     callee: str | None = Field(default=None, description="被叫号码/客户")
-    call_time: datetime | None = Field(default=None, description="通话时间")
+    call_time: datetime = Field(description="通话时间")
     duration: int | None = Field(default=None, description="通话时长(秒)")
     call_type: str | None = Field(default=None, description="通话类型")
     call_result: str | None = Field(default=None, description="通话结果")
@@ -52,7 +52,11 @@ class CallRecord(BaseTable, table=True):
     customer_name: str | None = Field(default=None, description="客户名称")
     staff_name: str | None = Field(default=None, description="员工名称")
     department: str | None = Field(default=None, description="部门")
-    transcript: str | None = Field(default=None, description="通话录音转写文本")
+    transcript: list[dict[str, Any]] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="通话录音转写文本(JSON格式)",
+    )
 
     # 员工映射字段（通过 staff_mapping 回写）
     staff_id: int | None = Field(default=None, foreign_key="staff.id", description="关联的员工ID")
@@ -75,14 +79,14 @@ class CallRecordCreate(SQLModel):
     record_id: str
     caller: str | None = None
     callee: str | None = None
-    call_time: datetime | None = None
+    call_time: datetime  # 必填字段
     duration: int | None = None
     call_type: str | None = None
     call_result: str | None = None
     customer_name: str | None = None
     staff_name: str | None = None
     department: str | None = None
-    transcript: str | None = None
+    transcript: list[dict[str, Any]] | None = None
     raw_data: dict[str, Any] = {}
 
 
@@ -98,7 +102,7 @@ class CallRecordUpdate(SQLModel):
     customer_name: str | None = None
     staff_name: str | None = None
     department: str | None = None
-    transcript: str | None = None
+    transcript: list[dict[str, Any]] | None = None
     raw_data: dict[str, Any] | None = None
 
 
@@ -117,7 +121,7 @@ class CallRecordResponse(SQLModel):
     customer_name: str | None
     staff_name: str | None
     department: str | None
-    transcript: str | None
+    transcript: list[dict[str, Any]] | None
     raw_data: dict[str, Any]
     created_at: datetime
     updated_at: datetime
