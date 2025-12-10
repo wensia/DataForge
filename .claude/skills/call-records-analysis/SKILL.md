@@ -37,10 +37,12 @@ PGPASSWORD='j7P8djrJwXdOWt5N' psql -h 124.220.15.80 -U postgres -d production -c
 
 生成周报时，必须按以下步骤执行，确保数据准确：
 
+> **重要原则**：统计数据基于**全部通话**，质量分析基于**有转写的通话**
+
 ### 步骤1：查询总览数据
 
 ```sql
--- 本周通话总览
+-- 本周通话总览（基于全部通话）
 SELECT
     COUNT(*) as 总通话数,
     COUNT(transcript) as 有转写数,
@@ -50,20 +52,21 @@ FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days';
 ```
 
-### 步骤2：查询员工明细（仅有转写的）
+### 步骤2：查询员工明细（基于全部通话）
 
 ```sql
--- 员工通话统计（核心数据）
+-- 员工通话统计（核心数据 - 基于全部通话）
 SELECT
     staff_name as 员工,
     COUNT(*) as 通话数,
     SUM(duration) as 总时长秒,
     ROUND(AVG(duration)::numeric, 1) as 平均时长秒,
     SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
-    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率,
+    COUNT(transcript) as 有转写数,
+    ROUND(COUNT(transcript) * 100.0 / COUNT(*), 1) as 转写率
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
   AND staff_name IS NOT NULL
 GROUP BY staff_name
 ORDER BY 超1分钟数 DESC, 通话数 DESC;
@@ -74,24 +77,24 @@ ORDER BY 超1分钟数 DESC, 通话数 DESC;
 ```sql
 -- 验证汇总数据（确保员工明细加总 = 总数）
 SELECT
-    COUNT(*) as 有转写通话总数,
+    COUNT(*) as 通话总数,
     SUM(duration) as 总时长秒,
-    COUNT(DISTINCT staff_name) as 员工数
+    COUNT(DISTINCT staff_name) as 员工数,
+    COUNT(transcript) as 有转写数
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
   AND staff_name IS NOT NULL;
 ```
 
 **校验要点**：
-- 员工通话数之和 = 有转写通话总数
-- 员工总时长之和 = 有转写总时长
+- 员工通话数之和 = 通话总数
+- 员工总时长之和 = 总时长
 - 如不一致，检查是否遗漏 `staff_name IS NOT NULL` 条件
 
-### 步骤4：时长分布统计
+### 步骤4：时长分布统计（基于全部通话）
 
 ```sql
--- 时长分布（仅有转写的）
+-- 时长分布（基于全部通话）
 SELECT
     CASE
         WHEN duration < 30 THEN '1. 0-30秒'
@@ -105,15 +108,14 @@ SELECT
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
 ```
 
-### 步骤5：抽取长通话进行质量分析
+### 步骤5：抽取长通话进行质量分析（需要转写）
 
 ```sql
--- 获取超过5分钟的深度通话（用于质量抽样）
+-- 获取超过5分钟的深度通话（用于质量抽样，必须有转写）
 SELECT id, staff_name, call_time, duration, call_result
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'

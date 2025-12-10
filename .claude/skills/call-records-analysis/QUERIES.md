@@ -200,6 +200,8 @@ WHERE id = {ID};
 
 ## 四、统计分析查询
 
+> **重要**：统计分析基于**全部通话**，不依赖 transcript 字段
+
 ### 1. 通话时长分布
 ```sql
 SELECT
@@ -213,7 +215,6 @@ SELECT
     COUNT(*) as 数量,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
 FROM call_records
-WHERE transcript IS NOT NULL
 GROUP BY 1
 ORDER BY MIN(duration);
 ```
@@ -225,34 +226,37 @@ SELECT
     COUNT(*) as 数量,
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
 FROM call_records
-WHERE transcript IS NOT NULL
 GROUP BY call_result
 ORDER BY 数量 DESC;
 ```
 
-### 3. 按员工统计（有转写的）
+### 3. 按员工统计
 ```sql
 SELECT
     staff_name as 员工,
     COUNT(*) as 通话数,
     SUM(duration) as 总时长秒,
     ROUND(AVG(duration)) as 平均时长秒,
-    ROUND(SUM(duration) / 60.0, 1) as 总时长分钟
+    SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率,
+    COUNT(transcript) as 有转写数,
+    ROUND(COUNT(transcript) * 100.0 / COUNT(*), 1) as 转写率
 FROM call_records
-WHERE transcript IS NOT NULL AND staff_name IS NOT NULL
+WHERE staff_name IS NOT NULL
 GROUP BY staff_name
 ORDER BY 通话数 DESC;
 ```
 
-### 4. 按部门统计（有转写的）
+### 4. 按部门统计
 ```sql
 SELECT
     department as 部门,
     COUNT(*) as 通话数,
     SUM(duration) as 总时长秒,
-    COUNT(DISTINCT staff_name) as 员工数
+    COUNT(DISTINCT staff_name) as 员工数,
+    COUNT(transcript) as 有转写数
 FROM call_records
-WHERE transcript IS NOT NULL AND department IS NOT NULL
+WHERE department IS NOT NULL
 GROUP BY department
 ORDER BY 通话数 DESC;
 ```
@@ -262,11 +266,11 @@ ORDER BY 通话数 DESC;
 SELECT
     DATE(call_time) as 日期,
     COUNT(*) as 通话数,
+    COUNT(transcript) as 有转写数,
     SUM(duration) as 总时长秒,
     ROUND(AVG(duration)) as 平均时长秒
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
 GROUP BY DATE(call_time)
 ORDER BY 日期;
 ```
@@ -379,6 +383,8 @@ ORDER BY call_time;
 ## 七、周报专用查询（重要）
 
 > 生成周报时按顺序执行以下查询，确保数据准确
+>
+> **重要原则**：统计数据基于**全部通话**，质量分析基于**有转写的通话**
 
 ### 1. 本周通话总览
 
@@ -392,7 +398,7 @@ FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days';
 ```
 
-### 2. 员工通话统计（核心数据）
+### 2. 员工通话统计（核心数据 - 基于全部通话）
 
 ```sql
 SELECT
@@ -401,10 +407,11 @@ SELECT
     SUM(duration) as 总时长秒,
     ROUND(AVG(duration)::numeric, 1) as 平均时长秒,
     SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as 超1分钟数,
-    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率
+    ROUND(SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as 有效率,
+    COUNT(transcript) as 有转写数,
+    ROUND(COUNT(transcript) * 100.0 / COUNT(*), 1) as 转写率
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
   AND staff_name IS NOT NULL
 GROUP BY staff_name
 ORDER BY 超1分钟数 DESC, 通话数 DESC;
@@ -415,21 +422,21 @@ ORDER BY 超1分钟数 DESC, 通话数 DESC;
 ```sql
 -- 验证员工明细加总 = 总数
 SELECT
-    COUNT(*) as 有转写通话总数,
+    COUNT(*) as 通话总数,
     SUM(duration) as 总时长秒,
-    COUNT(DISTINCT staff_name) as 员工数
+    COUNT(DISTINCT staff_name) as 员工数,
+    COUNT(transcript) as 有转写数
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
   AND staff_name IS NOT NULL;
 ```
 
 **校验要点**：
-- 员工通话数之和 = 有转写通话总数
-- 员工总时长之和 = 有转写总时长
+- 员工通话数之和 = 通话总数
+- 员工总时长之和 = 总时长
 - 如不一致，检查 `staff_name IS NOT NULL` 条件
 
-### 4. 时长分布统计
+### 4. 时长分布统计（基于全部通话）
 
 ```sql
 SELECT
@@ -445,7 +452,6 @@ SELECT
     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 1) as 占比
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
-  AND transcript IS NOT NULL
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -465,9 +471,10 @@ GROUP BY DATE(call_time)
 ORDER BY 日期 DESC;
 ```
 
-### 6. 深度通话列表（用于质量抽样）
+### 6. 深度通话列表（用于质量抽样 - 需要转写）
 
 ```sql
+-- 质量分析需要转写内容，所以此处保留 transcript IS NOT NULL 条件
 SELECT id, staff_name, call_time, duration, call_result
 FROM call_records
 WHERE call_time >= CURRENT_DATE - INTERVAL '7 days'
