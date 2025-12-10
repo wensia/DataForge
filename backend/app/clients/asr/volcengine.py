@@ -7,6 +7,7 @@
 import asyncio
 import logging
 import random
+import threading
 import time
 import uuid
 from typing import Any
@@ -17,31 +18,29 @@ from app.clients.asr.base import ASRClient, TranscriptSegment
 
 logger = logging.getLogger(__name__)
 
-# 全局请求限流器（线程安全）
-_rate_limit_lock: asyncio.Lock | None = None
+# 全局请求限流器（使用线程锁，兼容多事件循环）
+
+_rate_limit_lock = threading.Lock()
 _last_request_time: float = 0
 _MIN_REQUEST_INTERVAL = 0.2  # 最小请求间隔（秒），20 QPS = 0.05s，留余量
 
 
-def _get_rate_limit_lock() -> asyncio.Lock:
-    """获取或创建限流锁（延迟初始化）"""
-    global _rate_limit_lock
-    if _rate_limit_lock is None:
-        _rate_limit_lock = asyncio.Lock()
-    return _rate_limit_lock
-
-
 async def _rate_limited_request():
-    """请求前的限流等待（线程安全）"""
+    """请求前的限流等待（线程安全，兼容多事件循环）"""
     global _last_request_time
-    lock = _get_rate_limit_lock()
 
-    async with lock:
+    with _rate_limit_lock:
         now = time.time()
         elapsed = now - _last_request_time
         if elapsed < _MIN_REQUEST_INTERVAL:
-            await asyncio.sleep(_MIN_REQUEST_INTERVAL - elapsed)
-        _last_request_time = time.time()
+            wait_time = _MIN_REQUEST_INTERVAL - elapsed
+        else:
+            wait_time = 0
+        _last_request_time = now + wait_time
+
+    # 在锁外等待，避免阻塞其他线程
+    if wait_time > 0:
+        await asyncio.sleep(wait_time)
 
 
 class VolcengineASRClient(ASRClient):

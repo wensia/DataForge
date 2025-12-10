@@ -218,6 +218,12 @@ def run_task_in_background(
         loop.run_until_complete(
             _execute_task_async(task_id, handler_path, handler_kwargs)
         )
+    except Exception as e:
+        # 捕获所有异常并记录，防止静默失败
+        logger.error(f"后台任务 #{task_id} 执行异常: {e}")
+        import traceback
+
+        logger.error(f"调用栈: {traceback.format_exc()}")
     finally:
         loop.close()
 
