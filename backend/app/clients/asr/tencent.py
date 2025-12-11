@@ -113,11 +113,13 @@ class TencentASRClient(ASRClient):
 
         timestamp = int(time.time())
         headers = self._sign_request(action, params, timestamp)
+        # 重要: 必须使用 content= 而不是 json=，确保发送的内容与签名计算时一致
+        payload = json.dumps(params)
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"https://{self.API_HOST}",
-                json=params,
+                content=payload,
                 headers=headers,
                 timeout=30.0,
             )
