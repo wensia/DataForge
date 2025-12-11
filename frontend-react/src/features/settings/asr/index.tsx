@@ -16,6 +16,7 @@ import {
   EyeOff,
   Star,
   ExternalLink,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -271,8 +272,10 @@ export function AsrSettings() {
   const verifyConfig = useVerifyAsrConfig()
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<AsrConfig | null>(null)
+  const [editingConfig, setEditingConfig] = useState<AsrConfig | null>(null)
   const [verifyingId, setVerifyingId] = useState<number | null>(null)
 
   const form = useForm<AsrConfigForm>({
@@ -287,8 +290,22 @@ export function AsrSettings() {
     },
   })
 
+  const editForm = useForm<AsrConfigForm>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      provider: '',
+      credentials: {},
+      is_active: true,
+      is_default: false,
+      notes: '',
+    },
+  })
+
   const selectedProvider = form.watch('provider')
+  const editSelectedProvider = editForm.watch('provider')
   const currentPreset = presets[selectedProvider]
+  const editCurrentPreset = presets[editSelectedProvider]
 
   // 当选择提供商时重置 credentials
   const handleProviderChange = (provider: string) => {
@@ -366,6 +383,48 @@ export function AsrSettings() {
       toast.success('已设为默认配置')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '设置失败'
+      toast.error(message)
+    }
+  }
+
+  const handleOpenEditDialog = (config: AsrConfig) => {
+    setEditingConfig(config)
+    editForm.reset({
+      name: config.name,
+      provider: config.provider,
+      credentials: config.credentials,
+      is_active: config.is_active,
+      is_default: config.is_default,
+      notes: config.notes || '',
+    })
+    setEditDialogOpen(true)
+  }
+
+  const onEditSubmit = async (data: AsrConfigForm) => {
+    if (!editingConfig) return
+    try {
+      const filteredCredentials: Record<string, string> = {}
+      for (const [key, value] of Object.entries(data.credentials)) {
+        if (value && value.trim()) {
+          filteredCredentials[key] = value
+        }
+      }
+      await updateConfig.mutateAsync({
+        id: editingConfig.id,
+        data: {
+          name: data.name,
+          credentials: filteredCredentials,
+          is_active: data.is_active,
+          is_default: data.is_default,
+          notes: data.notes || undefined,
+        },
+      })
+      toast.success('ASR 配置更新成功')
+      setEditDialogOpen(false)
+      setEditingConfig(null)
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '更新失败，请检查密钥是否正确'
       toast.error(message)
     }
   }
@@ -492,6 +551,14 @@ export function AsrSettings() {
                         )}
                       />
                       验证密钥
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleOpenEditDialog(config)}
+                    >
+                      <Pencil className='mr-1 h-3 w-3' />
+                      编辑
                     </Button>
                     {!config.is_default && (
                       <Button
@@ -679,6 +746,157 @@ export function AsrSettings() {
                 </Button>
                 <Button type='submit' disabled={createConfig.isPending}>
                   {createConfig.isPending ? '验证并创建中...' : '验证并创建'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑配置对话框 */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className='max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>编辑 ASR 配置</DialogTitle>
+            <DialogDescription>
+              修改 ASR 配置信息。如果修改密钥，保存前会自动验证。
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form
+              onSubmit={editForm.handleSubmit(onEditSubmit)}
+              className='space-y-4'
+            >
+              <FormField
+                control={editForm.control}
+                name='name'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>名称</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder='例如：腾讯云 ASR 主账号' />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='provider'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>提供商</FormLabel>
+                    <Select value={field.value} disabled>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='选择 ASR 提供商' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {providerOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription className='text-muted-foreground'>
+                      提供商创建后不可更改
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {editCurrentPreset?.fields.map((field) => (
+                <FormField
+                  key={field.key}
+                  control={editForm.control}
+                  name={`credentials.${field.key}`}
+                  render={({ field: formField }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {field.label}
+                        {field.required && (
+                          <span className='text-destructive ml-1'>*</span>
+                        )}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...formField}
+                          type='password'
+                          placeholder={field.default || `请输入 ${field.label}`}
+                          className='font-mono'
+                        />
+                      </FormControl>
+                      {field.hint && (
+                        <FormDescription>{field.hint}</FormDescription>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+
+              <div className='flex items-center gap-6'>
+                <FormField
+                  control={editForm.control}
+                  name='is_active'
+                  render={({ field }) => (
+                    <FormItem className='flex items-center gap-2 space-y-0'>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className='font-normal'>启用</FormLabel>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name='is_default'
+                  render={({ field }) => (
+                    <FormItem className='flex items-center gap-2 space-y-0'>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className='font-normal'>设为默认</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name='notes'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>备注（可选）</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder='输入备注' rows={2} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  variant='outline'
+                  type='button'
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button type='submit' disabled={updateConfig.isPending}>
+                  {updateConfig.isPending ? '保存中...' : '保存更改'}
                 </Button>
               </DialogFooter>
             </form>
