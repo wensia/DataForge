@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 _rate_limit_lock = threading.Lock()
 _last_request_time: float = 0
-_MIN_REQUEST_INTERVAL = 0.2  # 最小请求间隔（秒），20 QPS = 0.05s，留余量
+_MIN_REQUEST_INTERVAL = 0.05  # 最小请求间隔（秒），20 QPS = 0.05s
 
 
 async def _rate_limited_request():
@@ -135,6 +135,7 @@ class VolcengineASRClient(ASRClient):
                 "enable_ddc": True,  # 数字转换
                 "show_utterances": True,  # 显示分句结果
                 "enable_channel_split": True,  # 双声道分离
+                "enable_emotion_detection": True,  # 情绪检测
             },
         }
 
@@ -317,9 +318,10 @@ class VolcengineASRClient(ASRClient):
         utterances = result.get("result", {}).get("utterances", [])
 
         for utterance in utterances:
-            # v3 API: channel_id 在 additions 字段中
+            # v3 API: channel_id 和 emotion 在 additions 字段中
             additions = utterance.get("additions", {})
             channel_id = str(additions.get("channel_id", "1"))
+            emotion = additions.get("emotion")  # 情绪标签
 
             # 映射声道到说话人标签
             speaker = speaker_labels.get(
@@ -339,6 +341,7 @@ class VolcengineASRClient(ASRClient):
                         end_time=end_time,
                         speaker=speaker,
                         text=text,
+                        emotion=emotion,
                     )
                 )
 

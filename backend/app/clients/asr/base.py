@@ -12,6 +12,7 @@ class TranscriptSegment:
     end_time: float  # 结束时间（秒）
     speaker: str  # 说话人 ("staff" 或 "customer")
     text: str  # 转写文本
+    emotion: str | None = None  # 情绪标签 (angry/happy/neutral/sad/surprise)
 
 
 class ASRClient(ABC):
