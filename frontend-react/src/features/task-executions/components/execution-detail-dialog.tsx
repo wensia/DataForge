@@ -264,18 +264,43 @@ export function ExecutionDetailDialog({
 
         {/* 日志区域 */}
         <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-          <div className='mb-2 flex items-center gap-2'>
-            <Terminal className='h-4 w-4' />
-            <span className='text-sm font-medium'>执行日志</span>
-            {isStreaming && (
-              <span className='text-muted-foreground text-xs'>
-                (实时更新中...)
-              </span>
-            )}
-            {isLoadingDetail && (
-              <span className='text-muted-foreground text-xs'>
-                (加载中...)
-              </span>
+          <div className='mb-2 flex items-center justify-between'>
+            <div className='flex items-center gap-2'>
+              <Terminal className='h-4 w-4' />
+              <span className='text-sm font-medium'>执行日志</span>
+              {/* 日志数量 - 实时更新 */}
+              <Badge variant='secondary' className='text-xs'>
+                {logs.length} 条
+              </Badge>
+              {isLoadingDetail && (
+                <span className='text-muted-foreground text-xs'>
+                  (加载中...)
+                </span>
+              )}
+            </div>
+
+            {/* 跟踪按钮 - 仅在任务运行中时显示 */}
+            {(displayStatus === 'running' || displayStatus === 'pending') && (
+              <Button
+                variant={isStreaming ? 'default' : 'outline'}
+                size='sm'
+                onClick={() => {
+                  if (isStreaming) {
+                    cleanupSSE()
+                  } else {
+                    connectSSE(execution.id)
+                  }
+                }}
+              >
+                {isStreaming ? (
+                  <>
+                    <Loader2 className='mr-1 h-3 w-3 animate-spin' />
+                    跟踪中
+                  </>
+                ) : (
+                  '开始跟踪'
+                )}
+              </Button>
             )}
           </div>
           <ScrollArea
