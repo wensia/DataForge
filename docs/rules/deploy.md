@@ -9,22 +9,37 @@
 | IP 地址 | `124.220.15.80` |
 | 用户名 | `ubuntu` |
 | 登录方式 | SSH 密钥登录 |
-| 密钥文件 | `claudeCode.pem` |
+| 密钥文件 | 项目根目录 `./claudeCode.pem` |
 | 系统 | Ubuntu 22.04 |
 | 面板 | 1Panel |
 
 ## SSH 连接
 
+**重要**: 所有 SSH 命令需在项目根目录执行，密钥文件位于 `./claudeCode.pem`
+
 ```bash
-# 基本连接
-ssh -i claudeCode.pem ubuntu@124.220.15.80
+# 基本连接（在项目根目录执行）
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
 # 确保密钥权限正确
-chmod 600 claudeCode.pem
+chmod 600 ./claudeCode.pem
 
 # 如果出现 host key 变更警告，清除旧记录
 ssh-keygen -R 124.220.15.80
 ```
+
+### 推荐：配置 SSH 别名（可选）
+
+添加到 `~/.ssh/config` 简化连接：
+
+```bash
+Host dataforge
+  HostName 124.220.15.80
+  User ubuntu
+  IdentityFile /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
+```
+
+配置后可直接使用 `ssh dataforge` 连接
 
 ## 1Panel 面板
 
@@ -187,7 +202,7 @@ sudo chown -R ubuntu:ubuntu /www/wwwroot
 由于服务器访问 GitHub 较慢，推荐从本地上传：
 
 ```bash
-# 在本地项目目录执行
+# 在项目根目录执行
 rsync -avz \
   --exclude 'node_modules' \
   --exclude '.venv' \
@@ -197,7 +212,8 @@ rsync -avz \
   --exclude '.git' \
   --exclude '*.pem' \
   --exclude '.cursor' \
-  -e "ssh -i claudeCode.pem" \
+  --exclude '.claude' \
+  -e "ssh -i ./claudeCode.pem" \
   ./ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/
 ```
 
@@ -220,8 +236,8 @@ EOF
 ### 8. 部署后端
 
 ```bash
-# SSH 到服务器
-ssh -i claudeCode.pem ubuntu@124.220.15.80
+# SSH 到服务器（在项目根目录执行）
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
 # 进入后端目录
 cd /www/wwwroot/yunke-transit/backend
@@ -274,14 +290,13 @@ sudo systemctl status yunke-backend
 由于服务器网络限制，在本地构建后上传：
 
 ```bash
-# 在本地 frontend 目录
-cd frontend
-npx vite build
+# 在项目根目录执行
+cd frontend-react && pnpm build && cd ..
 
 # 上传构建产物
 rsync -avz \
-  -e "ssh -i claudeCode.pem" \
-  dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
+  -e "ssh -i ./claudeCode.pem" \
+  frontend-react/dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
 ```
 
 ### 11. 配置 Nginx
@@ -376,21 +391,19 @@ free -h
 
 ## 更新部署
 
-### 快速更新脚本（本地执行）
+### 快速更新脚本（在项目根目录执行）
 
 ```bash
 #!/bin/bash
-# update-deploy.sh
+# deploy.sh - 一键部署脚本
 
-PROJECT_DIR="/Users/panyuhang/我的项目/编程/云客中转"
 SERVER="ubuntu@124.220.15.80"
-KEY="claudeCode.pem"
-
-cd "$PROJECT_DIR"
+KEY="./claudeCode.pem"
+REMOTE_DIR="/www/wwwroot/yunke-transit"
 
 # 1. 构建前端
 echo "Building frontend..."
-cd frontend && npx vite build && cd ..
+cd frontend-react && pnpm build && cd ..
 
 # 2. 上传代码
 echo "Uploading code..."
@@ -403,8 +416,9 @@ rsync -avz \
   --exclude '.git' \
   --exclude '*.pem' \
   --exclude '.cursor' \
+  --exclude '.claude' \
   -e "ssh -i $KEY" \
-  ./ $SERVER:/www/wwwroot/yunke-transit/
+  ./ $SERVER:$REMOTE_DIR/
 
 # 3. 重启后端
 echo "Restarting backend..."
@@ -413,7 +427,7 @@ ssh -i $KEY $SERVER "sudo systemctl restart yunke-backend"
 echo "Deploy completed!"
 ```
 
-### 仅更新后端
+### 仅更新后端（在项目根目录执行）
 
 ```bash
 # 上传后端代码
@@ -421,23 +435,23 @@ rsync -avz \
   --exclude '__pycache__' \
   --exclude '.venv' \
   --exclude '*.db' \
-  -e "ssh -i claudeCode.pem" \
+  -e "ssh -i ./claudeCode.pem" \
   backend/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/backend/
 
 # 重启服务
-ssh -i claudeCode.pem ubuntu@124.220.15.80 "sudo systemctl restart yunke-backend"
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80 "sudo systemctl restart yunke-backend"
 ```
 
-### 仅更新前端
+### 仅更新前端（在项目根目录执行）
 
 ```bash
-# 本地构建
-cd frontend && npx vite build
+# 构建
+cd frontend-react && pnpm build && cd ..
 
 # 上传
 rsync -avz \
-  -e "ssh -i claudeCode.pem" \
-  dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
+  -e "ssh -i ./claudeCode.pem" \
+  frontend-react/dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
 ```
 
 ## 备份策略
@@ -448,13 +462,13 @@ rsync -avz \
 # 手动备份（在服务器上执行）
 sudo -u postgres pg_dump production > ~/backup/production_$(date +%Y%m%d).sql
 
-# 下载到本地
-scp -i claudeCode.pem \
+# 下载到本地（在项目根目录执行）
+scp -i ./claudeCode.pem \
   ubuntu@124.220.15.80:~/backup/production_$(date +%Y%m%d).sql \
   ./backup/
 
-# 远程执行备份并下载
-ssh -i claudeCode.pem ubuntu@124.220.15.80 \
+# 远程执行备份并下载（在项目根目录执行）
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80 \
   "sudo -u postgres pg_dump production" > ./backup/production_$(date +%Y%m%d).sql
 ```
 
