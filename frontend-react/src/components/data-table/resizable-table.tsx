@@ -2,7 +2,6 @@
  * 可调整列宽的数据表格组件
  * 基于 TanStack Table 的 column resizing 功能
  */
-import * as React from 'react'
 import { flexRender, type Table as TanstackTable, type Header } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import {

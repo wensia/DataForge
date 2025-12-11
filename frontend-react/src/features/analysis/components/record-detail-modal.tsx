@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import { TranscriptViewer } from './transcript-viewer'
 import type { CallRecord } from '../types'
 import { formatDate } from '../types'

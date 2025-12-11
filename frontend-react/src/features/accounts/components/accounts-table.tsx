@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
   flexRender,
@@ -37,7 +38,7 @@ export function AccountsTable() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [globalFilter, setGlobalFilter] = useState('')
-  const [columnFilters, setColumnFilters] = useState([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
   const table = useReactTable({
     data: accounts,

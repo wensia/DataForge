@@ -44,10 +44,10 @@ type TaskMutateDrawerProps = {
 const formSchema = z
   .object({
     name: z.string().min(1, '任务名称不能为空'),
-    description: z.string().optional().default(''),
+    description: z.string(),
     task_type: z.enum(['cron', 'interval', 'date', 'manual']),
     cron_expression: z.string().optional(),
-    interval_seconds: z.coerce.number().optional(),
+    interval_seconds: z.number().optional(),
     run_date: z.string().optional(),
     handler_path: z.string().min(1, '请选择处理函数'),
     handler_kwargs: z.string().optional(),

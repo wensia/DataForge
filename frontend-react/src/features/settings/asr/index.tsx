@@ -214,8 +214,8 @@ const formSchema = z.object({
   name: z.string().min(1, '名称不能为空'),
   provider: z.string().min(1, '请选择提供商'),
   credentials: z.partialRecord(z.string(), z.string()),
-  is_active: z.boolean().default(true),
-  is_default: z.boolean().default(false),
+  is_active: z.boolean(),
+  is_default: z.boolean(),
   notes: z.string().optional(),
 })
 

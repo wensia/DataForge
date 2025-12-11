@@ -203,15 +203,6 @@ export function DataAnalysis() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnVisibility, columnOrder, sorting, preferencesLoaded])
 
-  // 重置为默认
-  const handleResetPreferences = useCallback(() => {
-    setColumnVisibility(defaultColumnVisibility)
-    setColumnOrder(defaultColumnOrder)
-    setSorting([])
-    setRowSelection({})
-    toast.success('已重置为默认设置')
-  }, [])
-
   // 重置筛选条件
   const handleResetFilters = useCallback(() => {
     setSourceFilter('')
