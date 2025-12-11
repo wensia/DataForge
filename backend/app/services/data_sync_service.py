@@ -332,6 +332,8 @@ def get_call_records(
     call_type: str | None = None,
     call_result: str | None = None,
     callee: str | None = None,
+    duration_min: int | None = None,
+    duration_max: int | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> tuple[list[CallRecord], int]:
@@ -347,6 +349,8 @@ def get_call_records(
         call_type: 通话类型筛选
         call_result: 通话结果筛选
         callee: 被叫号码筛选（模糊匹配）
+        duration_min: 最小通话时长（秒）
+        duration_max: 最大通话时长（秒）
         limit: 返回数量限制
         offset: 偏移量
 
@@ -372,6 +376,10 @@ def get_call_records(
         query = query.where(CallRecord.call_result == call_result)
     if callee:
         query = query.where(CallRecord.callee.contains(callee))
+    if duration_min is not None:
+        query = query.where(CallRecord.duration >= duration_min)
+    if duration_max is not None:
+        query = query.where(CallRecord.duration <= duration_max)
 
     # 获取总数
     from sqlalchemy import func

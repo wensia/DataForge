@@ -102,6 +102,8 @@ export function DataAnalysis() {
   const [calleeFilter, setCalleeFilter] = useState('')
   const [startTime, setStartTime] = useState<Date | undefined>(undefined)
   const [endTime, setEndTime] = useState<Date | undefined>(undefined)
+  const [durationMin, setDurationMin] = useState<string>('')
+  const [durationMax, setDurationMax] = useState<string>('')
 
   // UI 状态
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -213,6 +215,8 @@ export function DataAnalysis() {
     setCalleeFilter('')
     setStartTime(undefined)
     setEndTime(undefined)
+    setDurationMin('')
+    setDurationMax('')
     setFilters({ page: 1, page_size: filters.page_size || 20 })
     toast.success('已重置筛选条件')
   }, [filters.page_size])
@@ -305,6 +309,8 @@ export function DataAnalysis() {
       callee: calleeFilter || undefined,
       start_time: startTime ? format(startTime, 'yyyy-MM-dd') : undefined,
       end_time: endTime ? format(endTime, 'yyyy-MM-dd') : undefined,
+      duration_min: durationMin ? parseInt(durationMin, 10) : undefined,
+      duration_max: durationMax ? parseInt(durationMax, 10) : undefined,
     })
   }
 
@@ -431,6 +437,25 @@ export function DataAnalysis() {
                   placeholder='结束日期'
                   className='w-[140px]'
                 />
+                <div className='flex items-center gap-1'>
+                  <Input
+                    type='number'
+                    placeholder='最小时长(秒)'
+                    value={durationMin}
+                    onChange={(e) => setDurationMin(e.target.value)}
+                    className='w-[100px]'
+                    min={0}
+                  />
+                  <span className='text-muted-foreground'>-</span>
+                  <Input
+                    type='number'
+                    placeholder='最大时长(秒)'
+                    value={durationMax}
+                    onChange={(e) => setDurationMax(e.target.value)}
+                    className='w-[100px]'
+                    min={0}
+                  />
+                </div>
                 <div className='flex-1' />
                 <Button onClick={handleSearch}>
                   <Search className='mr-2 h-4 w-4' />

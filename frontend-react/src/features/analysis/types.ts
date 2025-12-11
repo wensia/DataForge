@@ -11,6 +11,7 @@ export interface TranscriptSegment {
   end_time: number // 结束时间（秒）
   speaker: 'staff' | 'customer' | string // 说话人标识
   text: string // 转写文本
+  emotion?: string | null // 情绪标签 (angry/happy/neutral/sad/surprise)
 }
 
 export interface CallRecord {
@@ -101,6 +102,8 @@ export interface RecordsParams {
   call_type?: string
   call_result?: string
   callee?: string
+  duration_min?: number
+  duration_max?: number
   page?: number
   page_size?: number
 }

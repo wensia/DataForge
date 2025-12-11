@@ -245,6 +245,7 @@ class ASRService:
                 "end_time": seg.end_time,
                 "speaker": seg.speaker,
                 "text": seg.text,
+                "emotion": seg.emotion,  # 情绪标签 (火山引擎支持)
             }
             for seg in segments
         ]

@@ -37,6 +37,17 @@ function getSpeakerName(speaker: string): string {
   return speaker
 }
 
+/**
+ * 情绪标签配置
+ */
+const emotionConfig: Record<string, { label: string; className: string }> = {
+  angry: { label: '生气', className: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+  happy: { label: '开心', className: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+  neutral: { label: '平静', className: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+  sad: { label: '悲伤', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+  surprise: { label: '惊讶', className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' },
+}
+
 interface TranscriptViewerProps {
   transcript: TranscriptSegment[]
   currentTime?: number // 当前音频播放时间（秒）
@@ -131,6 +142,17 @@ export function TranscriptViewer({
                 <span className='text-muted-foreground text-xs'>
                   {duration}s
                 </span>
+                {/* 情绪标签 */}
+                {seg.emotion && emotionConfig[seg.emotion] && (
+                  <span
+                    className={cn(
+                      'rounded px-1.5 py-0.5 text-xs',
+                      emotionConfig[seg.emotion].className
+                    )}
+                  >
+                    {emotionConfig[seg.emotion].label}
+                  </span>
+                )}
               </div>
               {/* 文本内容 */}
               <div className='text-sm leading-relaxed'>{seg.text}</div>
