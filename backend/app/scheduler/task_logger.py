@@ -2,7 +2,7 @@
 
 提供 task_log() 函数，在任务执行过程中记录日志。
 日志会保存到 TaskExecution.log_output 字段。
-支持实时日志推送给 SSE 订阅者。
+支持通过 Redis Pub/Sub 实时推送日志给 SSE 订阅者。
 
 使用方式:
     from app.scheduler import task_log
@@ -13,7 +13,6 @@
         task_log("静默记录", print_console=False)  # 只记录不打印
 """
 
-import asyncio
 import threading
 from contextvars import ContextVar
 from datetime import datetime
@@ -29,13 +28,12 @@ from app.database import engine
 _execution_id: ContextVar[int | None] = ContextVar("execution_id", default=None)
 _log_buffer: ContextVar[list[str]] = ContextVar("log_buffer")
 
-# 实时日志订阅者管理（线程安全）
-# key: execution_id, value: list of asyncio.Queue
-_log_subscribers: dict[int, list[asyncio.Queue]] = {}
-_subscribers_lock = threading.Lock()
-
 # 数据库写入锁（避免并发写入冲突）
 _db_write_lock = threading.Lock()
+
+# 记录哪些执行正在运行（用于 SSE 判断）
+_running_executions: set[int] = set()
+_running_lock = threading.Lock()
 
 
 def _persist_log_to_db(execution_id: int, log_line: str) -> None:
@@ -99,18 +97,11 @@ def task_log(*args: Any, print_console: bool | None = None) -> None:
         _log_buffer.set(buffer)
     buffer.append(log_line)
 
-    # 推送给实时订阅者（线程安全）
+    # 通过 Redis Pub/Sub 推送给实时订阅者
     if exec_id:
-        with _subscribers_lock:
-            if exec_id in _log_subscribers:
-                for queue in _log_subscribers[exec_id]:
-                    try:
-                        queue.put_nowait(log_line)
-                    except asyncio.QueueFull:
-                        pass  # 队列满则跳过
+        from app.utils.redis_client import publish_log
 
-        # 【已移除】实时保存到数据库 - 改为任务结束时批量写入
-        # _persist_log_to_db(exec_id, log_line)
+        publish_log(exec_id, log_line)
 
     # 控制台输出
     should_print = print_console if print_console is not None else settings.debug
@@ -169,6 +160,9 @@ def init_log_context(execution_id: int) -> None:
     """初始化日志上下文（由执行器调用）"""
     _execution_id.set(execution_id)
     _log_buffer.set([])
+    # 标记任务正在运行
+    with _running_lock:
+        _running_executions.add(execution_id)
 
 
 def clear_log_context() -> None:
@@ -179,69 +173,20 @@ def clear_log_context() -> None:
     if exec_id:
         flush_logs_to_db(exec_id)
 
-    # 通知所有订阅者任务已结束（线程安全）
+    # 通过 Redis 发送结束信号
     if exec_id:
-        with _subscribers_lock:
-            if exec_id in _log_subscribers:
-                for queue in _log_subscribers[exec_id]:
-                    try:
-                        queue.put_nowait(None)  # None 表示结束信号
-                    except asyncio.QueueFull:
-                        pass
-                del _log_subscribers[exec_id]
+        from app.utils.redis_client import publish_log_end
+
+        publish_log_end(exec_id)
+        # 从运行中列表移除
+        with _running_lock:
+            _running_executions.discard(exec_id)
+
     _execution_id.set(None)
     _log_buffer.set([])
 
 
-def subscribe_log(execution_id: int) -> asyncio.Queue:
-    """
-    订阅执行日志
-
-    Args:
-        execution_id: 执行记录ID
-
-    Returns:
-        asyncio.Queue: 用于接收日志的队列
-    """
-    queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
-    with _subscribers_lock:
-        if execution_id not in _log_subscribers:
-            _log_subscribers[execution_id] = []
-        _log_subscribers[execution_id].append(queue)
-    return queue
-
-
-def unsubscribe_log(execution_id: int, queue: asyncio.Queue) -> None:
-    """
-    取消订阅执行日志
-
-    Args:
-        execution_id: 执行记录ID
-        queue: 订阅时返回的队列
-    """
-    with _subscribers_lock:
-        if execution_id in _log_subscribers:
-            try:
-                _log_subscribers[execution_id].remove(queue)
-                if not _log_subscribers[execution_id]:
-                    del _log_subscribers[execution_id]
-            except ValueError:
-                pass
-
-
-def get_current_log_buffer(execution_id: int) -> str:
-    """
-    获取执行中任务的当前日志缓冲区
-
-    注意：这只在当前上下文中的执行ID匹配时有效
-    """
-    current_id = get_execution_id()
-    if current_id == execution_id:
-        return get_log_output()
-    return ""
-
-
 def is_execution_running(execution_id: int) -> bool:
-    """检查执行是否仍在运行（是否有订阅者注册）"""
-    with _subscribers_lock:
-        return execution_id in _log_subscribers
+    """检查执行是否仍在运行"""
+    with _running_lock:
+        return execution_id in _running_executions

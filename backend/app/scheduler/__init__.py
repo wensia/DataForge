@@ -14,9 +14,8 @@ from app.scheduler.registry import (
     register_handler,
 )
 from app.scheduler.task_logger import (
-    subscribe_log,
+    is_execution_running,
     task_log,
-    unsubscribe_log,
 )
 
 __all__ = [
@@ -26,10 +25,9 @@ __all__ = [
     "get_registered_handlers",
     "get_scheduler",
     "init_scheduler",
+    "is_execution_running",
     "register_handler",
     "shutdown_scheduler",
     "start_scheduler",
-    "subscribe_log",
     "task_log",
-    "unsubscribe_log",
 ]

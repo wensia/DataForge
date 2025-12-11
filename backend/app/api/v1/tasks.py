@@ -17,10 +17,11 @@ from app.models.task_execution import (
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
 )
-from app.scheduler import subscribe_log, unsubscribe_log
+from app.scheduler import is_execution_running
 from app.scheduler.registry import get_registered_handlers
 from app.schemas.response import ResponseModel
 from app.services import task_service
+from app.utils.redis_client import subscribe_logs
 
 router = APIRouter(prefix="/tasks", tags=["任务管理"])
 
@@ -193,7 +194,7 @@ async def get_task_executions(
 
 
 async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
-    """SSE 日志流生成器"""
+    """SSE 日志流生成器（使用 Redis Pub/Sub）"""
     # 检查执行记录是否存在
     execution = await task_service.get_execution_by_id_async(execution_id)
     if not execution:
@@ -212,33 +213,73 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
         yield f'data: {{"status": "{execution.status.value}", "finished": true}}\n\n'
         return
 
-    # 任务仍在运行，订阅实时日志
-    queue = subscribe_log(execution_id)
+    # 任务仍在运行，通过 Redis Pub/Sub 订阅实时日志
+    pubsub = await subscribe_logs(execution_id)
+    if pubsub is None:
+        # Redis 不可用，回退到轮询模式
+        yield 'data: {"warning": "Redis不可用，使用轮询模式"}\n\n'
+        yield f'data: {{"status": "running", "execution_id": {execution_id}}}\n\n'
+        while is_execution_running(execution_id):
+            await asyncio.sleep(2)
+            yield ": heartbeat\n\n"
+        # 任务结束，获取最终状态
+        execution = await task_service.get_execution_by_id_async(execution_id)
+        status = execution.status.value if execution else "unknown"
+        yield f'data: {{"status": "{status}", "finished": true}}\n\n'
+        return
+
     try:
         # 发送运行中状态
         yield f'data: {{"status": "running", "execution_id": {execution_id}}}\n\n'
 
-        # 持续读取日志
+        # 持续读取 Redis 消息
         while True:
             try:
-                log_line = await asyncio.wait_for(queue.get(), timeout=30.0)
-                if log_line is None:
-                    # 任务结束信号
-                    # 重新获取执行记录以获取最终状态
+                # 使用 get_message 带超时
+                message = await asyncio.wait_for(
+                    pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
+                    timeout=30.0,
+                )
+                if message is None:
+                    # 没有消息，检查任务是否还在运行
+                    if not is_execution_running(execution_id):
+                        # 任务已结束
+                        execution = await task_service.get_execution_by_id_async(
+                            execution_id
+                        )
+                        status = execution.status.value if execution else "unknown"
+                        yield f'data: {{"status": "{status}", "finished": true}}\n\n'
+                        break
+                    continue
+
+                if message["type"] == "message":
+                    data = message["data"]
+                    if data == "__END__":
+                        # 任务结束信号
+                        execution = await task_service.get_execution_by_id_async(
+                            execution_id
+                        )
+                        status = execution.status.value if execution else "unknown"
+                        yield f'data: {{"status": "{status}", "finished": true}}\n\n'
+                        break
+                    # 转义 JSON 特殊字符
+                    escaped = data.replace("\\", "\\\\").replace('"', '\\"')
+                    yield f'data: {{"log": "{escaped}"}}\n\n'
+
+            except TimeoutError:
+                # 发送心跳保持连接
+                yield ": heartbeat\n\n"
+                # 检查任务是否还在运行
+                if not is_execution_running(execution_id):
                     execution = await task_service.get_execution_by_id_async(
                         execution_id
                     )
                     status = execution.status.value if execution else "unknown"
                     yield f'data: {{"status": "{status}", "finished": true}}\n\n'
                     break
-                # 转义 JSON 特殊字符
-                escaped = log_line.replace("\\", "\\\\").replace('"', '\\"')
-                yield f'data: {{"log": "{escaped}"}}\n\n'
-            except TimeoutError:
-                # 发送心跳保持连接
-                yield ": heartbeat\n\n"
     finally:
-        unsubscribe_log(execution_id, queue)
+        await pubsub.unsubscribe()
+        await pubsub.close()
 
 
 @router.get("/executions/{execution_id}/logs/stream")
