@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
+import apiClient from '@/lib/api-client'
 import { useExecutionDetail } from '@/features/tasks/api'
 import type { TaskExecution } from '@/features/tasks/data/schema'
 
@@ -85,22 +86,18 @@ export function ExecutionDetailDialog({
   // 获取日志（轮询）
   const fetchLogs = useCallback(async (executionId: number) => {
     try {
-      const authToken = localStorage.getItem('auth_token')
-      const url = authToken
-        ? `/api/v1/tasks/executions/${executionId}/logs?api_key=${authToken}`
-        : `/api/v1/tasks/executions/${executionId}/logs`
+      const response = await apiClient.get<{
+        code: number
+        data: { logs: string[]; status: string; finished: boolean }
+      }>(`/tasks/executions/${executionId}/logs`)
 
-      const res = await fetch(url)
-      const data = await res.json()
+      const { logs: newLogs, status, finished } = response.data.data
+      setLogs(newLogs || [])
+      setCurrentStatus(status)
 
-      if (data.code === 200) {
-        setLogs(data.data.logs || [])
-        setCurrentStatus(data.data.status)
-
-        // 如果任务已完成，停止轮询
-        if (data.data.finished) {
-          stopPolling()
-        }
+      // 如果任务已完成，停止轮询
+      if (finished) {
+        stopPolling()
       }
     } catch (e) {
       console.error('获取日志失败:', e)
