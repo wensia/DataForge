@@ -37,6 +37,7 @@ class VolcengineASRClient(ASRClient):
     # 状态码 (在 X-Api-Status-Code header 中)
     CODE_SUCCESS = "20000000"
     CODE_PROCESSING = "20000001"
+    CODE_QUEUED = "20000003"  # 任务排队中
 
     def __init__(
         self,
@@ -295,6 +296,8 @@ class VolcengineASRClient(ASRClient):
                 logger.debug("ASR 任务 header 成功但 body 为空，继续等待")
             elif status_code == self.CODE_PROCESSING:
                 logger.debug(f"ASR 任务处理中: {request_id}")
+            elif status_code == self.CODE_QUEUED:
+                logger.debug(f"ASR 任务排队中: {request_id}")
             elif status_code.startswith("4"):
                 # 4xx 错误
                 message = body.get("message", "未知错误")
