@@ -121,12 +121,12 @@ export function ExecutionDetailDialog({
     // 立即获取一次日志
     fetchLogs(execution.id)
 
-    // 如果任务正在运行，开始轮询
+    // 如果任务正在运行，开始轮询（每 5 秒）
     if (execution.status === 'running' || execution.status === 'pending') {
       setIsPolling(true)
       intervalRef.current = setInterval(() => {
         fetchLogs(execution.id)
-      }, 1000)
+      }, 5000)
     }
 
     return () => {
