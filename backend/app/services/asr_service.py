@@ -99,6 +99,7 @@ class ASRService:
                 app_id=credentials.get("app_id", ""),
                 access_token=credentials.get("access_token", ""),
                 cluster=credentials.get("cluster", "volc.bigasr.auc"),
+                qps=int(credentials.get("qps", 20)),
             )
         else:
             raise ValueError(f"不支持的 ASR 提供商: {provider}")

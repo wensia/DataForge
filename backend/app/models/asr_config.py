@@ -52,6 +52,13 @@ ASR_PROVIDER_PRESETS = {
                 "default": "volc.bigasr.auc",
                 "hint": "录音文件识别: volc.bigasr.auc 或 volc.seedasr.auc",
             },
+            {
+                "key": "qps",
+                "label": "QPS",
+                "required": False,
+                "default": "20",
+                "hint": "每秒请求数限制，默认 20",
+            },
         ],
         "doc_url": "https://www.volcengine.com/docs/6561/1354868",
     },

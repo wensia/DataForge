@@ -18,30 +18,6 @@ from app.clients.asr.base import ASRClient, TranscriptSegment
 
 logger = logging.getLogger(__name__)
 
-# 全局请求限流器（使用线程锁，兼容多事件循环）
-
-_rate_limit_lock = threading.Lock()
-_last_request_time: float = 0
-_MIN_REQUEST_INTERVAL = 0.05  # 最小请求间隔（秒），20 QPS = 0.05s
-
-
-async def _rate_limited_request():
-    """请求前的限流等待（线程安全，兼容多事件循环）"""
-    global _last_request_time
-
-    with _rate_limit_lock:
-        now = time.time()
-        elapsed = now - _last_request_time
-        if elapsed < _MIN_REQUEST_INTERVAL:
-            wait_time = _MIN_REQUEST_INTERVAL - elapsed
-        else:
-            wait_time = 0
-        _last_request_time = now + wait_time
-
-    # 在锁外等待，避免阻塞其他线程
-    if wait_time > 0:
-        await asyncio.sleep(wait_time)
-
 
 class VolcengineASRClient(ASRClient):
     """火山引擎 ASR 客户端
@@ -67,6 +43,7 @@ class VolcengineASRClient(ASRClient):
         app_id: str,
         access_token: str,
         cluster: str = "volc.bigasr.auc",
+        qps: int = 20,
     ):
         """
         初始化火山引擎 ASR 客户端
@@ -75,12 +52,33 @@ class VolcengineASRClient(ASRClient):
             app_id: 火山引擎 App ID (X-Api-App-Key)
             access_token: 火山引擎 Access Token (X-Api-Access-Key)
             cluster: 资源 ID (X-Api-Resource-Id)，默认 volc.bigasr.auc
+            qps: 每秒请求数限制，默认 20
         """
         self.app_id = app_id
         self.access_token = access_token
         self.cluster = cluster
+        # QPS 限流 (实例级别)
+        self.qps = qps
+        self._min_interval = 1.0 / qps  # 最小请求间隔
+        self._last_request_time: float = 0
+        self._rate_lock = threading.Lock()
         # 保存最后一次请求的 logid，用于查询时链路追踪
         self._last_logid: str | None = None
+
+    async def _rate_limited_request(self):
+        """实例级别的请求限流（线程安全）"""
+        with self._rate_lock:
+            now = time.time()
+            elapsed = now - self._last_request_time
+            if elapsed < self._min_interval:
+                wait_time = self._min_interval - elapsed
+            else:
+                wait_time = 0
+            self._last_request_time = now + wait_time
+
+        # 在锁外等待，避免阻塞其他线程
+        if wait_time > 0:
+            await asyncio.sleep(wait_time)
 
     def _build_headers(self, request_id: str) -> dict[str, str]:
         """构建请求头"""
@@ -156,7 +154,7 @@ class VolcengineASRClient(ASRClient):
             try:
                 # 请求前限流
                 logger.debug("[volcengine] submit_task 开始限流等待...")
-                await _rate_limited_request()
+                await self._rate_limited_request()
                 logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
                 async with httpx.AsyncClient() as client:
@@ -219,7 +217,7 @@ class VolcengineASRClient(ASRClient):
         for attempt in range(max_retries + 1):
             try:
                 # 请求前限流
-                await _rate_limited_request()
+                await self._rate_limited_request()
 
                 async with httpx.AsyncClient() as client:
                     response = await client.post(
