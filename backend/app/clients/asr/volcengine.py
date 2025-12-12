@@ -93,6 +93,10 @@ class VolcengineASRClient(ASRClient):
         value = str(model_version).strip() if model_version else ""
         self.model_version = value or None
 
+    def get_last_logid(self) -> str | None:
+        """获取最后一次请求的 logid，用于问题追踪"""
+        return self._last_logid
+
     def _get_client(self) -> httpx.AsyncClient:
         """获取或创建 httpx 客户端（确保在当前事件循环中）
 

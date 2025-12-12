@@ -287,6 +287,11 @@ class ASRService:
                 correct_table_name=correct_table_name,
                 progress_callback=progress_callback,
             )
+            # 输出火山引擎 logid（用于问题追踪）
+            if hasattr(asr_client, "get_last_logid"):
+                logid = asr_client.get_last_logid()
+                if logid:
+                    task_log(f"  - [logid] {logid}")
             task_log("  - [DEBUG] ASR transcribe 返回")
             task_log(f"  - ASR 返回 {len(segments)} 个语音片段")
         except Exception as e:
@@ -295,6 +300,11 @@ class ASRService:
             error_msg = str(e) or "(无错误消息)"
             tb_lines = traceback.format_exc().split("\n")[-5:-1]  # 取最后几行
             tb_short = " | ".join(line.strip() for line in tb_lines if line.strip())
+            # 输出火山引擎 logid（用于问题追踪）
+            if hasattr(asr_client, "get_last_logid"):
+                logid = asr_client.get_last_logid()
+                if logid:
+                    task_log(f"  - [logid] {logid}")
             task_log(f"  - [ERROR] ASR 转写异常: [{error_type}] {error_msg}")
             task_log(f"  - [ERROR] 调用栈: {tb_short}")
             tb = traceback.format_exc()
