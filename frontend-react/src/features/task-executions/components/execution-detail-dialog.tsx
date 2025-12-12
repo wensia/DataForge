@@ -66,7 +66,7 @@ export function ExecutionDetailDialog({
   const [isPolling, setIsPolling] = useState(false)
   const [isFollowing, setIsFollowing] = useState(true)
   const [currentStatus, setCurrentStatus] = useState<string>('')
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollEndRef = useRef<HTMLDivElement>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 获取执行详情（包含 log_output）
@@ -145,8 +145,8 @@ export function ExecutionDetailDialog({
   // 自动滚动到底部（仅在开启"跟踪/跟随"时）
   useEffect(() => {
     if (!isFollowing) return
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (scrollEndRef.current) {
+      scrollEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [logs, isFollowing])
 
@@ -263,10 +263,7 @@ export function ExecutionDetailDialog({
               )}
             </label>
           </div>
-          <ScrollArea
-            className='bg-muted/50 h-[300px] rounded-md border'
-            ref={scrollRef}
-          >
+          <ScrollArea className='bg-muted/50 h-[300px] rounded-md border'>
             <div className='min-h-[268px] p-4'>
               {isLoadingDetail ? (
                 <div className='space-y-2'>
@@ -292,6 +289,7 @@ export function ExecutionDetailDialog({
                       {line}
                     </div>
                   ))}
+                  <div ref={scrollEndRef} />
                 </pre>
               ) : (
                 <p className='text-muted-foreground text-center text-sm'>
