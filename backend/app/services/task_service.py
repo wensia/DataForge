@@ -561,6 +561,8 @@ def cancel_execution(execution_id: int) -> dict:
     Returns:
         dict: {"success": bool, "message": str}
     """
+    from app.utils.redis_client import cleanup_execution_redis, get_logs
+
     with Session(engine) as session:
         execution = session.get(TaskExecution, execution_id)
         if not execution:
@@ -572,6 +574,12 @@ def cancel_execution(execution_id: int) -> dict:
                 "success": False,
                 "message": f"无法取消状态为 {execution.status.value} 的任务",
             }
+
+        # 从 Redis 获取已有日志并保存到数据库
+        redis_logs = get_logs(execution_id)
+        if redis_logs:
+            execution.log_output = "\n".join(redis_logs)
+            logger.info(f"任务 #{execution_id} 取消时保存了 {len(redis_logs)} 行日志")
 
         # 更新状态
         execution.status = ExecutionStatus.CANCELLED
@@ -586,6 +594,9 @@ def cancel_execution(execution_id: int) -> dict:
 
         session.add(execution)
         session.commit()
+
+        # 清理 Redis 中的日志数据
+        cleanup_execution_redis(execution_id)
 
         logger.info(f"任务执行 #{execution_id} 已被取消")
         return {"success": True, "message": "任务已取消"}
