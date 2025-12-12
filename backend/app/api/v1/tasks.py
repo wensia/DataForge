@@ -97,11 +97,11 @@ async def get_execution_logs(execution_id: int):
     if not execution:
         return ResponseModel.error(code=404, message="执行记录不存在")
 
-    # 检查 Redis 状态判断是否运行中
-    redis_status = await get_execution_status_async(execution_id)
-    is_running = redis_status == "running"
+    # 以数据库状态为准判断是否结束（pending/running 都属于进行中）
+    db_status = execution.status.value
+    is_active = db_status in ("pending", "running")
 
-    if is_running:
+    if is_active:
         # 从 Redis 获取实时日志
         logs = await get_logs_async(execution_id)
     else:
@@ -114,8 +114,8 @@ async def get_execution_logs(execution_id: int):
     return ResponseModel.success(
         data={
             "logs": logs,
-            "status": redis_status if is_running else execution.status.value,
-            "finished": not is_running,
+            "status": db_status,
+            "finished": not is_active,
         }
     )
 
@@ -248,120 +248,124 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
         yield 'data: {"error": "执行记录不存在"}\n\n'
         return
 
-    # 2. 检查 Redis 中的任务状态
-    redis_status = await get_execution_status_async(execution_id)
-
-    # 3. 如果任务正在运行（Redis 状态为 running）
-    if redis_status == "running":
-        # 从 Redis List 获取已有日志
-        sent_count = 0
-        existing_logs = await get_logs_async(execution_id)
-        for log_line in existing_logs:
-            if log_line.strip():
-                escaped = _escape_log_for_json(log_line)
-                yield f'data: {{"log": "{escaped}"}}\n\n'
-                sent_count += 1
-
-        # 发送运行中状态
-        yield f'data: {{"status": "running", "execution_id": {execution_id}}}\n\n'
-
-        # 订阅 Pub/Sub 获取新日志通知
-        pubsub = await subscribe_logs(execution_id)
-        if pubsub is None:
-            # Redis Pub/Sub 不可用，回退到轮询模式
-            yield 'data: {"warning": "Redis Pub/Sub不可用，使用轮询模式"}\n\n'
-            while is_execution_running(execution_id):
-                await asyncio.sleep(1)
-                # 检查是否有新日志
-                new_logs = await get_logs_async(execution_id, start=sent_count)
-                for log_line in new_logs:
-                    if log_line.strip():
-                        escaped = _escape_log_for_json(log_line)
-                        yield f'data: {{"log": "{escaped}"}}\n\n'
-                        sent_count += 1
-                yield ": heartbeat\n\n"
-            # 任务结束
-            execution = await task_service.get_execution_by_id_async(execution_id)
-            status = execution.status.value if execution else "unknown"
-            yield f'data: {{"status": "{status}", "finished": true}}\n\n'
-            return
-
-        try:
-            while True:
-                try:
-                    message = await asyncio.wait_for(
-                        pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
-                        timeout=30.0,
-                    )
-                    if message is None:
-                        # 没有消息，检查任务是否还在运行
-                        if not is_execution_running(execution_id):
-                            execution = await task_service.get_execution_by_id_async(
-                                execution_id
-                            )
-                            status = (
-                                execution.status.value if execution else "unknown"
-                            )
-                            finished_msg = f'{{"status": "{status}", "finished": true}}'
-                            yield f"data: {finished_msg}\n\n"
-                            break
-                        continue
-
-                    if message["type"] == "message":
-                        data = message["data"]
-                        if data == "__END__":
-                            # 任务结束信号 - 获取剩余日志
-                            remaining_logs = await get_logs_async(
-                                execution_id, start=sent_count
-                            )
-                            for log_line in remaining_logs:
-                                if log_line.strip():
-                                    escaped = _escape_log_for_json(log_line)
-                                    yield f'data: {{"log": "{escaped}"}}\n\n'
-                            # 发送完成信号
-                            execution = await task_service.get_execution_by_id_async(
-                                execution_id
-                            )
-                            status = (
-                                execution.status.value if execution else "unknown"
-                            )
-                            finished_msg = f'{{"status": "{status}", "finished": true}}'
-                            yield f"data: {finished_msg}\n\n"
-                            break
-                        elif data == "NEW_LOG":
-                            # 有新日志通知 - 从 Redis List 获取新日志
-                            new_logs = await get_logs_async(
-                                execution_id, start=sent_count
-                            )
-                            for log_line in new_logs:
-                                if log_line.strip():
-                                    escaped = _escape_log_for_json(log_line)
-                                    yield f'data: {{"log": "{escaped}"}}\n\n'
-                                    sent_count += 1
-
-                except TimeoutError:
-                    yield ": heartbeat\n\n"
-                    if not is_execution_running(execution_id):
-                        execution = await task_service.get_execution_by_id_async(
-                            execution_id
-                        )
-                        status = execution.status.value if execution else "unknown"
-                        yield f'data: {{"status": "{status}", "finished": true}}\n\n'
-                        break
-        finally:
-            await pubsub.unsubscribe()
-            await pubsub.close()
-
-    else:
-        # 4. 任务已完成或 Redis 状态不存在 - 从数据库获取日志
+    # 2. 如果任务已结束，直接返回完整日志并关闭连接
+    db_status = execution.status.value
+    if db_status not in ("pending", "running"):
         if execution.log_output:
             for line in execution.log_output.split("\n"):
                 if line.strip():
                     escaped = _escape_log_for_json(line)
                     yield f'data: {{"log": "{escaped}"}}\n\n'
+        yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
+        return
 
-        # 发送完成状态
-        yield f'data: {{"status": "{execution.status.value}", "finished": true}}\n\n'
+    # 3. pending/running：先发送已存在的 Redis 日志（若还没开始可能为空）
+    sent_count = 0
+    existing_logs = await get_logs_async(execution_id)
+    for log_line in existing_logs:
+        if log_line.strip():
+            escaped = _escape_log_for_json(log_line)
+            yield f'data: {{"log": "{escaped}"}}\n\n'
+            sent_count += 1
+
+    yield f'data: {{"status": "{db_status}", "execution_id": {execution_id}}}\n\n'
+
+    # 4. 订阅 Pub/Sub 获取新日志通知；若不可用则回退轮询
+    pubsub = await subscribe_logs(execution_id)
+    if pubsub is None:
+        yield 'data: {"warning": "Redis Pub/Sub不可用，使用轮询模式"}\n\n'
+        while True:
+            await asyncio.sleep(1)
+            new_logs = await get_logs_async(execution_id, start=sent_count)
+            for log_line in new_logs:
+                if log_line.strip():
+                    escaped = _escape_log_for_json(log_line)
+                    yield f'data: {{"log": "{escaped}"}}\n\n'
+                    sent_count += 1
+
+            execution = await task_service.get_execution_by_id_async(execution_id)
+            if not execution:
+                yield 'data: {"error": "执行记录不存在"}\n\n'
+                return
+            db_status = execution.status.value
+            if db_status not in ("pending", "running"):
+                remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                for log_line in remaining_logs:
+                    if log_line.strip():
+                        escaped = _escape_log_for_json(log_line)
+                        yield f'data: {{"log": "{escaped}"}}\n\n'
+                        sent_count += 1
+                yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
+                return
+
+            yield ": heartbeat\n\n"
+
+    try:
+        while True:
+            try:
+                message = await asyncio.wait_for(
+                    pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
+                    timeout=30.0,
+                )
+                if message is None:
+                    # 没有消息，检查 DB 状态是否已结束
+                    execution = await task_service.get_execution_by_id_async(execution_id)
+                    if not execution:
+                        yield 'data: {"error": "执行记录不存在"}\n\n'
+                        break
+                    db_status = execution.status.value
+                    if db_status not in ("pending", "running"):
+                        remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                        for log_line in remaining_logs:
+                            if log_line.strip():
+                                escaped = _escape_log_for_json(log_line)
+                                yield f'data: {{"log": "{escaped}"}}\n\n'
+                                sent_count += 1
+                        yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
+                        break
+                    continue
+
+                if message["type"] == "message":
+                    data = message["data"]
+                    if data == "__END__":
+                        remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                        for log_line in remaining_logs:
+                            if log_line.strip():
+                                escaped = _escape_log_for_json(log_line)
+                                yield f'data: {{"log": "{escaped}"}}\n\n'
+                                sent_count += 1
+
+                        execution = await task_service.get_execution_by_id_async(execution_id)
+                        db_status = execution.status.value if execution else "unknown"
+                        yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
+                        break
+                    elif data == "NEW_LOG":
+                        new_logs = await get_logs_async(execution_id, start=sent_count)
+                        for log_line in new_logs:
+                            if log_line.strip():
+                                escaped = _escape_log_for_json(log_line)
+                                yield f'data: {{"log": "{escaped}"}}\n\n'
+                                sent_count += 1
+
+            except TimeoutError:
+                yield ": heartbeat\n\n"
+                execution = await task_service.get_execution_by_id_async(execution_id)
+                if not execution:
+                    yield 'data: {"error": "执行记录不存在"}\n\n'
+                    break
+                db_status = execution.status.value
+                if db_status not in ("pending", "running"):
+                    remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                    for log_line in remaining_logs:
+                        if log_line.strip():
+                            escaped = _escape_log_for_json(log_line)
+                            yield f'data: {{"log": "{escaped}"}}\n\n'
+                            sent_count += 1
+                    yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
+                    break
+    finally:
+        await pubsub.unsubscribe()
+        await pubsub.close()
 
 
 @router.get("/executions/{execution_id}/logs/stream")
