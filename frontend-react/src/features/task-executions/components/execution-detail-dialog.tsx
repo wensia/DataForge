@@ -116,7 +116,7 @@ export function ExecutionDetailDialog({
       }
     }
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = () => {
       setIsStreaming(false)
       eventSource.close()
       eventSourceRef.current = null

@@ -43,6 +43,22 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
+    // 统一处理未授权：清除 token 并跳转登录
+    const status = error?.response?.status
+    if (status === 401) {
+      try {
+        localStorage.removeItem('auth_token')
+      } catch {
+        // ignore
+      }
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname
+        if (!currentPath.includes('/sign-in')) {
+          const redirect = encodeURIComponent(window.location.href)
+          window.location.href = `/sign-in?redirect=${redirect}`
+        }
+      }
+    }
     return Promise.reject(error)
   }
 )

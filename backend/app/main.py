@@ -74,10 +74,12 @@ async def lifespan(app: FastAPI):
         )
         from app.services.task_service import init_default_tasks, sync_tasks_to_scheduler
 
+        # 无论是否 leader，都需要发现处理函数（用于手动执行/参数校验）
+        discover_handlers()
+
         if acquire_leader_lock():
             logger.info("正在初始化任务调度器...")
             init_scheduler()
-            discover_handlers()
             start_scheduler()
             start_renewal_task()
             renewal_started = True
@@ -85,7 +87,7 @@ async def lifespan(app: FastAPI):
             sync_tasks_to_scheduler()
             logger.info("任务调度器启动完成")
         else:
-            logger.info("当前实例非 leader，跳过调度器启动")
+            logger.info("当前实例非 leader，仅加载处理函数，不启动调度器")
 
     yield
 
