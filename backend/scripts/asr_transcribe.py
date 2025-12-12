@@ -118,6 +118,7 @@ async def _process_single_record(
     max_records: int,
     semaphore: asyncio.Semaphore,
     correct_table_name: str = "",
+    qps: int = 20,
 ) -> bool:
     """处理单条记录 (并发安全)
 
@@ -128,6 +129,7 @@ async def _process_single_record(
         max_records: 最大成功数量限制
         semaphore: 并发信号量
         correct_table_name: 替换词本名称（仅火山引擎有效）
+        qps: 每秒请求数限制（仅火山引擎有效）
 
     Returns:
         bool: 是否应该继续处理 (False 表示已达到 max_records)
@@ -154,6 +156,7 @@ async def _process_single_record(
                 asr_config_id=asr_config_id,
                 staff_name=record.staff_name,
                 correct_table_name=correct_table_name or None,
+                qps=qps,
             )
 
             # 3. 处理结果
@@ -199,6 +202,7 @@ async def run(
     max_records: int = 0,
     concurrency: int = 5,
     correct_table_name: str = "",
+    qps: int = 20,
 ) -> dict:
     """ASR 语音识别任务入口
 
@@ -212,6 +216,7 @@ async def run(
         max_records: 最大识别成功数量，达到此数量后停止处理，0 表示不限制
         concurrency: 并发数，默认 5
         correct_table_name: 替换词本名称（仅火山引擎有效），在火山引擎控制台自学习平台创建
+        qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
     Returns:
         dict: 执行结果
@@ -227,6 +232,7 @@ async def run(
     task_log(f"最小通话时长: {min_duration} 秒")
     task_log(f"每批处理数量: {batch_size}")
     task_log(f"并发数: {concurrency}")
+    task_log(f"QPS 限制: {qps}")
     if correct_table_name:
         task_log(f"替换词本: {correct_table_name}")
 
@@ -288,6 +294,7 @@ async def run(
                 max_records=max_records,
                 semaphore=semaphore,
                 correct_table_name=correct_table_name,
+                qps=qps,
             )
             for record in batch
         ]

@@ -67,11 +67,12 @@ class ASRService:
             for c in configs
         ]
 
-    def create_client(self, config: ASRConfig) -> ASRClient:
+    def create_client(self, config: ASRConfig, qps: int = 20) -> ASRClient:
         """根据配置创建 ASR 客户端
 
         Args:
             config: ASR 配置
+            qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
         Returns:
             ASRClient: 对应提供商的客户端实例
@@ -99,16 +100,17 @@ class ASRService:
                 app_id=credentials.get("app_id", ""),
                 access_token=credentials.get("access_token", ""),
                 cluster=credentials.get("cluster", "volc.bigasr.auc"),
-                qps=int(credentials.get("qps", 20)),
+                qps=qps,
             )
         else:
             raise ValueError(f"不支持的 ASR 提供商: {provider}")
 
-    async def get_client_by_id(self, config_id: int) -> ASRClient:
+    async def get_client_by_id(self, config_id: int, qps: int = 20) -> ASRClient:
         """根据配置 ID 获取 ASR 客户端
 
         Args:
             config_id: 配置 ID
+            qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
         Returns:
             ASRClient: ASR 客户端
@@ -121,7 +123,7 @@ class ASRService:
             raise ValueError(f"ASR 配置不存在: {config_id}")
         if not config.is_active:
             raise ValueError(f"ASR 配置未启用: {config_id}")
-        return self.create_client(config)
+        return self.create_client(config, qps=qps)
 
     @staticmethod
     def extract_record_url(raw_data: dict[str, Any]) -> str | None:
@@ -193,6 +195,7 @@ class ASRService:
         asr_config_id: int,
         staff_name: str | None = None,
         correct_table_name: str | None = None,
+        qps: int = 20,
     ) -> list[dict] | None:
         """转写单条通话记录
 
@@ -201,6 +204,7 @@ class ASRService:
             asr_config_id: ASR 配置 ID
             staff_name: 员工名称（保留参数，用于日志显示）
             correct_table_name: 替换词本名称（仅火山引擎有效）
+            qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
         Returns:
             list[dict] | None: 转写结果列表，失败返回 None
@@ -215,7 +219,7 @@ class ASRService:
         task_log(f"  - 录音 URL: {audio_url[:80]}...")
 
         # 2. 获取 ASR 客户端
-        asr_client = await self.get_client_by_id(asr_config_id)
+        asr_client = await self.get_client_by_id(asr_config_id, qps=qps)
         task_log("  - 创建 ASR 任务...")
 
         # 3. 执行转写
