@@ -17,7 +17,9 @@
         task_log("静默记录", print_console=False)  # 只记录不打印
 """
 
+import asyncio
 import threading
+from collections import deque
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
@@ -30,7 +32,7 @@ from app.database import engine
 
 # 上下文变量 - 用于在异步任务中传递执行上下文
 _execution_id: ContextVar[int | None] = ContextVar("execution_id", default=None)
-_log_buffer: ContextVar[list[str]] = ContextVar("log_buffer")
+_log_buffer: ContextVar[deque[str]] = ContextVar("log_buffer")
 
 # 数据库写入锁（避免并发写入冲突）
 _db_write_lock = threading.Lock()
@@ -38,6 +40,35 @@ _db_write_lock = threading.Lock()
 # 记录哪些执行正在运行（用于 SSE 判断）
 _running_executions: set[int] = set()
 _running_lock = threading.Lock()
+
+# NEW_LOG 发布节流（每个执行一个定时器）
+_publish_handles: dict[int, asyncio.Handle] = {}
+_publish_lock = threading.Lock()
+
+
+def _schedule_publish_new_log(execution_id: int) -> None:
+    """节流发布 NEW_LOG 通知，合并短时间内的多次日志写入。"""
+    from app.utils.redis_client import publish_log
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # 无事件循环（极少），直接发布
+        publish_log(execution_id, "NEW_LOG")
+        return
+
+    delay = max(0.05, settings.scheduler_log_publish_interval)
+
+    def _do_publish() -> None:
+        with _publish_lock:
+            _publish_handles.pop(execution_id, None)
+        publish_log(execution_id, "NEW_LOG")
+
+    with _publish_lock:
+        handle = _publish_handles.get(execution_id)
+        if handle and not handle.cancelled():
+            return
+        _publish_handles[execution_id] = loop.call_later(delay, _do_publish)
 
 
 def _persist_log_to_db(execution_id: int, log_line: str) -> None:
@@ -97,18 +128,18 @@ def task_log(*args: Any, print_console: bool | None = None) -> None:
         buffer = _log_buffer.get()
     except LookupError:
         # 如果上下文未初始化，创建新的缓冲区
-        buffer = []
+        buffer = deque(maxlen=settings.scheduler_log_buffer_max_lines)
         _log_buffer.set(buffer)
     buffer.append(log_line)
 
     # 存储到 Redis List + 发送 Pub/Sub 通知
     if exec_id:
-        from app.utils.redis_client import publish_log, rpush_log
+        from app.utils.redis_client import rpush_log
 
         # 1. 持久化存储到 Redis List
         rpush_log(exec_id, log_line)
-        # 2. 发送通知信号（不发送完整日志，只通知有新日志）
-        publish_log(exec_id, "NEW_LOG")
+        # 2. 发送通知信号（不发送完整日志，只通知有新日志，做节流合并）
+        _schedule_publish_new_log(exec_id)
 
     # 控制台输出
     should_print = print_console if print_console is not None else settings.debug
@@ -158,7 +189,7 @@ def get_log_output() -> str:
     """获取所有日志内容"""
     try:
         buffer = _log_buffer.get()
-        return "\n".join(buffer)
+        return "\n".join(list(buffer))
     except LookupError:
         return ""
 
@@ -166,7 +197,7 @@ def get_log_output() -> str:
 def init_log_context(execution_id: int) -> None:
     """初始化日志上下文（由执行器调用）"""
     _execution_id.set(execution_id)
-    _log_buffer.set([])
+    _log_buffer.set(deque(maxlen=settings.scheduler_log_buffer_max_lines))
 
     # 标记任务正在运行（本地 + Redis）
     with _running_lock:
@@ -187,6 +218,12 @@ def clear_log_context(status: str = "completed") -> None:
     exec_id = get_execution_id()
 
     if exec_id:
+        # 取消可能尚未触发的 NEW_LOG 定时发布
+        with _publish_lock:
+            handle = _publish_handles.pop(exec_id, None)
+        if handle and not handle.cancelled():
+            handle.cancel()
+
         # 1. 批量将日志写入数据库（永久存储）
         flush_logs_to_db(exec_id)
 
@@ -201,7 +238,7 @@ def clear_log_context(status: str = "completed") -> None:
             _running_executions.discard(exec_id)
 
     _execution_id.set(None)
-    _log_buffer.set([])
+    _log_buffer.set(deque(maxlen=settings.scheduler_log_buffer_max_lines))
 
 
 def is_execution_running(execution_id: int) -> bool:

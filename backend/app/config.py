@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     timezone: str = "Asia/Shanghai"
     max_execution_history_days: int = 30  # 执行历史保留天数
+    # 调度器分布式 leader 锁（防止多进程/多实例重复调度）
+    scheduler_leader_lock_enabled: bool = True
+    scheduler_leader_lock_key: str = "scheduler:leader"
+    scheduler_leader_lock_ttl: int = 30  # 秒
+    scheduler_leader_lock_refresh_interval: int = 10  # 秒
+    scheduler_log_publish_interval: float = 0.3  # NEW_LOG 通知节流间隔（秒）
+    scheduler_log_buffer_max_lines: int = 20000  # 单次执行内存日志上限（超出自动丢弃最早）
 
     # 脚本文件夹配置
     scripts_path: str = "scripts"  # 任务脚本文件夹路径（相对于 backend 目录）

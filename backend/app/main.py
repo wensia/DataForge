@@ -49,6 +49,7 @@ def setup_security_logging():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    renewal_started = False
     # 启动时执行
     logger.info("正在初始化数据库...")
     init_db()
@@ -65,24 +66,42 @@ async def lifespan(app: FastAPI):
             shutdown_scheduler,
             start_scheduler,
         )
+        from app.scheduler.leader_lock import (
+            acquire_leader_lock,
+            release_leader_lock,
+            start_renewal_task,
+            stop_renewal_task,
+        )
         from app.services.task_service import init_default_tasks, sync_tasks_to_scheduler
 
-        logger.info("正在初始化任务调度器...")
-        init_scheduler()
-        discover_handlers()
-        start_scheduler()
-        init_default_tasks()
-        sync_tasks_to_scheduler()
-        logger.info("任务调度器启动完成")
+        if acquire_leader_lock():
+            logger.info("正在初始化任务调度器...")
+            init_scheduler()
+            discover_handlers()
+            start_scheduler()
+            start_renewal_task()
+            renewal_started = True
+            init_default_tasks()
+            sync_tasks_to_scheduler()
+            logger.info("任务调度器启动完成")
+        else:
+            logger.info("当前实例非 leader，跳过调度器启动")
 
     yield
 
     # 关闭时执行
     if settings.scheduler_enabled:
         from app.scheduler import shutdown_scheduler
+        from app.scheduler.leader_lock import (
+            release_leader_lock,
+            stop_renewal_task,
+        )
 
         logger.info("正在关闭任务调度器...")
         shutdown_scheduler()
+        if renewal_started:
+            await stop_renewal_task()
+            release_leader_lock()
 
     logger.info("应用正在关闭...")
 
@@ -131,4 +150,3 @@ async def root():
         data={"name": settings.app_name, "version": settings.app_version},
         message="欢迎使用云客中转 API",
     )
-

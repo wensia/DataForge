@@ -193,8 +193,11 @@ def rpush_log(execution_id: int, log_line: str) -> bool:
         return False
     try:
         key = _get_log_list_key(execution_id)
-        client.rpush(key, log_line)
-        client.expire(key, LOG_TTL_SECONDS)
+        # 使用 pipeline 合并 rpush + expire，减少 RTT
+        pipe = client.pipeline()
+        pipe.rpush(key, log_line)
+        pipe.expire(key, LOG_TTL_SECONDS)
+        pipe.execute()
         return True
     except Exception as e:
         logger.warning(f"追加日志到 Redis List 失败: {e}")

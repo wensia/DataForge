@@ -27,7 +27,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 
 from app.database import engine
-from app.models import CallRecord
+from app.models import ASRProvider, CallRecord
 from app.scheduler import task_log
 from app.services.asr_service import asr_service
 from scripts._utils import normalize_time_param
@@ -161,7 +161,10 @@ async def _process_single_record(
 
             # 3. 处理结果
             if transcript:
-                asr_service.update_record_transcript(record.id, transcript)
+                # 同步 DB 写入放到线程，避免阻塞事件循环
+                await asyncio.to_thread(
+                    asr_service.update_record_transcript, record.id, transcript
+                )
                 current = await stats.inc_success()
                 max_display = max_records if max_records > 0 else "∞"
                 task_log(f"[Record {record.id}] ✓ 转写成功 ({current}/{max_display})")
@@ -200,7 +203,7 @@ async def run(
     min_duration: int = 0,
     batch_size: int = 10,
     max_records: int = 0,
-    concurrency: int = 5,
+    concurrency: int = 0,
     correct_table_name: str = "",
     qps: int = 20,
 ) -> dict:
@@ -214,7 +217,7 @@ async def run(
         min_duration: 最小通话时长（秒），只处理时长>=此值的记录，默认 0 不限制
         batch_size: 每批处理数量，默认 10
         max_records: 最大识别成功数量，达到此数量后停止处理，0 表示不限制
-        concurrency: 并发数，默认 5
+        concurrency: 并发数，0 表示自动（默认）
         correct_table_name: 替换词本名称（仅火山引擎有效），在火山引擎控制台自学习平台创建
         qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
@@ -231,7 +234,6 @@ async def run(
     task_log(f"跳过已有转写: {skip_existing}")
     task_log(f"最小通话时长: {min_duration} 秒")
     task_log(f"每批处理数量: {batch_size}")
-    task_log(f"并发数: {concurrency}")
     task_log(f"QPS 限制: {qps}")
     if correct_table_name:
         task_log(f"替换词本: {correct_table_name}")
@@ -252,6 +254,20 @@ async def run(
     if max_records > 0:
         task_log(f"最大识别成功数量: {max_records}")
 
+    # 并发自适应（火山引擎按轮询间隔推算需要的 in-flight 数）
+    if concurrency <= 0:
+        if asr_config.provider == ASRProvider.VOLCENGINE:
+            poll_interval = 5.0  # 与 VolcengineASRClient.wait_for_task 默认一致
+            auto_concurrency = int(qps * poll_interval)
+            # 安全边界，避免极端参数导致过多并发
+            auto_concurrency = max(5, min(auto_concurrency, 200))
+        else:
+            auto_concurrency = 5
+        concurrency = auto_concurrency
+        task_log(f"并发数自动调整为: {concurrency}")
+    else:
+        task_log(f"并发数: {concurrency}")
+
     # 获取需要转写的记录（不限制数量，由 max_records 控制成功数量）
     records = _get_records_to_transcribe(
         start_time, end_time, skip_existing, min_duration, limit=None
@@ -270,20 +286,24 @@ async def run(
             "skipped": 0,
         }
 
+    # batch_size 至少覆盖并发数，否则会被批次顺序限制吞吐
+    effective_batch_size = max(batch_size, concurrency)
     # 创建并发控制和统计
     semaphore = asyncio.Semaphore(concurrency)
     stats = ConcurrentStats()
 
     # 分批处理
-    for i in range(0, total_count, batch_size):
+    for i in range(0, total_count, effective_batch_size):
         # 检查是否已达到 max_records
         if max_records > 0 and await stats.get_success_count() >= max_records:
             task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
             break
 
-        batch = records[i : i + batch_size]
-        batch_num = i // batch_size + 1
-        task_log(f"处理第 {batch_num} 批（{len(batch)} 条，并发 {concurrency}）")
+        batch = records[i : i + effective_batch_size]
+        batch_num = i // effective_batch_size + 1
+        task_log(
+            f"处理第 {batch_num} 批（{len(batch)} 条，并发 {concurrency}）"
+        )
 
         # 并发执行本批次所有任务
         tasks = [

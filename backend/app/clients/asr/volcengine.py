@@ -66,6 +66,17 @@ class VolcengineASRClient(ASRClient):
         # 保存最后一次请求的 logid，用于查询时链路追踪
         self._last_logid: str | None = None
 
+    def set_qps(self, qps: int) -> None:
+        """动态调整 QPS 限制。
+
+        共享客户端时用于按任务参数更新限流上限。
+        """
+        if qps <= 0:
+            return
+        with self._rate_lock:
+            self.qps = qps
+            self._min_interval = 1.0 / qps
+
     async def _rate_limited_request(self):
         """实例级别的请求限流（线程安全）"""
         with self._rate_lock:

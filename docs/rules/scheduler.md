@@ -460,6 +460,16 @@ scheduler_enabled: bool = True           # 是否启用调度器
 timezone: str = "Asia/Shanghai"          # 时区
 max_execution_history_days: int = 30     # 执行历史保留天数
 
+# 多实例/多进程部署 leader 锁（Redis）
+scheduler_leader_lock_enabled: bool = True        # 是否启用 leader 锁
+scheduler_leader_lock_key: str = "scheduler:leader"  # Redis 锁 key
+scheduler_leader_lock_ttl: int = 30              # 锁 TTL（秒）
+scheduler_leader_lock_refresh_interval: int = 10 # 续租间隔（秒）
+
+# 实时日志性能优化
+scheduler_log_publish_interval: float = 0.3      # NEW_LOG 通知节流间隔（秒）
+scheduler_log_buffer_max_lines: int = 20000      # 单次执行内存日志上限
+
 # 脚本文件夹配置
 scripts_path: str = "scripts"            # 脚本文件夹路径
 ```

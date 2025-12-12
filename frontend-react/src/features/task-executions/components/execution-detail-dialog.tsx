@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -62,10 +63,10 @@ export function ExecutionDetailDialog({
 }: ExecutionDetailDialogProps) {
   const [logs, setLogs] = useState<string[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [isFollowing, setIsFollowing] = useState(true)
   const [currentStatus, setCurrentStatus] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
-  const initializedRef = useRef(false)
 
   // 获取执行详情（包含 log_output）
   const { data: detailData, isLoading: isLoadingDetail } = useExecutionDetail(
@@ -91,17 +92,12 @@ export function ExecutionDetailDialog({
       ? `/api/v1/tasks/executions/${executionId}/logs/stream?token=${authToken}`
       : `/api/v1/tasks/executions/${executionId}/logs/stream`
 
-    console.log('[SSE] Connecting to:', sseUrl)
+    setLogs([])
     const eventSource = new EventSource(sseUrl)
     eventSourceRef.current = eventSource
     setIsStreaming(true)
 
-    eventSource.onopen = () => {
-      console.log('[SSE] Connection opened')
-    }
-
     eventSource.onmessage = (event) => {
-      console.log('[SSE] Message received:', event.data)
       try {
         const data = JSON.parse(event.data)
         if (data.log) {
@@ -111,7 +107,6 @@ export function ExecutionDetailDialog({
           setCurrentStatus(data.status)
         }
         if (data.finished) {
-          console.log('[SSE] Task finished')
           setIsStreaming(false)
           eventSource.close()
           eventSourceRef.current = null
@@ -122,7 +117,6 @@ export function ExecutionDetailDialog({
     }
 
     eventSource.onerror = (error) => {
-      console.error('[SSE] Error:', error)
       setIsStreaming(false)
       eventSource.close()
       eventSourceRef.current = null
@@ -135,7 +129,7 @@ export function ExecutionDetailDialog({
       // 弹窗关闭时重置状态
       setLogs([])
       setCurrentStatus('')
-      initializedRef.current = false
+      setIsFollowing(true)
       cleanupSSE()
       return
     }
@@ -144,19 +138,17 @@ export function ExecutionDetailDialog({
     setCurrentStatus(execution.status)
   }, [open, execution, cleanupSSE])
 
-  // 弹窗打开时，根据任务状态决定如何获取日志
+  // 弹窗打开时，如果任务仍在运行/等待中，自动建立 SSE 连接显示实时日志
   useEffect(() => {
-    if (!open || !execution || initializedRef.current) return
-
-    // 标记已初始化，避免重复执行
-    initializedRef.current = true
-
-    // 如果任务正在运行或等待中，直接建立 SSE 连接（SSE 会先发送已有日志）
-    // 如果任务已完成，等 detailData 加载完成后显示日志
-    if (execution.status === 'running' || execution.status === 'pending') {
+    if (!open || !execution) return
+    const status = currentStatus || detailData?.status || execution.status
+    if (
+      (status === 'running' || status === 'pending') &&
+      !eventSourceRef.current
+    ) {
       connectSSE(execution.id)
     }
-  }, [open, execution, connectSSE])
+  }, [open, execution, detailData, currentStatus, connectSSE])
 
   // 当详情数据加载完成后，显示已完成任务的日志
   useEffect(() => {
@@ -166,12 +158,16 @@ export function ExecutionDetailDialog({
     setCurrentStatus(detailData.status)
 
     // 如果任务已完成，从 detailData 加载日志
-    if (detailData.status !== 'running' && detailData.status !== 'pending') {
+    if (
+      !isStreaming &&
+      detailData.status !== 'running' &&
+      detailData.status !== 'pending'
+    ) {
       if (detailData.log_output) {
         setLogs(detailData.log_output.split('\n').filter(Boolean))
       }
     }
-  }, [open, execution, detailData])
+  }, [open, execution, detailData, isStreaming])
 
   // 组件卸载时清理
   useEffect(() => {
@@ -180,12 +176,13 @@ export function ExecutionDetailDialog({
     }
   }, [cleanupSSE])
 
-  // 自动滚动到底部
+  // 自动滚动到底部（仅在开启“跟踪/跟随”时）
   useEffect(() => {
+    if (!isFollowing) return
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [logs])
+  }, [logs, isFollowing])
 
   if (!execution) return null
 
@@ -194,6 +191,7 @@ export function ExecutionDetailDialog({
   const displayData = detailData || execution
   const status = statusConfig[displayStatus as keyof typeof statusConfig]
   const StatusIcon = status?.icon || Clock
+  const isRunnable = displayStatus === 'running' || displayStatus === 'pending'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,29 +277,25 @@ export function ExecutionDetailDialog({
               )}
             </div>
 
-            {/* 跟踪按钮 - 仅在任务运行中时显示 */}
-            {(displayStatus === 'running' || displayStatus === 'pending') && (
-              <Button
-                variant={isStreaming ? 'default' : 'outline'}
-                size='sm'
-                onClick={() => {
-                  if (isStreaming) {
-                    cleanupSSE()
-                  } else {
-                    connectSSE(execution.id)
-                  }
+            <label className='flex cursor-pointer items-center gap-2 text-sm'>
+              <Checkbox
+                checked={isFollowing}
+                onCheckedChange={(checked) => {
+                  setIsFollowing(checked === true)
                 }}
-              >
-                {isStreaming ? (
-                  <>
-                    <Loader2 className='mr-1 h-3 w-3 animate-spin' />
-                    跟踪中
-                  </>
-                ) : (
-                  '开始跟踪'
-                )}
-              </Button>
-            )}
+                disabled={!isRunnable}
+                aria-label='跟踪（自动滚动到最新日志）'
+              />
+              <span className={cn(!isRunnable && 'text-muted-foreground')}>
+                跟踪（自动滚动）
+              </span>
+              {isRunnable && isFollowing && (
+                <Badge variant='secondary' className='gap-1 text-xs'>
+                  <Loader2 className='h-3 w-3 animate-spin' />
+                  跟踪中
+                </Badge>
+              )}
+            </label>
           </div>
           <ScrollArea
             className='bg-muted/50 h-[300px] rounded-md border'
@@ -335,7 +329,7 @@ export function ExecutionDetailDialog({
                 </pre>
               ) : (
                 <p className='text-muted-foreground text-center text-sm'>
-                  暂无日志
+                  {isRunnable ? '等待实时日志...' : '暂无日志'}
                 </p>
               )}
             </div>

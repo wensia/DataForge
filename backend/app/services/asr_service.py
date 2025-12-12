@@ -6,6 +6,7 @@
 
 import json
 import logging
+import threading
 import traceback
 from typing import Any
 
@@ -28,6 +29,11 @@ logger = logging.getLogger(__name__)
 
 class ASRService:
     """ASR 语音识别服务"""
+
+    def __init__(self) -> None:
+        # 客户端缓存（按配置 ID 复用，保证限流等状态全局生效）
+        self._client_cache: dict[int, ASRClient] = {}
+        self._cache_lock = threading.Lock()
 
     def get_config(self, config_id: int) -> ASRConfig | None:
         """获取 ASR 配置
@@ -123,7 +129,19 @@ class ASRService:
             raise ValueError(f"ASR 配置不存在: {config_id}")
         if not config.is_active:
             raise ValueError(f"ASR 配置未启用: {config_id}")
-        return self.create_client(config, qps=qps)
+
+        cache_key = config.id  # type: ignore[assignment]
+        with self._cache_lock:
+            cached = self._client_cache.get(cache_key)
+            if cached:
+                # 共享火山客户端时更新 QPS 上限（避免每条记录新建实例导致限流失效）
+                if isinstance(cached, VolcengineASRClient):
+                    cached.set_qps(qps)
+                return cached
+
+            client = self.create_client(config, qps=qps)
+            self._client_cache[cache_key] = client
+            return client
 
     @staticmethod
     def extract_record_url(raw_data: dict[str, Any]) -> str | None:

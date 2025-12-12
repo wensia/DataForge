@@ -1,5 +1,6 @@
 """任务执行器 - 包装任务执行，记录日志和错误"""
 
+import asyncio
 import json
 import traceback
 from collections.abc import Callable
@@ -65,18 +66,20 @@ async def execute_task(
     Returns:
         TaskExecution: 执行记录
     """
-    # 创建执行记录
-    with Session(engine) as session:
-        execution = TaskExecution(
-            task_id=task_id,
-            status=ExecutionStatus.RUNNING,
-            trigger_type=trigger_type,
-            started_at=datetime.now(),
-        )
-        session.add(execution)
-        session.commit()
-        session.refresh(execution)
-        execution_id = execution.id
+    # 创建执行记录（同步 DB 操作放入线程，避免阻塞事件循环）
+    def _create_execution() -> int:
+        with Session(engine) as session:
+            execution = TaskExecution(
+                task_id=task_id,
+                status=ExecutionStatus.PENDING,
+                trigger_type=trigger_type,
+            )
+            session.add(execution)
+            session.commit()
+            session.refresh(execution)
+            return execution.id  # type: ignore[return-value]
+
+    execution_id = await asyncio.to_thread(_create_execution)
 
     # 使用共用的执行逻辑
     return await execute_task_with_execution(
@@ -113,14 +116,17 @@ async def execute_task_with_execution(
 
     start_time = datetime.now()
 
-    # 更新执行记录状态为 RUNNING
-    with Session(engine) as session:
-        execution = session.get(TaskExecution, execution_id)
-        if execution:
-            execution.status = ExecutionStatus.RUNNING
-            execution.started_at = start_time
-            session.add(execution)
-            session.commit()
+    # 更新执行记录状态为 RUNNING（线程化）
+    def _mark_running() -> None:
+        with Session(engine) as session:
+            execution = session.get(TaskExecution, execution_id)
+            if execution:
+                execution.status = ExecutionStatus.RUNNING
+                execution.started_at = start_time
+                session.add(execution)
+                session.commit()
+
+    await asyncio.to_thread(_mark_running)
 
     logger.info(f"开始执行任务 #{task_id}, 执行记录 #{execution_id}")
 
@@ -141,32 +147,37 @@ async def execute_task_with_execution(
         end_time = datetime.now()
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
-        with Session(engine) as session:
-            execution = session.get(TaskExecution, execution_id)
-            if execution:
-                execution.status = ExecutionStatus.SUCCESS
-                execution.finished_at = end_time
-                execution.duration_ms = duration_ms
-                execution.result = (
-                    json.dumps(result, ensure_ascii=False) if result else None
-                )
-                execution.log_output = log_output if log_output else None
-                session.add(execution)
+        result_json = json.dumps(result, ensure_ascii=False) if result else None
 
-            # 更新任务统计
-            task = session.get(ScheduledTask, task_id)
-            if task:
-                task.last_run_at = end_time
-                task.run_count += 1
-                task.success_count += 1
-                task.updated_at = datetime.now()
-                session.add(task)
+        def _mark_success() -> TaskExecution | None:
+            with Session(engine) as session:
+                execution = session.get(TaskExecution, execution_id)
+                if execution:
+                    execution.status = ExecutionStatus.SUCCESS
+                    execution.finished_at = end_time
+                    execution.duration_ms = duration_ms
+                    execution.result = result_json
+                    execution.log_output = log_output if log_output else None
+                    session.add(execution)
 
-            session.commit()
-            session.refresh(execution)
+                # 更新任务统计
+                task = session.get(ScheduledTask, task_id)
+                if task:
+                    task.last_run_at = end_time
+                    task.run_count += 1
+                    task.success_count += 1
+                    task.updated_at = datetime.now()
+                    session.add(task)
+
+                session.commit()
+                if execution:
+                    session.refresh(execution)
+                return execution
+
+        execution = await asyncio.to_thread(_mark_success)
 
         logger.info(f"任务 #{task_id} 执行成功, 耗时 {duration_ms}ms")
-        return execution
+        return execution  # type: ignore[return-value]
 
     except Exception as e:
         # 标记任务失败
@@ -180,31 +191,36 @@ async def execute_task_with_execution(
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
         error_tb = traceback.format_exc()
 
-        with Session(engine) as session:
-            execution = session.get(TaskExecution, execution_id)
-            if execution:
-                execution.status = ExecutionStatus.FAILED
-                execution.finished_at = end_time
-                execution.duration_ms = duration_ms
-                execution.error_message = str(e)
-                execution.error_traceback = error_tb
-                execution.log_output = log_output if log_output else None
-                session.add(execution)
+        def _mark_failed() -> TaskExecution | None:
+            with Session(engine) as session:
+                execution = session.get(TaskExecution, execution_id)
+                if execution:
+                    execution.status = ExecutionStatus.FAILED
+                    execution.finished_at = end_time
+                    execution.duration_ms = duration_ms
+                    execution.error_message = str(e)
+                    execution.error_traceback = error_tb
+                    execution.log_output = log_output if log_output else None
+                    session.add(execution)
 
-            # 更新任务统计
-            task = session.get(ScheduledTask, task_id)
-            if task:
-                task.last_run_at = end_time
-                task.run_count += 1
-                task.fail_count += 1
-                task.updated_at = datetime.now()
-                session.add(task)
+                # 更新任务统计
+                task = session.get(ScheduledTask, task_id)
+                if task:
+                    task.last_run_at = end_time
+                    task.run_count += 1
+                    task.fail_count += 1
+                    task.updated_at = datetime.now()
+                    session.add(task)
 
-            session.commit()
-            session.refresh(execution)
+                session.commit()
+                if execution:
+                    session.refresh(execution)
+                return execution
+
+        execution = await asyncio.to_thread(_mark_failed)
 
         logger.error(f"任务 #{task_id} 执行失败: {e}")
-        return execution
+        return execution  # type: ignore[return-value]
 
     finally:
         # 清理日志上下文（传入任务状态，用于更新 Redis）
