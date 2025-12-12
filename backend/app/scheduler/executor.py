@@ -2,8 +2,9 @@
 
 import json
 import traceback
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from loguru import logger
 from sqlmodel import Session
@@ -11,7 +12,11 @@ from sqlmodel import Session
 from app.database import engine
 from app.models.task import ScheduledTask
 from app.models.task_execution import ExecutionStatus, TaskExecution
-from app.scheduler.task_logger import clear_log_context, get_log_output, init_log_context
+from app.scheduler.task_logger import (
+    clear_log_context,
+    get_log_output,
+    init_log_context,
+)
 from app.utils.safe_eval import safe_eval
 
 
@@ -122,6 +127,9 @@ async def execute_task_with_execution(
     # 初始化日志上下文
     init_log_context(execution_id)
 
+    # 用于追踪任务执行状态
+    task_status = "completed"
+
     try:
         # 执行处理函数（使用解析后的参数）
         result = await handler(**resolved_kwargs)
@@ -161,6 +169,9 @@ async def execute_task_with_execution(
         return execution
 
     except Exception as e:
+        # 标记任务失败
+        task_status = "failed"
+
         # 获取任务日志
         log_output = get_log_output()
 
@@ -196,5 +207,5 @@ async def execute_task_with_execution(
         return execution
 
     finally:
-        # 清理日志上下文
-        clear_log_context()
+        # 清理日志上下文（传入任务状态，用于更新 Redis）
+        clear_log_context(task_status)

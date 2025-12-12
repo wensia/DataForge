@@ -6,6 +6,13 @@
 - get_async_redis(): 异步客户端，用于 SSE 等异步场景
 - publish_log(): 同步发布日志到 Redis 频道
 - subscribe_logs(): 异步订阅日志频道
+
+任务日志相关（使用 Redis List 持久化存储）:
+- rpush_log(): 追加日志到 Redis List
+- get_logs() / get_logs_async(): 获取日志列表
+- set_execution_status(): 设置执行状态
+- get_execution_status() / get_execution_status_async(): 获取执行状态
+- cleanup_execution_redis(): 清理 Redis 数据
 """
 
 import redis
@@ -20,6 +27,13 @@ _async_redis_client: aioredis.Redis | None = None
 
 # 任务日志频道前缀
 LOG_CHANNEL_PREFIX = "task_logs:"
+
+# 任务日志 Redis Key 设计
+# task_logs:{exec_id}:logs   - List 存储日志行
+# task_logs:{exec_id}:status - String 存储状态 (running/completed/failed)
+LOG_LIST_SUFFIX = ":logs"
+STATUS_KEY_SUFFIX = ":status"
+LOG_TTL_SECONDS = 3600  # 日志数据 TTL: 1 小时
 
 
 def get_redis_client() -> redis.Redis | None:
@@ -149,3 +163,207 @@ async def subscribe_logs(execution_id: int) -> aioredis.client.PubSub | None:
     except Exception as e:
         logger.warning(f"订阅日志频道失败: {e}")
         return None
+
+
+# ========== 任务日志 Redis List 相关函数 ==========
+
+
+def _get_log_list_key(execution_id: int) -> str:
+    """获取日志 List 的 Redis Key"""
+    return f"{LOG_CHANNEL_PREFIX}{execution_id}{LOG_LIST_SUFFIX}"
+
+
+def _get_status_key(execution_id: int) -> str:
+    """获取状态的 Redis Key"""
+    return f"{LOG_CHANNEL_PREFIX}{execution_id}{STATUS_KEY_SUFFIX}"
+
+
+def rpush_log(execution_id: int, log_line: str) -> bool:
+    """追加日志到 Redis List
+
+    Args:
+        execution_id: 任务执行 ID
+        log_line: 日志行
+
+    Returns:
+        是否成功
+    """
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        key = _get_log_list_key(execution_id)
+        client.rpush(key, log_line)
+        client.expire(key, LOG_TTL_SECONDS)
+        return True
+    except Exception as e:
+        logger.warning(f"追加日志到 Redis List 失败: {e}")
+        return False
+
+
+def get_logs(execution_id: int, start: int = 0, end: int = -1) -> list[str]:
+    """获取日志列表（同步）
+
+    Args:
+        execution_id: 任务执行 ID
+        start: 起始索引（默认 0）
+        end: 结束索引（默认 -1 表示全部）
+
+    Returns:
+        日志行列表
+    """
+    client = get_redis_client()
+    if client is None:
+        return []
+    try:
+        key = _get_log_list_key(execution_id)
+        return client.lrange(key, start, end)
+    except Exception as e:
+        logger.warning(f"获取 Redis 日志列表失败: {e}")
+        return []
+
+
+async def get_logs_async(execution_id: int, start: int = 0, end: int = -1) -> list[str]:
+    """获取日志列表（异步）
+
+    Args:
+        execution_id: 任务执行 ID
+        start: 起始索引（默认 0）
+        end: 结束索引（默认 -1 表示全部）
+
+    Returns:
+        日志行列表
+    """
+    client = await get_async_redis()
+    if client is None:
+        return []
+    try:
+        key = _get_log_list_key(execution_id)
+        return await client.lrange(key, start, end)
+    except Exception as e:
+        logger.warning(f"获取 Redis 日志列表失败: {e}")
+        return []
+
+
+def get_logs_count(execution_id: int) -> int:
+    """获取日志行数（同步）
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        日志行数
+    """
+    client = get_redis_client()
+    if client is None:
+        return 0
+    try:
+        key = _get_log_list_key(execution_id)
+        return client.llen(key)
+    except Exception as e:
+        logger.warning(f"获取 Redis 日志行数失败: {e}")
+        return 0
+
+
+async def get_logs_count_async(execution_id: int) -> int:
+    """获取日志行数（异步）
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        日志行数
+    """
+    client = await get_async_redis()
+    if client is None:
+        return 0
+    try:
+        key = _get_log_list_key(execution_id)
+        return await client.llen(key)
+    except Exception as e:
+        logger.warning(f"获取 Redis 日志行数失败: {e}")
+        return 0
+
+
+def set_execution_status(execution_id: int, status: str) -> bool:
+    """设置执行状态
+
+    Args:
+        execution_id: 任务执行 ID
+        status: 状态 (running/completed/failed)
+
+    Returns:
+        是否成功
+    """
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        key = _get_status_key(execution_id)
+        client.set(key, status, ex=LOG_TTL_SECONDS)
+        return True
+    except Exception as e:
+        logger.warning(f"设置执行状态失败: {e}")
+        return False
+
+
+def get_execution_status(execution_id: int) -> str | None:
+    """获取执行状态（同步）
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        状态字符串，不存在返回 None
+    """
+    client = get_redis_client()
+    if client is None:
+        return None
+    try:
+        key = _get_status_key(execution_id)
+        return client.get(key)
+    except Exception as e:
+        logger.warning(f"获取执行状态失败: {e}")
+        return None
+
+
+async def get_execution_status_async(execution_id: int) -> str | None:
+    """获取执行状态（异步）
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        状态字符串，不存在返回 None
+    """
+    client = await get_async_redis()
+    if client is None:
+        return None
+    try:
+        key = _get_status_key(execution_id)
+        return await client.get(key)
+    except Exception as e:
+        logger.warning(f"获取执行状态失败: {e}")
+        return None
+
+
+def cleanup_execution_redis(execution_id: int) -> bool:
+    """清理执行相关的 Redis 数据
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        是否成功
+    """
+    client = get_redis_client()
+    if client is None:
+        return False
+    try:
+        log_key = _get_log_list_key(execution_id)
+        status_key = _get_status_key(execution_id)
+        client.delete(log_key, status_key)
+        return True
+    except Exception as e:
+        logger.warning(f"清理 Redis 数据失败: {e}")
+        return False

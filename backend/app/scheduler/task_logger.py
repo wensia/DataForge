@@ -2,7 +2,11 @@
 
 提供 task_log() 函数，在任务执行过程中记录日志。
 日志会保存到 TaskExecution.log_output 字段。
-支持通过 Redis Pub/Sub 实时推送日志给 SSE 订阅者。
+
+日志存储策略：
+1. 实时存储到 Redis List（持久化，支持跨进程访问）
+2. 通过 Redis Pub/Sub 发送通知信号（通知 SSE 有新日志）
+3. 任务结束时批量写入数据库（永久存储）
 
 使用方式:
     from app.scheduler import task_log
@@ -97,11 +101,14 @@ def task_log(*args: Any, print_console: bool | None = None) -> None:
         _log_buffer.set(buffer)
     buffer.append(log_line)
 
-    # 通过 Redis Pub/Sub 推送给实时订阅者
+    # 存储到 Redis List + 发送 Pub/Sub 通知
     if exec_id:
-        from app.utils.redis_client import publish_log
+        from app.utils.redis_client import publish_log, rpush_log
 
-        publish_log(exec_id, log_line)
+        # 1. 持久化存储到 Redis List
+        rpush_log(exec_id, log_line)
+        # 2. 发送通知信号（不发送完整日志，只通知有新日志）
+        publish_log(exec_id, "NEW_LOG")
 
     # 控制台输出
     should_print = print_console if print_console is not None else settings.debug
@@ -160,25 +167,36 @@ def init_log_context(execution_id: int) -> None:
     """初始化日志上下文（由执行器调用）"""
     _execution_id.set(execution_id)
     _log_buffer.set([])
-    # 标记任务正在运行
+
+    # 标记任务正在运行（本地 + Redis）
     with _running_lock:
         _running_executions.add(execution_id)
 
+    # 设置 Redis 状态为 running（跨进程可见）
+    from app.utils.redis_client import set_execution_status
 
-def clear_log_context() -> None:
-    """清空日志上下文（由执行器调用）"""
+    set_execution_status(execution_id, "running")
+
+
+def clear_log_context(status: str = "completed") -> None:
+    """清空日志上下文（由执行器调用）
+
+    Args:
+        status: 任务结束状态 (completed/failed)
+    """
     exec_id = get_execution_id()
 
-    # 任务结束时，批量将日志写入数据库
     if exec_id:
+        # 1. 批量将日志写入数据库（永久存储）
         flush_logs_to_db(exec_id)
 
-    # 通过 Redis 发送结束信号
-    if exec_id:
-        from app.utils.redis_client import publish_log_end
+        # 2. 更新 Redis 状态 + 发送结束信号
+        from app.utils.redis_client import publish_log_end, set_execution_status
 
+        set_execution_status(exec_id, status)
         publish_log_end(exec_id)
-        # 从运行中列表移除
+
+        # 3. 从本地运行中列表移除
         with _running_lock:
             _running_executions.discard(exec_id)
 
@@ -187,6 +205,17 @@ def clear_log_context() -> None:
 
 
 def is_execution_running(execution_id: int) -> bool:
-    """检查执行是否仍在运行"""
+    """检查执行是否仍在运行
+
+    优先检查 Redis 状态（跨进程可靠），回退到本地检查。
+    """
+    # 1. 优先检查 Redis 状态（跨进程有效）
+    from app.utils.redis_client import get_execution_status
+
+    redis_status = get_execution_status(execution_id)
+    if redis_status is not None:
+        return redis_status == "running"
+
+    # 2. 回退到本地检查（单进程场景）
     with _running_lock:
         return execution_id in _running_executions
