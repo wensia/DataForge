@@ -62,66 +62,50 @@ export function ExecutionDetailDialog({
   execution,
 }: ExecutionDetailDialogProps) {
   const [logs, setLogs] = useState<string[]>([])
-  const [isStreaming, setIsStreaming] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
   const [isFollowing, setIsFollowing] = useState(true)
   const [currentStatus, setCurrentStatus] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
-  const eventSourceRef = useRef<EventSource | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 获取执行详情（包含 log_output）
   const { data: detailData, isLoading: isLoadingDetail } = useExecutionDetail(
     open && execution ? execution.id : 0
   )
 
-  // 清理 SSE 连接
-  const cleanupSSE = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
+  // 停止轮询
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-    setIsStreaming(false)
+    setIsPolling(false)
   }, [])
 
-  // 建立 SSE 连接
-  const connectSSE = useCallback((executionId: number) => {
-    // 如果已经有连接，不重复创建
-    if (eventSourceRef.current) return
+  // 获取日志（轮询）
+  const fetchLogs = useCallback(async (executionId: number) => {
+    try {
+      const authToken = localStorage.getItem('auth_token')
+      const url = authToken
+        ? `/api/v1/tasks/executions/${executionId}/logs?api_key=${authToken}`
+        : `/api/v1/tasks/executions/${executionId}/logs`
 
-    const authToken = localStorage.getItem('auth_token')
-    const sseUrl = authToken
-      ? `/api/v1/tasks/executions/${executionId}/logs/stream?token=${authToken}`
-      : `/api/v1/tasks/executions/${executionId}/logs/stream`
+      const res = await fetch(url)
+      const data = await res.json()
 
-    setLogs([])
-    const eventSource = new EventSource(sseUrl)
-    eventSourceRef.current = eventSource
-    setIsStreaming(true)
+      if (data.code === 200) {
+        setLogs(data.data.logs || [])
+        setCurrentStatus(data.data.status)
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        if (data.log) {
-          setLogs((prev) => [...prev, data.log])
+        // 如果任务已完成，停止轮询
+        if (data.data.finished) {
+          stopPolling()
         }
-        if (data.status) {
-          setCurrentStatus(data.status)
-        }
-        if (data.finished) {
-          setIsStreaming(false)
-          eventSource.close()
-          eventSourceRef.current = null
-        }
-      } catch {
-        // 忽略解析错误（如心跳）
       }
+    } catch (e) {
+      console.error('获取日志失败:', e)
     }
-
-    eventSource.onerror = () => {
-      setIsStreaming(false)
-      eventSource.close()
-      eventSourceRef.current = null
-    }
-  }, [])
+  }, [stopPolling])
 
   // 弹窗打开时初始化
   useEffect(() => {
@@ -130,53 +114,38 @@ export function ExecutionDetailDialog({
       setLogs([])
       setCurrentStatus('')
       setIsFollowing(true)
-      cleanupSSE()
+      stopPolling()
       return
     }
 
     // 设置初始状态
     setCurrentStatus(execution.status)
-  }, [open, execution, cleanupSSE])
 
-  // 弹窗打开时，如果任务仍在运行/等待中，自动建立 SSE 连接显示实时日志
-  useEffect(() => {
-    if (!open || !execution) return
-    const status = currentStatus || detailData?.status || execution.status
-    if (
-      (status === 'running' || status === 'pending') &&
-      !eventSourceRef.current
-    ) {
-      connectSSE(execution.id)
+    // 立即获取一次日志
+    fetchLogs(execution.id)
+
+    // 如果任务正在运行，开始轮询
+    if (execution.status === 'running' || execution.status === 'pending') {
+      setIsPolling(true)
+      intervalRef.current = setInterval(() => {
+        fetchLogs(execution.id)
+      }, 1000)
     }
-  }, [open, execution, detailData, currentStatus, connectSSE])
 
-  // 当详情数据加载完成后，显示已完成任务的日志
+    return () => {
+      stopPolling()
+    }
+  }, [open, execution?.id, execution?.status, fetchLogs, stopPolling])
+
+  // 当详情数据加载完成后，更新状态（用于已完成任务）
   useEffect(() => {
     if (!open || !execution || !detailData) return
 
     // 更新状态
     setCurrentStatus(detailData.status)
+  }, [open, execution, detailData])
 
-    // 如果任务已完成，从 detailData 加载日志
-    if (
-      !isStreaming &&
-      detailData.status !== 'running' &&
-      detailData.status !== 'pending'
-    ) {
-      if (detailData.log_output) {
-        setLogs(detailData.log_output.split('\n').filter(Boolean))
-      }
-    }
-  }, [open, execution, detailData, isStreaming])
-
-  // 组件卸载时清理
-  useEffect(() => {
-    return () => {
-      cleanupSSE()
-    }
-  }, [cleanupSSE])
-
-  // 自动滚动到底部（仅在开启“跟踪/跟随”时）
+  // 自动滚动到底部（仅在开启"跟踪/跟随"时）
   useEffect(() => {
     if (!isFollowing) return
     if (scrollRef.current) {
@@ -199,7 +168,7 @@ export function ExecutionDetailDialog({
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             执行详情 #{execution.id}
-            {isStreaming && (
+            {isPolling && (
               <Badge variant='secondary' className='gap-1'>
                 <Loader2 className='h-3 w-3 animate-spin' />
                 实时
@@ -329,7 +298,7 @@ export function ExecutionDetailDialog({
                 </pre>
               ) : (
                 <p className='text-muted-foreground text-center text-sm'>
-                  {isRunnable ? '等待实时日志...' : '暂无日志'}
+                  {isRunnable ? '等待日志...' : '暂无日志'}
                 </p>
               )}
             </div>

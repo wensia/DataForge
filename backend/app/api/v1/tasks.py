@@ -85,6 +85,41 @@ async def get_execution_detail(execution_id: int):
     return ResponseModel.success(data=execution)
 
 
+@router.get("/executions/{execution_id}/logs", response_model=ResponseModel[dict])
+async def get_execution_logs(execution_id: int):
+    """获取执行日志（轮询用）
+
+    返回日志列表和执行状态，用于前端轮询获取实时日志。
+    - 运行中：从 Redis List 获取实时日志
+    - 已完成：从数据库 log_output 获取
+    """
+    execution = await task_service.get_execution_by_id_async(execution_id)
+    if not execution:
+        return ResponseModel.error(code=404, message="执行记录不存在")
+
+    # 检查 Redis 状态判断是否运行中
+    redis_status = await get_execution_status_async(execution_id)
+    is_running = redis_status == "running"
+
+    if is_running:
+        # 从 Redis 获取实时日志
+        logs = await get_logs_async(execution_id)
+    else:
+        # 从数据库获取完成后的日志
+        logs = execution.log_output.split("\n") if execution.log_output else []
+
+    # 过滤空行
+    logs = [line for line in logs if line.strip()]
+
+    return ResponseModel.success(
+        data={
+            "logs": logs,
+            "status": redis_status if is_running else execution.status.value,
+            "finished": not is_running,
+        }
+    )
+
+
 @router.post("/executions/{execution_id}/cancel", response_model=ResponseModel)
 async def cancel_execution(execution_id: int):
     """取消执行中的任务
