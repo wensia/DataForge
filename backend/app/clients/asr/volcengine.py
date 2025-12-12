@@ -248,7 +248,7 @@ class VolcengineASRClient(ASRClient):
 
     async def query_task(
         self, request_id: str, max_retries: int = 5
-    ) -> tuple[str, dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any], str]:
         """
         查询任务结果（带重试和限流）
 
@@ -257,7 +257,7 @@ class VolcengineASRClient(ASRClient):
             max_retries: 最大重试次数
 
         Returns:
-            tuple[str, dict]: (状态码, 响应 body)
+            tuple[str, dict, str]: (状态码, 响应 body, header message)
         """
         for attempt in range(max_retries + 1):
             try:
@@ -277,10 +277,13 @@ class VolcengineASRClient(ASRClient):
 
                 # v3 API: 状态码在 response headers 中
                 status_code = response.headers.get("X-Api-Status-Code", "")
+                message = response.headers.get("X-Api-Message", "")
                 body = response.json()
 
-                logger.debug(f"火山引擎查询: status={status_code}")
-                return status_code, body
+                logger.debug(
+                    f"火山引擎查询: status={status_code}, msg={message or '(empty)'}"
+                )
+                return status_code, body, message
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
@@ -331,7 +334,7 @@ class VolcengineASRClient(ASRClient):
             if elapsed > timeout:
                 raise TimeoutError(f"ASR 任务超时: {request_id}")
 
-            status_code, body = await self.query_task(request_id)
+            status_code, body, header_msg = await self.query_task(request_id)
             poll_count += 1
 
             if status_code == self.CODE_SUCCESS:
@@ -354,7 +357,7 @@ class VolcengineASRClient(ASRClient):
                 return body
             elif status_code.startswith("4"):
                 # 4xx 错误
-                message = body.get("message", "未知错误")
+                message = body.get("message") or header_msg or "未知错误"
                 raise RuntimeError(f"ASR 任务失败: {status_code} - {message}")
             else:
                 status_msg = f"状态: {status_code}"
