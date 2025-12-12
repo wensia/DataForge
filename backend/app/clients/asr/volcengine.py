@@ -107,13 +107,19 @@ class VolcengineASRClient(ASRClient):
             return "raw"
         return "mp3"  # 默认 mp3
 
-    async def submit_task(self, audio_url: str, max_retries: int = 5) -> str:
+    async def submit_task(
+        self,
+        audio_url: str,
+        max_retries: int = 5,
+        correct_table_name: str | None = None,
+    ) -> str:
         """
         提交录音文件识别任务（带重试和限流）
 
         Args:
             audio_url: 音频文件 URL
             max_retries: 最大重试次数
+            correct_table_name: 替换词本名称（在火山引擎控制台自学习平台创建）
 
         Returns:
             str: 请求 ID（用于查询结果）
@@ -138,6 +144,13 @@ class VolcengineASRClient(ASRClient):
                 "enable_emotion_detection": True,  # 情绪检测
             },
         }
+
+        # 添加替换词本配置（如果有配置）
+        if correct_table_name:
+            payload["request"]["corpus"] = {
+                "correct_table_name": correct_table_name
+            }
+            logger.info(f"[volcengine] 使用替换词本: {correct_table_name}")
 
         for attempt in range(max_retries + 1):
             try:
@@ -353,6 +366,7 @@ class VolcengineASRClient(ASRClient):
         self,
         audio_url: str,
         speaker_labels: dict[str, str] | None = None,
+        correct_table_name: str | None = None,
     ) -> list[TranscriptSegment]:
         """
         转写音频文件
@@ -360,13 +374,17 @@ class VolcengineASRClient(ASRClient):
         Args:
             audio_url: 音频文件 URL
             speaker_labels: 说话人标签映射
+            correct_table_name: 替换词本名称（在火山引擎控制台自学习平台创建）
 
         Returns:
             list[TranscriptSegment]: 转写结果片段列表
         """
         # 1. 提交任务
         logger.info("[volcengine] transcribe 开始，提交任务...")
-        request_id = await self.submit_task(audio_url)
+        request_id = await self.submit_task(
+            audio_url,
+            correct_table_name=correct_table_name,
+        )
         logger.info(f"[volcengine] 任务已提交，request_id={request_id}")
 
         # 2. 等待完成

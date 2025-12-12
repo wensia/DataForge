@@ -191,6 +191,7 @@ class ASRService:
         record: CallRecord,
         asr_config_id: int,
         staff_name: str | None = None,
+        correct_table_name: str | None = None,
     ) -> list[dict] | None:
         """转写单条通话记录
 
@@ -198,6 +199,7 @@ class ASRService:
             record: 通话记录
             asr_config_id: ASR 配置 ID
             staff_name: 员工名称（保留参数，用于日志显示）
+            correct_table_name: 替换词本名称（仅火山引擎有效）
 
         Returns:
             list[dict] | None: 转写结果列表，失败返回 None
@@ -218,7 +220,10 @@ class ASRService:
         # 3. 执行转写
         try:
             task_log("  - [DEBUG] 开始调用 ASR transcribe...")
-            segments = await asr_client.transcribe(audio_url)
+            segments = await asr_client.transcribe(
+                audio_url,
+                correct_table_name=correct_table_name,
+            )
             task_log("  - [DEBUG] ASR transcribe 返回")
             task_log(f"  - ASR 返回 {len(segments)} 个语音片段")
         except Exception as e:
