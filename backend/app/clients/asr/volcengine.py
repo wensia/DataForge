@@ -10,6 +10,7 @@ import random
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import httpx
@@ -274,6 +275,7 @@ class VolcengineASRClient(ASRClient):
         request_id: str,
         poll_interval: float = 5.0,
         timeout: float = 600.0,
+        progress_callback: Callable[[str, int], None] | None = None,
     ) -> dict[str, Any]:
         """
         等待任务完成
@@ -282,21 +284,25 @@ class VolcengineASRClient(ASRClient):
             request_id: 请求 ID
             poll_interval: 轮询间隔（秒），默认 5 秒避免限流
             timeout: 超时时间（秒）
+            progress_callback: 进度回调函数，参数为 (状态描述, 已等待秒数)
 
         Returns:
             dict: 识别结果
         """
         start_time = time.time()
+        poll_count = 0
 
         # 添加随机初始延迟，避免多个任务同时轮询
         initial_delay = random.uniform(0, 2.0)
         await asyncio.sleep(initial_delay)
 
         while True:
-            if time.time() - start_time > timeout:
+            elapsed = int(time.time() - start_time)
+            if elapsed > timeout:
                 raise TimeoutError(f"ASR 任务超时: {request_id}")
 
             status_code, body = await self.query_task(request_id)
+            poll_count += 1
 
             if status_code == self.CODE_SUCCESS:
                 # 检查 body 是否有结果
@@ -304,17 +310,25 @@ class VolcengineASRClient(ASRClient):
                     logger.info(f"火山引擎 ASR 任务完成: {request_id}")
                     return body
                 # 有时候 header 返回成功但 body 还没准备好，继续等待
+                status_msg = "等待结果"
                 logger.debug("ASR 任务 header 成功但 body 为空，继续等待")
             elif status_code == self.CODE_PROCESSING:
+                status_msg = "处理中"
                 logger.debug(f"ASR 任务处理中: {request_id}")
             elif status_code == self.CODE_QUEUED:
+                status_msg = "排队中"
                 logger.debug(f"ASR 任务排队中: {request_id}")
             elif status_code.startswith("4"):
                 # 4xx 错误
                 message = body.get("message", "未知错误")
                 raise RuntimeError(f"ASR 任务失败: {status_code} - {message}")
             else:
+                status_msg = f"状态: {status_code}"
                 logger.warning(f"ASR 未知状态: {status_code}")
+
+            # 每 6 次轮询（约 30 秒）调用一次进度回调
+            if progress_callback and poll_count % 6 == 0:
+                progress_callback(status_msg, elapsed)
 
             await asyncio.sleep(poll_interval)
 
@@ -379,6 +393,7 @@ class VolcengineASRClient(ASRClient):
         audio_url: str,
         speaker_labels: dict[str, str] | None = None,
         correct_table_name: str | None = None,
+        progress_callback: Callable[[str, int], None] | None = None,
     ) -> list[TranscriptSegment]:
         """
         转写音频文件
@@ -387,6 +402,7 @@ class VolcengineASRClient(ASRClient):
             audio_url: 音频文件 URL
             speaker_labels: 说话人标签映射
             correct_table_name: 替换词本名称（在火山引擎控制台自学习平台创建）
+            progress_callback: 进度回调函数，参数为 (状态描述, 已等待秒数)
 
         Returns:
             list[TranscriptSegment]: 转写结果片段列表
@@ -401,7 +417,10 @@ class VolcengineASRClient(ASRClient):
 
         # 2. 等待完成
         logger.info("[volcengine] 开始等待任务完成...")
-        result = await self.wait_for_task(request_id)
+        result = await self.wait_for_task(
+            request_id,
+            progress_callback=progress_callback,
+        )
         result_keys = list(result.keys()) if result else "None"
         logger.info(f"[volcengine] 任务完成，结果 keys: {result_keys}")
 

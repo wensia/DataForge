@@ -240,12 +240,17 @@ class ASRService:
         asr_client = await self.get_client_by_id(asr_config_id, qps=qps)
         task_log("  - 创建 ASR 任务...")
 
+        # 进度回调函数，用于在等待 ASR 结果时输出心跳日志
+        def progress_callback(status: str, elapsed_seconds: int) -> None:
+            task_log(f"  - [ASR] {status}，已等待 {elapsed_seconds} 秒...")
+
         # 3. 执行转写
         try:
             task_log("  - [DEBUG] 开始调用 ASR transcribe...")
             segments = await asr_client.transcribe(
                 audio_url,
                 correct_table_name=correct_table_name,
+                progress_callback=progress_callback,
             )
             task_log("  - [DEBUG] ASR transcribe 返回")
             task_log(f"  - ASR 返回 {len(segments)} 个语音片段")
