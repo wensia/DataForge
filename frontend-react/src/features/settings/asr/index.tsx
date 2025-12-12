@@ -829,7 +829,7 @@ export function AsrSettings() {
                       <FormControl>
                         <Input
                           {...formField}
-                          type='password'
+                          type='text'
                           placeholder={field.default || `请输入 ${field.label}`}
                           className='font-mono'
                         />

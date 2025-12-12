@@ -45,7 +45,8 @@ class VolcengineASRClient(ASRClient):
         self,
         app_id: str,
         access_token: str,
-        cluster: str = "volc.bigasr.auc",
+        cluster: str = "volc.seedasr.auc",
+        model_version: str | None = "400",
         qps: int = 20,
     ):
         """
@@ -54,12 +55,14 @@ class VolcengineASRClient(ASRClient):
         Args:
             app_id: 火山引擎 App ID (X-Api-App-Key)
             access_token: 火山引擎 Access Token (X-Api-Access-Key)
-            cluster: 资源 ID (X-Api-Resource-Id)，默认 volc.bigasr.auc
+            cluster: 资源 ID (X-Api-Resource-Id)，默认 volc.seedasr.auc
+            model_version: 模型版本；传 "400" 使用 400 模型，不传则默认 310
             qps: 每秒请求数限制，默认 20
         """
         self.app_id = app_id
         self.access_token = access_token
         self.cluster = cluster
+        self.model_version = str(model_version).strip() if model_version else None
         # QPS 限流 (实例级别)
         self.qps = qps
         self._min_interval = 1.0 / qps  # 最小请求间隔
@@ -81,6 +84,14 @@ class VolcengineASRClient(ASRClient):
         with self._rate_lock:
             self.qps = qps
             self._min_interval = 1.0 / qps
+
+    def set_model_version(self, model_version: str | None) -> None:
+        """动态调整 model_version。
+
+        共享客户端时用于按配置更新模型版本。
+        """
+        value = str(model_version).strip() if model_version else ""
+        self.model_version = value or None
 
     def _get_client(self) -> httpx.AsyncClient:
         """获取或创建 httpx 客户端（确保在当前事件循环中）
@@ -175,19 +186,22 @@ class VolcengineASRClient(ASRClient):
         """
         request_id = str(uuid.uuid4())
 
+        request_payload: dict[str, Any] = {
+            "model_name": "bigmodel",
+            "enable_itn": True,  # 逆文本归一化（官方默认 True）
+            "enable_punc": True,  # 标点符号（官方默认 False，按业务需求开启）
+            "enable_ddc": True,  # 语义顺滑/口语处理（按业务需求开启）
+            "show_utterances": True,  # 输出分句/时间戳
+            "enable_channel_split": True,  # 双声道分离（返回 channel_id）
+            "enable_emotion_detection": True,  # 情绪检测（返回 emotion）
+        }
+        if self.model_version:
+            request_payload["model_version"] = self.model_version
+
         payload = {
             "user": {"uid": "dataforge-user"},
             "audio": self._build_audio_field(audio_url),
-            "request": {
-                "model_name": "bigmodel",
-                "model_version": "400",
-                "enable_itn": True,  # 逆文本归一化（官方默认 True）
-                "enable_punc": True,  # 标点符号（官方默认 False，按业务需求开启）
-                "enable_ddc": True,  # 语义顺滑/口语处理（按业务需求开启）
-                "show_utterances": True,  # 输出分句/时间戳
-                "enable_channel_split": True,  # 双声道分离（返回 channel_id）
-                "enable_emotion_detection": True,  # 情绪检测（返回 emotion）
-            },
+            "request": request_payload,
         }
 
         # 添加替换词本配置（如果有配置）

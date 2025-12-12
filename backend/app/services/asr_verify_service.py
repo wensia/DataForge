@@ -225,7 +225,7 @@ async def verify_alibaba(
 
 
 async def verify_volcengine(
-    app_id: str, access_token: str, cluster: str = "volc.bigasr.auc"
+    app_id: str, access_token: str, cluster: str = "volc.seedasr.auc"
 ) -> dict:
     """验证火山引擎 ASR 密钥
 
@@ -234,7 +234,7 @@ async def verify_volcengine(
     Args:
         app_id: 火山引擎 App ID
         access_token: Access Token
-        cluster: 集群，默认 volc.bigasr.auc（录音文件识别）
+        cluster: 集群，默认 volc.seedasr.auc（录音文件识别）
 
     Returns:
         dict: {"success": bool, "message": str, "detail": ...}
@@ -324,7 +324,7 @@ async def verify_asr_credentials(provider: str, credentials: dict) -> dict:
         return await verify_volcengine(
             app_id=credentials.get("app_id", ""),
             access_token=credentials.get("access_token", ""),
-            cluster=credentials.get("cluster", "volc.bigasr.auc"),
+            cluster=credentials.get("cluster", "volc.seedasr.auc"),
         )
     else:
         return {

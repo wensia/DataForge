@@ -102,10 +102,18 @@ class ASRService:
                 app_key=credentials.get("app_key", ""),
             )
         elif provider == ASRProvider.VOLCENGINE:
+            raw_model_version = credentials.get("model_version")
+            model_version_str = (
+                str(raw_model_version).strip() if raw_model_version is not None else ""
+            )
+            # 文档：不传 model_version 默认走 310；传 "400" 使用 400 模型
+            # 由于前端会过滤空值，这里约定填 "310" 表示不传该字段（走默认 310）
+            model_version = None if model_version_str == "310" else (model_version_str or "400")
             return VolcengineASRClient(
                 app_id=credentials.get("app_id", ""),
                 access_token=credentials.get("access_token", ""),
-                cluster=credentials.get("cluster", "volc.bigasr.auc"),
+                cluster=credentials.get("cluster", "volc.seedasr.auc"),
+                model_version=model_version,
                 qps=qps,
             )
         else:
@@ -130,6 +138,13 @@ class ASRService:
         if not config.is_active:
             raise ValueError(f"ASR 配置未启用: {config_id}")
 
+        credentials = json.loads(config.credentials) if config.credentials else {}
+        raw_model_version = credentials.get("model_version")
+        model_version_str = (
+            str(raw_model_version).strip() if raw_model_version is not None else ""
+        )
+        model_version = None if model_version_str == "310" else (model_version_str or "400")
+
         cache_key = config.id  # type: ignore[assignment]
         with self._cache_lock:
             cached = self._client_cache.get(cache_key)
@@ -137,6 +152,7 @@ class ASRService:
                 # 共享火山客户端时更新 QPS 上限（避免每条记录新建实例导致限流失效）
                 if isinstance(cached, VolcengineASRClient):
                     cached.set_qps(qps)
+                    cached.set_model_version(model_version)
                 return cached
 
             client = self.create_client(config, qps=qps)
