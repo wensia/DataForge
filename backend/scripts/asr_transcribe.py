@@ -24,6 +24,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from sqlalchemy import or_, text
 from sqlmodel import Session, select
 
 from app.database import engine
@@ -102,6 +103,25 @@ def _get_records_to_transcribe(
         if min_duration > 0:
             # 过滤通话时长
             statement = statement.where(CallRecord.duration >= min_duration)
+
+        # 过滤有录音 URL 的记录（在 SQL 层面过滤，避免获取无录音的记录）
+        statement = statement.where(
+            or_(
+                text(
+                    "raw_data->>'录音地址' IS NOT NULL AND raw_data->>'录音地址' != ''"
+                ),
+                text("raw_data->>'voiceUrl' IS NOT NULL AND raw_data->>'voiceUrl' != ''"),
+                text(
+                    "raw_data->>'voice_url' IS NOT NULL AND raw_data->>'voice_url' != ''"
+                ),
+                text(
+                    "raw_data->>'recordUrl' IS NOT NULL AND raw_data->>'recordUrl' != ''"
+                ),
+                text(
+                    "raw_data->>'record_url' IS NOT NULL AND raw_data->>'record_url' != ''"
+                ),
+            )
+        )
 
         statement = statement.order_by(CallRecord.call_time.desc())
 

@@ -36,9 +36,10 @@ class VolcengineASRClient(ASRClient):
     QUERY_URL = f"https://{API_HOST}/api/v3/auc/bigmodel/query"
 
     # 状态码 (在 X-Api-Status-Code header 中)
-    CODE_SUCCESS = "20000000"
-    CODE_PROCESSING = "20000001"
-    CODE_QUEUED = "20000003"  # 任务排队中
+    CODE_SUCCESS = "20000000"  # 成功 / 结果已就绪
+    CODE_PROCESSING = "20000001"  # 处理中
+    CODE_QUEUEING = "20000002"  # 任务在队列中
+    CODE_SILENT = "20000003"  # 静音/空音频（无需继续 query）
 
     def __init__(
         self,
@@ -66,6 +67,8 @@ class VolcengineASRClient(ASRClient):
         self._rate_lock = threading.Lock()
         # 保存最后一次请求的 logid，用于查询时链路追踪
         self._last_logid: str | None = None
+        # 复用 HTTP 连接，提升吞吐（官方示例亦建议 keep-alive）
+        self._client = httpx.AsyncClient(timeout=30.0)
 
     def set_qps(self, qps: int) -> None:
         """动态调整 QPS 限制。
@@ -118,6 +121,20 @@ class VolcengineASRClient(ASRClient):
             return "raw"
         return "mp3"  # 默认 mp3
 
+    def _build_audio_field(self, audio_url: str) -> dict[str, Any]:
+        """构建 audio 字段（遵循官方字段定义）"""
+        fmt = self._detect_audio_format(audio_url)
+        audio: dict[str, Any] = {
+            "format": fmt,
+            "url": audio_url,
+        }
+        # codec 只支持 raw/opus，mp3 不应传 codec
+        if fmt in ("raw", "wav"):
+            audio["codec"] = "raw"
+        elif fmt == "ogg":
+            audio["codec"] = "opus"
+        return audio
+
     async def submit_task(
         self,
         audio_url: str,
@@ -139,20 +156,16 @@ class VolcengineASRClient(ASRClient):
 
         payload = {
             "user": {"uid": "dataforge-user"},
-            "audio": {
-                "format": self._detect_audio_format(audio_url),
-                "url": audio_url,
-                "codec": "raw",
-            },
+            "audio": self._build_audio_field(audio_url),
             "request": {
                 "model_name": "bigmodel",
                 "model_version": "400",
-                "enable_itn": True,  # 逆文本归一化
-                "enable_punc": True,  # 标点符号
-                "enable_ddc": True,  # 数字转换
-                "show_utterances": True,  # 显示分句结果
-                "enable_channel_split": True,  # 双声道分离
-                "enable_emotion_detection": True,  # 情绪检测
+                "enable_itn": True,  # 逆文本归一化（官方默认 True）
+                "enable_punc": True,  # 标点符号（官方默认 False，按业务需求开启）
+                "enable_ddc": True,  # 语义顺滑/口语处理（按业务需求开启）
+                "show_utterances": True,  # 输出分句/时间戳
+                "enable_channel_split": True,  # 双声道分离（返回 channel_id）
+                "enable_emotion_detection": True,  # 情绪检测（返回 emotion）
             },
         }
 
@@ -170,31 +183,29 @@ class VolcengineASRClient(ASRClient):
                 await self._rate_limited_request()
                 logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        self.SUBMIT_URL,
-                        json=payload,
-                        headers=self._build_headers(request_id),
-                        timeout=30.0,
+                response = await self._client.post(
+                    self.SUBMIT_URL,
+                    json=payload,
+                    headers=self._build_headers(request_id),
+                )
+                response.raise_for_status()
+
+                # 保存 logid 用于查询
+                self._last_logid = response.headers.get("X-Tt-Logid")
+
+                # v3 API: 状态码在 response headers 中
+                status_code = response.headers.get("X-Api-Status-Code", "")
+                message = response.headers.get("X-Api-Message", "")
+
+                logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
+
+                if status_code != self.CODE_SUCCESS:
+                    raise RuntimeError(
+                        f"火山引擎提交任务失败: {status_code} - {message}"
                     )
-                    response.raise_for_status()
 
-                    # 保存 logid 用于查询
-                    self._last_logid = response.headers.get("X-Tt-Logid")
-
-                    # v3 API: 状态码在 response headers 中
-                    status_code = response.headers.get("X-Api-Status-Code", "")
-                    message = response.headers.get("X-Api-Message", "")
-
-                    logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
-
-                    if status_code != self.CODE_SUCCESS:
-                        raise RuntimeError(
-                            f"火山引擎提交任务失败: {status_code} - {message}"
-                        )
-
-                    logger.info(f"火山引擎 ASR 任务已提交: {request_id}")
-                    return request_id
+                logger.info(f"火山引擎 ASR 任务已提交: {request_id}")
+                return request_id
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
@@ -232,25 +243,23 @@ class VolcengineASRClient(ASRClient):
                 # 请求前限流
                 await self._rate_limited_request()
 
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        self.QUERY_URL,
-                        json={},  # v3 API 查询时请求体为空
-                        headers=self._build_headers(request_id),
-                        timeout=30.0,
-                    )
-                    response.raise_for_status()
+                response = await self._client.post(
+                    self.QUERY_URL,
+                    json={},  # v3 API 查询时请求体为空
+                    headers=self._build_headers(request_id),
+                )
+                response.raise_for_status()
 
-                    # 更新 logid
-                    if response.headers.get("X-Tt-Logid"):
-                        self._last_logid = response.headers.get("X-Tt-Logid")
+                # 更新 logid
+                if response.headers.get("X-Tt-Logid"):
+                    self._last_logid = response.headers.get("X-Tt-Logid")
 
-                    # v3 API: 状态码在 response headers 中
-                    status_code = response.headers.get("X-Api-Status-Code", "")
-                    body = response.json()
+                # v3 API: 状态码在 response headers 中
+                status_code = response.headers.get("X-Api-Status-Code", "")
+                body = response.json()
 
-                    logger.debug(f"火山引擎查询: status={status_code}")
-                    return status_code, body
+                logger.debug(f"火山引擎查询: status={status_code}")
+                return status_code, body
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
@@ -315,9 +324,13 @@ class VolcengineASRClient(ASRClient):
             elif status_code == self.CODE_PROCESSING:
                 status_msg = "处理中"
                 logger.debug(f"ASR 任务处理中: {request_id}")
-            elif status_code == self.CODE_QUEUED:
+            elif status_code == self.CODE_QUEUEING:
                 status_msg = "排队中"
                 logger.debug(f"ASR 任务排队中: {request_id}")
+            elif status_code == self.CODE_SILENT:
+                # 官方文档：静音音频无需继续 query，直接结束
+                logger.info(f"ASR 静音/空音频: {request_id}")
+                return body
             elif status_code.startswith("4"):
                 # 4xx 错误
                 message = body.get("message", "未知错误")
