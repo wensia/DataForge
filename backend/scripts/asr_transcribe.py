@@ -258,9 +258,12 @@ async def run(
     if concurrency <= 0:
         if asr_config.provider == ASRProvider.VOLCENGINE:
             poll_interval = 5.0  # 与 VolcengineASRClient.wait_for_task 默认一致
-            auto_concurrency = int(qps * poll_interval)
+            # 轮询会消耗 QPS（query_task），需预留一部分 QPS 给 submit_task
+            # 经验值：约 40% QPS 用于轮询，60% 用于提交，避免服务端排队过长
+            poll_fraction = 0.4
+            auto_concurrency = int(qps * poll_interval * poll_fraction)
             # 安全边界，避免极端参数导致过多并发
-            auto_concurrency = max(5, min(auto_concurrency, 200))
+            auto_concurrency = max(5, min(auto_concurrency, 50))
         else:
             auto_concurrency = 5
         concurrency = auto_concurrency

@@ -506,6 +506,10 @@ export function AsrSettings() {
                     </Badge>
                   </div>
                   <CardDescription className='flex items-center gap-2'>
+                    <span className='text-muted-foreground/70'>
+                      #{config.id}
+                    </span>
+                    <span className='text-muted-foreground/50'>·</span>
                     {providerOptions.find((p) => p.value === config.provider)
                       ?.label || config.provider}
                     {presets[config.provider]?.doc_url && (
