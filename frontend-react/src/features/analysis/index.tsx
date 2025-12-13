@@ -15,7 +15,7 @@ import {
 } from '@tanstack/react-table'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
-import { Search, Loader2, RotateCcw, Trash2, FilterX } from 'lucide-react'
+import { Search, Loader2, RotateCcw, Trash2, FilterX, ChevronDown, ChevronUp, Filter } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { DataPageContent } from '@/components/layout/data-page-layout'
@@ -111,6 +111,7 @@ export function DataAnalysis() {
   const [selectedRecord, setSelectedRecord] = useState<CallRecord | null>(null)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [filtersExpanded, setFiltersExpanded] = useState(true)
 
   // 权限检查
   const isAdmin = useAuthStore((state) => state.auth.isAdmin())
@@ -357,115 +358,143 @@ export function DataAnalysis() {
         <DataPageContent
           toolbar={
             <div className='flex w-full flex-col gap-3'>
-              {/* 筛选条件行 */}
-              <div className='flex items-center gap-2'>
-                <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                  <SelectTrigger className='w-[100px]'>
-                    <SelectValue placeholder='来源' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>全部</SelectItem>
-                    <SelectItem value='feishu'>飞书</SelectItem>
-                    <SelectItem value='yunke'>云客</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
-                  <SelectTrigger className='w-[100px]'>
-                    <SelectValue placeholder='类型' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>全部</SelectItem>
-                    {Object.entries(callTypeMap).map(([key, { label }]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={callResultFilter}
-                  onValueChange={setCallResultFilter}
+              {/* 筛选区标题栏 */}
+              <div className='flex items-center justify-between'>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => setFiltersExpanded(!filtersExpanded)}
+                  className='gap-2 px-2'
                 >
-                  <SelectTrigger className='w-[100px]'>
-                    <SelectValue placeholder='结果' />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='all'>全部</SelectItem>
-                    {Object.entries(callResultMap).map(([key, { label }]) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <SearchableSelect
-                  value={staffNameFilter}
-                  onValueChange={setStaffNameFilter}
-                  options={[
-                    { value: 'all', label: '全部' },
-                    ...(filterOptions?.staff_names.map((name) => ({
-                      value: name,
-                      label: name,
-                    })) || []),
-                  ]}
-                  placeholder='员工'
-                  searchPlaceholder='搜索员工...'
-                  emptyText='未找到员工'
-                  className='w-[120px]'
-                />
-                <Input
-                  placeholder='部门'
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className='w-[120px]'
-                />
-                <Input
-                  placeholder='被叫号码'
-                  value={calleeFilter}
-                  onChange={(e) => setCalleeFilter(e.target.value)}
-                  className='w-[120px]'
-                />
-                <FilterDatePicker
-                  selected={startTime}
-                  onSelect={setStartTime}
-                  placeholder='开始日期'
-                  className='w-[140px]'
-                />
-                <FilterDatePicker
-                  selected={endTime}
-                  onSelect={setEndTime}
-                  placeholder='结束日期'
-                  className='w-[140px]'
-                />
-                <div className='flex items-center gap-1'>
-                  <Input
-                    type='number'
-                    placeholder='最小时长(秒)'
-                    value={durationMin}
-                    onChange={(e) => setDurationMin(e.target.value)}
-                    className='w-[100px]'
-                    min={0}
-                  />
-                  <span className='text-muted-foreground'>-</span>
-                  <Input
-                    type='number'
-                    placeholder='最大时长(秒)'
-                    value={durationMax}
-                    onChange={(e) => setDurationMax(e.target.value)}
-                    className='w-[100px]'
-                    min={0}
-                  />
+                  <Filter className='h-4 w-4' />
+                  <span className='text-sm font-medium'>筛选条件</span>
+                  {filtersExpanded ? (
+                    <ChevronUp className='h-4 w-4' />
+                  ) : (
+                    <ChevronDown className='h-4 w-4' />
+                  )}
+                </Button>
+                <div className='flex items-center gap-2'>
+                  <Button onClick={handleSearch}>
+                    <Search className='mr-2 h-4 w-4' />
+                    查询
+                  </Button>
+                  <Button variant='outline' onClick={handleResetFilters}>
+                    <FilterX className='mr-2 h-4 w-4' />
+                    重置
+                  </Button>
                 </div>
-                <div className='flex-1' />
-                <Button onClick={handleSearch}>
-                  <Search className='mr-2 h-4 w-4' />
-                  查询
-                </Button>
-                <Button variant='outline' onClick={handleResetFilters}>
-                  <FilterX className='mr-2 h-4 w-4' />
-                  重置
-                </Button>
               </div>
+
+              {/* 可折叠的筛选条件区 */}
+              {filtersExpanded && (
+                <div className='flex flex-col gap-2 rounded-md border bg-muted/30 p-3'>
+                  {/* 第一排：基本筛选 */}
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                      <SelectTrigger className='w-[100px]'>
+                        <SelectValue placeholder='来源' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='all'>全部</SelectItem>
+                        <SelectItem value='feishu'>飞书</SelectItem>
+                        <SelectItem value='yunke'>云客</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
+                      <SelectTrigger className='w-[100px]'>
+                        <SelectValue placeholder='类型' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='all'>全部</SelectItem>
+                        {Object.entries(callTypeMap).map(([key, { label }]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={callResultFilter}
+                      onValueChange={setCallResultFilter}
+                    >
+                      <SelectTrigger className='w-[100px]'>
+                        <SelectValue placeholder='结果' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='all'>全部</SelectItem>
+                        {Object.entries(callResultMap).map(([key, { label }]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <SearchableSelect
+                      value={staffNameFilter}
+                      onValueChange={setStaffNameFilter}
+                      options={[
+                        { value: 'all', label: '全部' },
+                        ...(filterOptions?.staff_names.map((name) => ({
+                          value: name,
+                          label: name,
+                        })) || []),
+                      ]}
+                      placeholder='员工'
+                      searchPlaceholder='搜索员工...'
+                      emptyText='未找到员工'
+                      className='w-[120px]'
+                    />
+                    <Input
+                      placeholder='部门'
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      className='w-[120px]'
+                    />
+                    <Input
+                      placeholder='被叫号码'
+                      value={calleeFilter}
+                      onChange={(e) => setCalleeFilter(e.target.value)}
+                      className='w-[120px]'
+                    />
+                  </div>
+                  {/* 第二排：时间和时长 */}
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <FilterDatePicker
+                      selected={startTime}
+                      onSelect={setStartTime}
+                      placeholder='开始日期'
+                      className='w-[140px]'
+                    />
+                    <FilterDatePicker
+                      selected={endTime}
+                      onSelect={setEndTime}
+                      placeholder='结束日期'
+                      className='w-[140px]'
+                    />
+                    <div className='flex items-center gap-1'>
+                      <Input
+                        type='number'
+                        placeholder='最小时长(秒)'
+                        value={durationMin}
+                        onChange={(e) => setDurationMin(e.target.value)}
+                        className='w-[110px]'
+                        min={0}
+                      />
+                      <span className='text-muted-foreground'>-</span>
+                      <Input
+                        type='number'
+                        placeholder='最大时长(秒)'
+                        value={durationMax}
+                        onChange={(e) => setDurationMax(e.target.value)}
+                        className='w-[110px]'
+                        min={0}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 操作栏 */}
               <div className='flex items-center gap-2'>
                 {selectedRowCount > 0 && (
