@@ -1,7 +1,7 @@
 """AI 客户端基类定义"""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -15,14 +15,67 @@ class AIClientError(Exception):
 
 
 @dataclass
+class FunctionCall:
+    """函数调用信息"""
+
+    name: str
+    arguments: str  # JSON 字符串
+
+
+@dataclass
+class ToolCall:
+    """工具调用"""
+
+    id: str
+    type: str  # function
+    function: FunctionCall
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ToolCall":
+        """从字典创建 ToolCall"""
+        return cls(
+            id=data.get("id", ""),
+            type=data.get("type", "function"),
+            function=FunctionCall(
+                name=data.get("function", {}).get("name", ""),
+                arguments=data.get("function", {}).get("arguments", "{}"),
+            ),
+        )
+
+    def to_dict(self) -> dict:
+        """转换为字典"""
+        return {
+            "id": self.id,
+            "type": self.type,
+            "function": {
+                "name": self.function.name,
+                "arguments": self.function.arguments,
+            },
+        }
+
+
+@dataclass
 class ChatMessage:
     """聊天消息"""
 
-    role: str  # system / user / assistant
-    content: str
+    role: str  # system / user / assistant / tool
+    content: str | None = None
+    tool_calls: list[ToolCall] | None = None  # assistant 消息中的工具调用
+    tool_call_id: str | None = None  # tool 消息中的工具调用 ID
 
-    def to_dict(self) -> dict[str, str]:
-        return {"role": self.role, "content": self.content}
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"role": self.role}
+
+        if self.content is not None:
+            result["content"] = self.content
+
+        if self.tool_calls:
+            result["tool_calls"] = [tc.to_dict() for tc in self.tool_calls]
+
+        if self.tool_call_id:
+            result["tool_call_id"] = self.tool_call_id
+
+        return result
 
 
 @dataclass
@@ -33,6 +86,8 @@ class ChatResponse:
     model: str
     tokens_used: int | None = None
     finish_reason: str | None = None
+    reasoning_content: str | None = None  # 思考模式的推理内容
+    tool_calls: list[ToolCall] | None = None  # 工具调用请求
 
 
 class AIClient(ABC):
