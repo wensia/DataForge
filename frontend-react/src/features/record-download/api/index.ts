@@ -64,3 +64,17 @@ export function useDownloadRecord() {
     },
   })
 }
+
+// 通过代理获取录音流（解决跨域问题）
+export function useProxyRecord() {
+  return useMutation({
+    mutationFn: async ({ url }: { url: string }) => {
+      const response = await apiClient.post('/record-proxy/stream', {
+        url,
+      }, {
+        responseType: 'blob',
+      })
+      return response.data as Blob
+    },
+  })
+}

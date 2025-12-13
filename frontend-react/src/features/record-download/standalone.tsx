@@ -40,7 +40,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTheme } from '@/context/theme-provider'
 import { useAccounts } from '@/features/accounts/api'
-import { useDownloadRecord, useRecordUrl } from './api'
+import { useDownloadRecord, useRecordUrl, useProxyRecord } from './api'
 
 // 从 URL 中解析的录音信息
 interface ParsedRecordInfo {
@@ -104,6 +104,8 @@ export function StandaloneRecordDownload() {
 
   // 获取录音地址
   const recordUrlMutation = useRecordUrl()
+  // 代理获取录音（解决跨域）
+  const proxyRecordMutation = useProxyRecord()
   // 下载录音
   const downloadMutation = useDownloadRecord()
 
@@ -121,6 +123,7 @@ export function StandaloneRecordDownload() {
     }
 
     setParsedInfo(info)
+    setAudioUrl(null) // 清除旧的音频
     toast.success(`已解析 voiceId: ${info.voiceId}`)
   }
 
@@ -143,22 +146,37 @@ export function StandaloneRecordDownload() {
       return
     }
 
+    // 如果已有音频 URL，直接播放
+    if (audioUrl && audioRef.current) {
+      audioRef.current.play()
+      setIsPlaying(true)
+      return
+    }
+
     try {
+      // 1. 获取云客录音 URL
       const result = await recordUrlMutation.mutateAsync({
         accountId,
         voiceId: parsedInfo.voiceId,
       })
 
-      setAudioUrl(result.download_url)
+      // 2. 通过代理获取录音（解决跨域问题）
+      const blob = await proxyRecordMutation.mutateAsync({
+        url: result.download_url,
+      })
+
+      // 3. 创建 Blob URL 播放
+      const blobUrl = window.URL.createObjectURL(blob)
+      setAudioUrl(blobUrl)
 
       // 播放音频
       if (audioRef.current) {
-        audioRef.current.src = result.download_url
+        audioRef.current.src = blobUrl
         audioRef.current.play()
         setIsPlaying(true)
       }
     } catch {
-      toast.error('获取录音地址失败')
+      toast.error('获取录音失败')
     }
   }
 
@@ -360,17 +378,17 @@ export function StandaloneRecordDownload() {
                     <Button
                       variant="outline"
                       onClick={handlePlay}
-                      disabled={!accountId || recordUrlMutation.isPending}
+                      disabled={!accountId || recordUrlMutation.isPending || proxyRecordMutation.isPending}
                       className="flex-1"
                     >
-                      {recordUrlMutation.isPending ? (
+                      {recordUrlMutation.isPending || proxyRecordMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : isPlaying ? (
                         <Pause className="mr-2 h-4 w-4" />
                       ) : (
                         <Play className="mr-2 h-4 w-4" />
                       )}
-                      {isPlaying ? '暂停' : '播放'}
+                      {recordUrlMutation.isPending || proxyRecordMutation.isPending ? '加载中' : isPlaying ? '暂停' : '播放'}
                     </Button>
 
                     <Button
