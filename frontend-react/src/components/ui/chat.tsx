@@ -215,7 +215,7 @@ const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
     )
 
     return (
-      <div className={cn('border-t bg-background p-4', className)}>
+      <div className={cn('border-t bg-background px-4 py-6', className)}>
         <div className="relative flex items-end gap-2">
           <Textarea
             ref={ref}
