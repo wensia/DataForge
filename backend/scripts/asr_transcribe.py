@@ -262,9 +262,9 @@ async def run(
     Returns:
         dict: 执行结果
     """
-    # 参数标准化
-    start_time = normalize_time_param(start_time)
-    end_time = normalize_time_param(end_time)
+    # 参数标准化（开始时间默认 00:00，结束时间默认 23:59）
+    start_time = normalize_time_param(start_time, default_time="00:00")
+    end_time = normalize_time_param(end_time, default_time="23:59")
 
     task_log("开始 ASR 语音识别任务")
     task_log(f"时间范围: {start_time} ~ {end_time}")

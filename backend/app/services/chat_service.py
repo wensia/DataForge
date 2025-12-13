@@ -466,8 +466,12 @@ async def send_message_stream(
     user_id: int,
     content: str,
     ai_provider: str | None = None,
+    enable_tools: bool = True,
+    use_deep_thinking: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """流式发送消息并获取 AI 回复
+
+    支持 Function Calling 和深度思考模式。
 
     Args:
         session: 数据库会话
@@ -475,12 +479,17 @@ async def send_message_stream(
         user_id: 用户 ID
         content: 用户消息内容
         ai_provider: 临时使用的 AI 提供商
+        enable_tools: 是否启用工具调用 (Function Calling)
+        use_deep_thinking: 是否启用深度思考模式 (DeepSeek Reasoner)
 
     Yields:
         dict: SSE 事件数据
-            - type: "start" | "content" | "done" | "error"
+            - type: "start" | "tool_start" | "tool_result" | "reasoning" | "content" | "done" | "error"
             - content: 增量内容 (content 类型)
+            - reasoning: 思考过程内容 (reasoning 类型)
             - user_message_id: 用户消息 ID (start 类型)
+            - tool_name: 工具名称 (tool_start 类型)
+            - tool_result: 工具执行结果摘要 (tool_result 类型)
             - assistant_message_id: AI 消息 ID (done 类型)
             - tokens_used: token 消耗 (done 类型)
             - error: 错误信息 (error 类型)
@@ -530,10 +539,15 @@ async def send_message_stream(
         provider = ai_provider or conversation.ai_provider
         provider_id, client, model = _resolve_ai_client(session, provider)
 
-        # 添加系统提示（如果是数据分析对话）
-        if conversation.conversation_type == ConversationType.ANALYSIS:
-            system_prompt = """你是一个专业的数据分析助手。
-请用中文回答问题，并以清晰、结构化的方式呈现分析结果。"""
+        # 检查是否支持 Function Calling (目前只有 DeepSeek 支持)
+        use_tools = enable_tools and isinstance(client, DeepSeekClient)
+
+        # 添加系统提示（如果启用工具或是数据分析对话）
+        if use_tools or conversation.conversation_type == ConversationType.ANALYSIS:
+            system_prompt = """你是一个专业的数据分析助手。你可以使用提供的工具来查询通话记录数据。
+当用户询问与通话数据相关的问题时，请使用工具获取数据，然后基于数据给出分析和回答。
+如果需要知道当前日期（例如计算"最近一周"），请先调用 get_current_date 工具。
+请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
             chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
 
         # 检查客户端是否支持流式输出
@@ -545,22 +559,117 @@ async def send_message_stream(
         full_content = ""
         total_tokens = 0
 
-        # 流式调用 AI
-        logger.info(
-            f"开始流式对话: conversation_id={conversation_id}, "
-            f"provider={provider_id}"
-        )
+        # 如果启用工具，先处理工具调用（非流式）
+        if use_tools:
+            logger.info(
+                f"开始流式对话(带工具): conversation_id={conversation_id}, "
+                f"provider={provider_id}"
+            )
 
-        async for chunk in client.chat_stream(chat_history, model=model):
-            if chunk.content:
-                full_content += chunk.content
-                yield {"type": "content", "content": chunk.content}
+            # 使用 Function Calling
+            response = await client.chat_with_tools(
+                chat_history,
+                tools=CHAT_TOOLS,
+                model=model,
+            )
+            total_tokens += response.tokens_used or 0
 
-            if chunk.tokens_used:
-                total_tokens = chunk.tokens_used
+            # 处理工具调用循环（最多 5 轮）
+            max_iterations = 5
+            iteration = 0
 
-            if chunk.finish_reason:
-                logger.debug(f"流式响应完成: finish_reason={chunk.finish_reason}")
+            while response.tool_calls and iteration < max_iterations:
+                iteration += 1
+                logger.info(
+                    f"工具调用第 {iteration} 轮: {[tc.function.name for tc in response.tool_calls]}"
+                )
+
+                # 添加 AI 的工具调用请求到历史
+                chat_history.append(
+                    AIChatMessage(
+                        role="assistant",
+                        content=response.content,
+                        tool_calls=response.tool_calls,
+                    )
+                )
+
+                # 执行每个工具调用
+                for tool_call in response.tool_calls:
+                    # 发送工具开始事件
+                    yield {
+                        "type": "tool_start",
+                        "tool_name": tool_call.function.name,
+                    }
+
+                    tool_result = await execute_tool(
+                        session,
+                        tool_call.function.name,
+                        tool_call.function.arguments,
+                    )
+
+                    # 添加工具结果到历史
+                    chat_history.append(
+                        AIChatMessage(
+                            role="tool",
+                            content=tool_result,
+                            tool_call_id=tool_call.id,
+                        )
+                    )
+
+                    # 发送工具结果事件（简化显示）
+                    yield {
+                        "type": "tool_result",
+                        "tool_name": tool_call.function.name,
+                        "success": True,
+                    }
+
+                # 继续对话，获取 AI 的下一步响应
+                response = await client.chat_with_tools(
+                    chat_history,
+                    tools=CHAT_TOOLS,
+                    model=model,
+                )
+                total_tokens += response.tokens_used or 0
+
+            # 工具调用完成，最终结果流式输出
+            # 如果最后的 response 没有工具调用，使用流式输出最终内容
+            if not response.tool_calls:
+                # 使用非流式结果（已经有了）
+                full_content = response.content
+                # 流式发送内容（分块发送以模拟流式效果）
+                chunk_size = 20
+                for i in range(0, len(full_content), chunk_size):
+                    chunk = full_content[i : i + chunk_size]
+                    yield {"type": "content", "content": chunk}
+        else:
+            # 普通流式对话（不使用工具）
+            # 检查是否启用深度思考模式 (仅 DeepSeek 支持)
+            is_deep_thinking = use_deep_thinking and isinstance(client, DeepSeekClient)
+            stream_model = "deepseek-reasoner" if is_deep_thinking else model
+
+            logger.info(
+                f"开始流式对话: conversation_id={conversation_id}, "
+                f"provider={provider_id}, deep_thinking={is_deep_thinking}"
+            )
+
+            full_reasoning = ""  # 收集完整思考过程
+
+            async for chunk in client.chat_stream(chat_history, model=stream_model):
+                # 处理思考内容 (reasoning_content)
+                if chunk.reasoning_content:
+                    full_reasoning += chunk.reasoning_content
+                    yield {"type": "reasoning", "reasoning": chunk.reasoning_content}
+
+                # 处理正式内容
+                if chunk.content:
+                    full_content += chunk.content
+                    yield {"type": "content", "content": chunk.content}
+
+                if chunk.tokens_used:
+                    total_tokens = chunk.tokens_used
+
+                if chunk.finish_reason:
+                    logger.debug(f"流式响应完成: finish_reason={chunk.finish_reason}")
 
         # 保存 AI 回复
         assistant_message = Message(

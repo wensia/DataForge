@@ -153,10 +153,18 @@ function ParamField({
       )
 
     case 'datetime': {
-      // 将 datetime 字符串转换为 datetime-local 格式
-      const dateValue = value
-        ? String(value).replace(' ', 'T').slice(0, 16)
-        : ''
+      // 判断是开始时间还是结束时间
+      const isStartTime = name.toLowerCase().includes('start')
+      const isEndTime = name.toLowerCase().includes('end')
+
+      // 生成提示文本
+      let hint = '支持格式: "2025-12-01" 或 "datetime.now()"'
+      if (isStartTime) {
+        hint += '，日期将自动配置为 00:00:00'
+      } else if (isEndTime) {
+        hint += '，日期将自动配置为 23:59:59'
+      }
+
       return (
         <div className='space-y-2'>
           <Label>
@@ -164,15 +172,13 @@ function ParamField({
             {required && <span className='text-destructive ml-1'>*</span>}
           </Label>
           <Input
-            type='datetime-local'
-            value={dateValue}
-            onChange={(e) => {
-              // 转换为 "YYYY-MM-DD HH:mm" 格式，与后端 datetime 兼容
-              const val = e.target.value.replace('T', ' ')
-              onChange(val)
-            }}
+            type='text'
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
+            placeholder='2025-12-01 或 datetime.now()'
           />
+          <p className='text-muted-foreground text-xs'>{hint}</p>
         </div>
       )
     }

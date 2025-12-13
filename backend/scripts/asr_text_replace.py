@@ -100,10 +100,10 @@ async def run(
         statement = select(CallRecord).where(CallRecord.transcript.isnot(None))
 
         if start_time:
-            start_time = normalize_time_param(start_time)
+            start_time = normalize_time_param(start_time, default_time="00:00")
             statement = statement.where(CallRecord.call_time >= start_time)
         if end_time:
-            end_time = normalize_time_param(end_time)
+            end_time = normalize_time_param(end_time, default_time="23:59")
             statement = statement.where(CallRecord.call_time <= end_time)
 
         records = session.exec(statement).all()

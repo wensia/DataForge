@@ -9,12 +9,14 @@ import { useQueryClient } from '@tanstack/react-query'
 
 // SSE 事件类型
 interface SSEEvent {
-  type: 'start' | 'content' | 'done' | 'error'
+  type: 'start' | 'tool_start' | 'tool_result' | 'content' | 'done' | 'error'
   content?: string
   user_message_id?: number
   assistant_message_id?: number
   tokens_used?: number
   error?: string
+  tool_name?: string
+  success?: boolean
 }
 
 interface UseChatStreamOptions {
@@ -76,6 +78,7 @@ export function useChatStream({
             body: JSON.stringify({
               content,
               ai_provider: aiProvider,
+              enable_tools: true,
             }),
             signal: abortControllerRef.current.signal,
           }
@@ -128,6 +131,31 @@ export function useChatStream({
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversation', conversationId],
                   })
+                  break
+
+                case 'tool_start':
+                  // 工具开始执行，显示查询状态
+                  if (event.tool_name) {
+                    const toolNames: Record<string, string> = {
+                      query_call_records: '查询通话记录',
+                      get_call_statistics: '统计通话数据',
+                      get_staff_list: '获取员工列表',
+                      get_call_ranking: '获取通话排行',
+                      get_current_date: '获取当前日期',
+                    }
+                    const displayName =
+                      toolNames[event.tool_name] || event.tool_name
+                    setStreamingContent(
+                      (prev) => prev + `\n🔍 正在${displayName}...\n`
+                    )
+                  }
+                  break
+
+                case 'tool_result':
+                  // 工具执行完成
+                  if (event.success) {
+                    setStreamingContent((prev) => prev + '✅ 数据查询完成\n\n')
+                  }
                   break
 
                 case 'content':

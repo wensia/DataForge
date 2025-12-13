@@ -320,6 +320,7 @@ async def send_message_stream(
             user_id=current_user.user_id,
             content=data.content,
             ai_provider=data.ai_provider,
+            enable_tools=data.enable_tools,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 

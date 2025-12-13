@@ -11,6 +11,7 @@ def normalize_time_param(value, default_time: str = "00:00") -> str | None:
     - datetime.datetime 对象
     - 字符串 "YYYY-MM-DD"
     - 字符串 "YYYY-MM-DD HH:mm"
+    - 字符串 "datetime.now()" 或 "now" - 返回当前时间
     - None
 
     Args:
@@ -28,6 +29,9 @@ def normalize_time_param(value, default_time: str = "00:00") -> str | None:
 
     if isinstance(value, str):
         value = value.strip()
+        # 支持 datetime.now() 或 now 特殊值
+        if value.lower() in ("datetime.now()", "now"):
+            return datetime.now().strftime("%Y-%m-%d %H:%M")
         if len(value) == 10:  # YYYY-MM-DD
             return f"{value} {default_time}"
         return value

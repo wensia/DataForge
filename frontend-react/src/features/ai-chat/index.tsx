@@ -109,10 +109,12 @@ export function AIChat() {
   const conversations = conversationsData?.items || []
   const messages = conversationData?.messages || []
 
-  // 设置默认 provider
+  // 设置默认 provider (优先使用 DeepSeek，因为它支持 Function Calling)
   useEffect(() => {
     if (providers && providers.length > 0 && !selectedProvider) {
-      setSelectedProvider(providers[0].id)
+      // 优先选择 deepseek
+      const deepseek = providers.find((p) => p.id === 'deepseek')
+      setSelectedProvider(deepseek?.id || providers[0].id)
     }
   }, [providers, selectedProvider])
 
@@ -120,7 +122,7 @@ export function AIChat() {
   const handleCreateConversation = async () => {
     try {
       const conversation = await createMutation.mutateAsync({
-        ai_provider: selectedProvider || 'kimi',
+        ai_provider: selectedProvider || 'deepseek',
       })
       setSelectedId(conversation.id)
     } catch {
