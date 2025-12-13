@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Eye, EyeOff, Pencil } from 'lucide-react'
+import { GripVertical, Eye, EyeOff, Pencil, ExternalLink, Copy } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { NavItemConfig } from '../types'
@@ -28,6 +29,21 @@ export function SortableItem({ item, onToggleVisibility, onEdit }: SortableItemP
   }
 
   const IconComponent = getIcon(item.icon) || defaultIcon
+
+  const fullUrl = `${window.location.origin}${item.url}`
+
+  const handleOpenInNewTab = () => {
+    window.open(fullUrl, '_blank')
+  }
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      toast.success('已复制链接')
+    } catch {
+      toast.error('复制失败')
+    }
+  }
 
   return (
     <div
@@ -67,7 +83,28 @@ export function SortableItem({ item, onToggleVisibility, onEdit }: SortableItemP
         variant="ghost"
         size="icon"
         className="h-7 w-7"
+        onClick={handleOpenInNewTab}
+        title="在新标签页打开"
+      >
+        <ExternalLink className="h-4 w-4" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
+        onClick={handleCopyUrl}
+        title="复制链接"
+      >
+        <Copy className="h-4 w-4" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7"
         onClick={() => onToggleVisibility(item.id)}
+        title={item.isVisible ? '隐藏' : '显示'}
       >
         {item.isVisible ? (
           <Eye className="h-4 w-4" />
@@ -81,6 +118,7 @@ export function SortableItem({ item, onToggleVisibility, onEdit }: SortableItemP
         size="icon"
         className="h-7 w-7"
         onClick={() => onEdit(item)}
+        title="编辑"
       >
         <Pencil className="h-4 w-4" />
       </Button>
