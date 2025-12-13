@@ -224,7 +224,7 @@ const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled || isLoading}
-            className="min-h-[60px] max-h-[200px] resize-none pr-12"
+            className="min-h-[60px] max-h-[200px] resize-none py-4 pr-12"
             rows={1}
           />
           <Button
