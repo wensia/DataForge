@@ -109,37 +109,43 @@ export function StandaloneRecordDownload() {
   // 下载录音
   const downloadMutation = useDownloadRecord()
 
-  // 加载音频（不自动播放）
-  const loadAudio = useCallback(async () => {
-    if (!parsedInfo?.voiceId || !accountId) return
-    if (audioUrl) return // 已加载过
-
-    try {
-      // 1. 获取云客录音 URL
-      const result = await recordUrlMutation.mutateAsync({
-        accountId,
-        voiceId: parsedInfo.voiceId,
-      })
-
-      // 2. 通过代理获取录音（解决跨域问题）
-      const blob = await proxyRecordMutation.mutateAsync({
-        url: result.download_url,
-      })
-
-      // 3. 创建 Blob URL
-      const blobUrl = window.URL.createObjectURL(blob)
-      setAudioUrl(blobUrl)
-    } catch {
-      toast.error('加载录音失败')
-    }
-  }, [parsedInfo?.voiceId, accountId, audioUrl, recordUrlMutation, proxyRecordMutation])
+  // 是否正在加载录音（用于防止重复请求）
+  const isLoadingRef = useRef(false)
 
   // 解析 URL 后自动加载音频
   useEffect(() => {
-    if (parsedInfo?.voiceId && accountId && !audioUrl) {
-      loadAudio()
+    // 检查条件
+    if (!parsedInfo?.voiceId || !accountId || audioUrl) return
+    // 防止重复请求
+    if (isLoadingRef.current) return
+
+    const loadAudio = async () => {
+      isLoadingRef.current = true
+      try {
+        // 1. 获取云客录音 URL
+        const result = await recordUrlMutation.mutateAsync({
+          accountId,
+          voiceId: parsedInfo.voiceId,
+        })
+
+        // 2. 通过代理获取录音（解决跨域问题）
+        const blob = await proxyRecordMutation.mutateAsync({
+          url: result.download_url,
+        })
+
+        // 3. 创建 Blob URL
+        const blobUrl = window.URL.createObjectURL(blob)
+        setAudioUrl(blobUrl)
+      } catch {
+        toast.error('加载录音失败')
+      } finally {
+        isLoadingRef.current = false
+      }
     }
-  }, [parsedInfo?.voiceId, accountId, audioUrl, loadAudio])
+
+    loadAudio()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsedInfo?.voiceId, accountId, audioUrl])
 
   // 解析 URL
   const handleParseUrl = () => {
