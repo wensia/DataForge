@@ -1,25 +1,23 @@
 # DataForge CI/CD 工作流
-# 构建 Docker 镜像 → 推送到 GitHub Container Registry → 部署到服务器
+# 构建 Docker 镜像 → 推送到阿里云 ACR → 部署到服务器
 
 name: Build and Deploy
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/dataforge-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/dataforge-frontend
+  REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  NAMESPACE: pandw
+  BACKEND_IMAGE: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend
+  FRONTEND_IMAGE: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend
 
 jobs:
   # ===== 构建后端镜像 =====
   build-backend:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -28,21 +26,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Aliyun ACR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.BACKEND_IMAGE }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and push backend
         uses: docker/build-push-action@v5
@@ -50,17 +39,15 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ===== 构建前端镜像 =====
   build-frontend:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -69,21 +56,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Login to Aliyun ACR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.FRONTEND_IMAGE }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and push frontend
         uses: docker/build-push-action@v5
@@ -91,8 +69,9 @@ jobs:
           context: ./frontend-react
           file: ./frontend-react/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           build-args: |
             VITE_API_BASE_URL=/api/v1
           cache-from: type=gha
@@ -110,40 +89,27 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: GITHUB_TOKEN,GITHUB_ACTOR,BACKEND_IMAGE,FRONTEND_IMAGE
           script: |
             cd /www/wwwroot/yunke-transit
 
             # 拉取最新代码
             git pull origin main
 
-            # 设置镜像名称
-            BACKEND_IMG="ghcr.io/wensia/dataforge-backend:latest"
-            FRONTEND_IMG="ghcr.io/wensia/dataforge-frontend:latest"
-
-            # 登录 GitHub Container Registry
-            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || echo "登录失败，尝试匿名拉取"
-
-            # 导出环境变量供 docker-compose 使用
-            export GITHUB_OWNER=wensia
+            # 登录阿里云 ACR
+            sudo docker login registry.cn-hangzhou.aliyuncs.com -u ${{ secrets.ACR_USERNAME }} -p ${{ secrets.ACR_PASSWORD }}
 
             # 拉取最新镜像
-            docker pull "$BACKEND_IMG" || echo "拉取后端镜像失败"
-            docker pull "$FRONTEND_IMG" || echo "拉取前端镜像失败"
+            sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+            sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
 
             # 使用生产配置重启服务
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker compose -f docker-compose.prod.yml up -d
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans || true
+            sudo docker compose -f docker-compose.prod.yml up -d
 
             # 清理旧镜像
-            docker image prune -f
+            sudo docker image prune -f
 
             # 显示状态
-            docker compose -f docker-compose.prod.yml ps
+            sudo docker compose -f docker-compose.prod.yml ps
 
             echo "部署完成！"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
-          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
