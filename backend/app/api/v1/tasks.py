@@ -170,7 +170,7 @@ async def update_task(task_id: int, data: ScheduledTaskUpdate):
 @router.delete("/{task_id}", response_model=ResponseModel)
 async def delete_task(task_id: int):
     """删除任务"""
-    success = task_service.delete_task(task_id)
+    success = await task_service.delete_task_async(task_id)
     if not success:
         return ResponseModel.error(code=400, message="任务不存在或为系统任务，无法删除")
     return ResponseModel.success(message="任务删除成功")

@@ -12,6 +12,7 @@ from app.api.v1 import (
     data_analysis,
     feishu_config,
     health,
+    prompts,
     record_proxy,
     staff_mapping,
     tasks,
@@ -38,3 +39,4 @@ router.include_router(record_proxy.router)
 router.include_router(user_preferences.router)
 router.include_router(staff_mapping.router)
 router.include_router(chat.router)
+router.include_router(prompts.router)

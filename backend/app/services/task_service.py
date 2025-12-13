@@ -138,6 +138,15 @@ def delete_task(task_id: int) -> bool:
         return True
 
 
+async def delete_task_async(task_id: int) -> bool:
+    """异步删除任务"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(delete_task, task_id),
+    )
+
+
 def pause_task(task_id: int) -> bool:
     """暂停任务"""
     with Session(engine) as session:

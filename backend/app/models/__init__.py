@@ -126,6 +126,16 @@ from app.models.conversation import (
     SendMessageRequest,
     SendMessageResponse,
 )
+from app.models.prompt import (
+    Prompt,
+    PromptAssignment,
+    PromptCreate,
+    PromptUpdate,
+    PromptResponse,
+    PromptWithAssignments,
+    AssignUsersRequest,
+    PromptAssignmentResponse,
+)
 
 __all__ = [
     "AIProvider",
@@ -225,4 +235,12 @@ __all__ = [
     "MessageRole",
     "SendMessageRequest",
     "SendMessageResponse",
+    "Prompt",
+    "PromptAssignment",
+    "PromptCreate",
+    "PromptUpdate",
+    "PromptResponse",
+    "PromptWithAssignments",
+    "AssignUsersRequest",
+    "PromptAssignmentResponse",
 ]
