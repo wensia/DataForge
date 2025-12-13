@@ -14,6 +14,7 @@ import {
   Mic,
   UserRoundCog,
   Layers,
+  Download,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -48,6 +49,11 @@ export const sidebarData: SidebarData = {
           title: '云客账号',
           url: '/accounts',
           icon: FolderTree,
+        },
+        {
+          title: '录音下载',
+          url: '/record-download',
+          icon: Download,
         },
       ],
     },

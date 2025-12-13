@@ -33,6 +33,14 @@ export const defaultNavConfig: NavPageConfig = {
           order: 0,
           isVisible: true,
         },
+        {
+          id: 'record-download',
+          title: '录音下载',
+          url: '/record-download',
+          icon: 'Download',
+          order: 1,
+          isVisible: true,
+        },
       ],
     },
     {
