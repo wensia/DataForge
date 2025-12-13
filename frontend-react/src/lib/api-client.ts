@@ -53,7 +53,10 @@ apiClient.interceptors.response.use(
       }
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname
-        if (!currentPath.includes('/sign-in')) {
+        // 独立页面不重定向到登录页
+        const standalonePaths = ['/sign-in', '/chat', '/record-download']
+        const isStandalonePage = standalonePaths.some((p) => currentPath.startsWith(p))
+        if (!isStandalonePage) {
           const redirect = encodeURIComponent(window.location.href)
           window.location.href = `/sign-in?redirect=${redirect}`
         }
