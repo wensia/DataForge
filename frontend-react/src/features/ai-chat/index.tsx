@@ -14,10 +14,16 @@ import {
   Bot,
   StopCircle,
   Pencil,
+  Copy,
+  Check,
+  Brain,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +94,7 @@ export function AIChat() {
     Conversation | null
   >(null)
   const [newTitle, setNewTitle] = useState('')
+  const [useDeepThinking, setUseDeepThinking] = useState(false)
 
   // API Hooks
   const { data: conversationsData, isLoading: isLoadingConversations } =
@@ -100,7 +107,7 @@ export function AIChat() {
   const deleteMutation = useDeleteConversation()
 
   // 流式聊天 Hook
-  const { isStreaming, streamingContent, sendMessage, stopStreaming } =
+  const { isStreaming, streamingContent, streamingReasoning, pendingUserMessage, sendMessage, stopStreaming } =
     useChatStream({
       conversationId: selectedId,
       onError: (err) => toast.error(err),
@@ -180,12 +187,12 @@ export function AIChat() {
     setInputMessage('')
 
     try {
-      await sendMessage(content, selectedProvider || undefined)
+      await sendMessage(content, selectedProvider || undefined, useDeepThinking)
     } catch {
       toast.error('发送失败，请重试')
       setInputMessage(content)
     }
-  }, [inputMessage, selectedId, isStreaming, sendMessage, selectedProvider])
+  }, [inputMessage, selectedId, isStreaming, sendMessage, selectedProvider, useDeepThinking])
 
   // 复制消息内容
   const handleCopyMessage = useCallback((content: string) => {
@@ -280,7 +287,23 @@ export function AIChat() {
                     {conversationData?.title || '新对话'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  {/* 深度思考开关 */}
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      id="deep-thinking"
+                      checked={useDeepThinking}
+                      onCheckedChange={setUseDeepThinking}
+                      disabled={isStreaming}
+                    />
+                    <label
+                      htmlFor="deep-thinking"
+                      className="flex cursor-pointer items-center gap-1 text-sm text-muted-foreground"
+                    >
+                      <Brain className="h-3.5 w-3.5" />
+                      深度思考
+                    </label>
+                  </div>
                   <Badge variant="secondary">
                     {conversationData?.ai_provider?.toUpperCase()}
                   </Badge>
@@ -303,7 +326,7 @@ export function AIChat() {
                 <div className="flex flex-1 items-center justify-center">
                   <Loader2 className="animate-spin text-muted-foreground" />
                 </div>
-              ) : messages.length === 0 && !isStreaming ? (
+              ) : messages.length === 0 && !isStreaming && !pendingUserMessage ? (
                 <ChatEmpty
                   title="开始对话"
                   description="发送消息与 AI 开始交流"
@@ -315,8 +338,27 @@ export function AIChat() {
                       key={message.id}
                       message={message}
                       onCopy={() => handleCopyMessage(message.content)}
+                      onEdit={(content) => setInputMessage(content)}
                     />
                   ))}
+                  {/* 待发送的用户消息（立即显示） */}
+                  {pendingUserMessage && (
+                    <ChatBubble variant="user" showCopy={false}>
+                      <div className="whitespace-pre-wrap break-words">{pendingUserMessage}</div>
+                    </ChatBubble>
+                  )}
+                  {/* 流式响应中的思考过程 */}
+                  {isStreaming && streamingReasoning && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+                        <Brain className="h-4 w-4" />
+                        AI 正在思考...
+                      </div>
+                      <div className="max-h-40 overflow-y-auto text-sm text-amber-900/80 dark:text-amber-200/80">
+                        <MarkdownContent content={streamingReasoning} />
+                      </div>
+                    </div>
+                  )}
                   {/* 流式响应中的消息 */}
                   {isStreaming && streamingContent && (
                     <ChatBubble variant="assistant" showCopy={false}>
@@ -324,7 +366,7 @@ export function AIChat() {
                     </ChatBubble>
                   )}
                   {/* 正在等待响应 */}
-                  {isStreaming && !streamingContent && (
+                  {isStreaming && !streamingContent && !streamingReasoning && (
                     <ChatTypingIndicator />
                   )}
                 </ChatMessages>
@@ -512,11 +554,24 @@ function ConversationItem({
 function MessageBubble({
   message,
   onCopy,
+  onEdit,
 }: {
   message: Message
   onCopy: () => void
+  onEdit: (content: string) => void
 }) {
   const isUser = message.role === 'user'
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [message.content])
+
+  const handleEdit = useCallback(() => {
+    onEdit(message.content)
+  }, [message.content, onEdit])
 
   return (
     <ChatBubble
@@ -531,11 +586,37 @@ function MessageBubble({
       )}
       <div
         className={cn(
-          'mt-2 text-xs opacity-60',
-          isUser ? 'text-right' : 'text-left'
+          'mt-2 flex items-center text-xs opacity-60',
+          isUser ? 'justify-end gap-2' : 'justify-start'
         )}
       >
-        {format(new Date(message.created_at), 'HH:mm')}
+        {isUser && (
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary/80"
+              onClick={handleCopy}
+              title="复制"
+            >
+              {copied ? (
+                <Check className="h-3 w-3" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary/80"
+              onClick={handleEdit}
+              title="重新编辑"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+        <span>{format(new Date(message.created_at), 'HH:mm')}</span>
         {message.tokens_used && (
           <span className="ml-2">({message.tokens_used} tokens)</span>
         )}

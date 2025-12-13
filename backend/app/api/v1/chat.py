@@ -321,6 +321,7 @@ async def send_message_stream(
             content=data.content,
             ai_provider=data.ai_provider,
             enable_tools=data.enable_tools,
+            use_deep_thinking=data.use_deep_thinking,
         ):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 

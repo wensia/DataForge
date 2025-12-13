@@ -9,8 +9,9 @@ import { useQueryClient } from '@tanstack/react-query'
 
 // SSE 事件类型
 interface SSEEvent {
-  type: 'start' | 'tool_start' | 'tool_result' | 'content' | 'done' | 'error'
+  type: 'start' | 'tool_start' | 'tool_result' | 'reasoning' | 'content' | 'done' | 'error'
   content?: string
+  reasoning?: string
   user_message_id?: number
   assistant_message_id?: number
   tokens_used?: number
@@ -29,10 +30,12 @@ interface UseChatStreamReturn {
   // 状态
   isStreaming: boolean
   streamingContent: string
+  streamingReasoning: string
+  pendingUserMessage: string | null
   error: string | null
 
   // 方法
-  sendMessage: (content: string, aiProvider?: string) => Promise<void>
+  sendMessage: (content: string, aiProvider?: string, useDeepThinking?: boolean) => Promise<void>
   stopStreaming: () => void
   clearError: () => void
 }
@@ -44,12 +47,14 @@ export function useChatStream({
 }: UseChatStreamOptions): UseChatStreamReturn {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+  const [streamingReasoning, setStreamingReasoning] = useState('')
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const queryClient = useQueryClient()
 
   const sendMessage = useCallback(
-    async (content: string, aiProvider?: string) => {
+    async (content: string, aiProvider?: string, useDeepThinking?: boolean) => {
       if (!conversationId) {
         setError('请先选择或创建对话')
         return
@@ -58,6 +63,8 @@ export function useChatStream({
       // 清理之前的状态
       setError(null)
       setStreamingContent('')
+      setStreamingReasoning('')
+      setPendingUserMessage(content) // 立即显示用户消息
       setIsStreaming(true)
 
       // 创建 AbortController 用于取消请求
@@ -79,6 +86,7 @@ export function useChatStream({
               content,
               ai_provider: aiProvider,
               enable_tools: true,
+              use_deep_thinking: useDeepThinking ?? false,
             }),
             signal: abortControllerRef.current.signal,
           }
@@ -127,7 +135,8 @@ export function useChatStream({
 
               switch (event.type) {
                 case 'start':
-                  // 刷新消息列表以显示用户消息
+                  // 用户消息已保存到数据库，清除待发送消息并刷新列表
+                  setPendingUserMessage(null)
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversation', conversationId],
                   })
@@ -155,6 +164,13 @@ export function useChatStream({
                   // 工具执行完成
                   if (event.success) {
                     setStreamingContent((prev) => prev + '✅ 数据查询完成\n\n')
+                  }
+                  break
+
+                case 'reasoning':
+                  // 思考过程内容
+                  if (event.reasoning) {
+                    setStreamingReasoning((prev) => prev + event.reasoning)
                   }
                   break
 
@@ -210,6 +226,8 @@ export function useChatStream({
       } finally {
         setIsStreaming(false)
         setStreamingContent('')
+        setStreamingReasoning('')
+        setPendingUserMessage(null)
         abortControllerRef.current = null
       }
     },
@@ -229,6 +247,8 @@ export function useChatStream({
   return {
     isStreaming,
     streamingContent,
+    streamingReasoning,
+    pendingUserMessage,
     error,
     sendMessage,
     stopStreaming,
