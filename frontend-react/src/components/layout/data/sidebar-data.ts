@@ -106,6 +106,11 @@ export const sidebarData: SidebarData = {
           url: '/ai-chat',
           icon: Bot,
         },
+        {
+          title: '快捷话术',
+          url: '/settings/prompts',
+          icon: MessageCircle,
+        },
       ],
     },
     {
@@ -135,11 +140,6 @@ export const sidebarData: SidebarData = {
           title: '用户管理',
           url: '/settings/users',
           icon: Users,
-        },
-        {
-          title: '快捷话术',
-          url: '/settings/prompts',
-          icon: MessageCircle,
         },
         {
           title: '页面管理',
