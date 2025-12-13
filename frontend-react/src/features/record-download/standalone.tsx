@@ -263,7 +263,7 @@ export function StandaloneRecordDownload() {
                     <SelectContent>
                       {accounts.map((account) => (
                         <SelectItem key={account.id} value={String(account.id)}>
-                          {account.name || account.phone}
+                          {account.company_name || account.phone}
                         </SelectItem>
                       ))}
                     </SelectContent>
