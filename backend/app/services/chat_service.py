@@ -1,0 +1,366 @@
+"""对话服务
+
+提供 AI 对话功能，支持多轮会话和历史记录管理。
+"""
+
+from datetime import datetime
+
+from loguru import logger
+from sqlalchemy import func
+from sqlmodel import Session, select
+
+from app.clients.ai import AIClientError, ChatMessage as AIChatMessage
+from app.models.conversation import (
+    Conversation,
+    ConversationCreate,
+    ConversationUpdate,
+    ConversationType,
+    Message,
+    MessageRole,
+)
+from app.services.ai_analysis_service import _resolve_ai_client, AIAnalysisError
+
+
+class ChatServiceError(Exception):
+    """对话服务异常"""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+
+
+def create_conversation(
+    session: Session,
+    user_id: int,
+    data: ConversationCreate,
+) -> Conversation:
+    """创建对话
+
+    Args:
+        session: 数据库会话
+        user_id: 用户 ID
+        data: 创建数据
+
+    Returns:
+        Conversation: 创建的对话
+    """
+    now = datetime.now()
+    title = data.title or f"新对话 {now.strftime('%m-%d %H:%M')}"
+
+    conversation = Conversation(
+        user_id=user_id,
+        title=title,
+        ai_provider=data.ai_provider,
+        conversation_type=data.conversation_type,
+        created_at=now,
+        updated_at=now,
+    )
+
+    session.add(conversation)
+    session.commit()
+    session.refresh(conversation)
+
+    logger.info(f"创建对话: id={conversation.id}, user_id={user_id}")
+    return conversation
+
+
+def get_conversations(
+    session: Session,
+    user_id: int,
+    conversation_type: str | None = None,
+    include_archived: bool = False,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Conversation], int]:
+    """获取用户对话列表
+
+    Args:
+        session: 数据库会话
+        user_id: 用户 ID
+        conversation_type: 对话类型筛选
+        include_archived: 是否包含归档
+        limit: 返回数量
+        offset: 偏移量
+
+    Returns:
+        tuple: (对话列表, 总数)
+    """
+    query = select(Conversation).where(Conversation.user_id == user_id)
+
+    if conversation_type:
+        query = query.where(Conversation.conversation_type == conversation_type)
+
+    if not include_archived:
+        query = query.where(Conversation.is_archived == False)  # noqa: E712
+
+    # 获取总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total = session.exec(count_query).one()
+
+    # 分页和排序（最新的在前）
+    query = query.order_by(Conversation.updated_at.desc())
+    query = query.offset(offset).limit(limit)
+
+    conversations = session.exec(query).all()
+    return list(conversations), total
+
+
+def get_conversation(
+    session: Session,
+    conversation_id: int,
+    user_id: int,
+) -> Conversation | None:
+    """获取单个对话
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        user_id: 用户 ID
+
+    Returns:
+        Conversation | None: 对话或 None
+    """
+    query = select(Conversation).where(
+        Conversation.id == conversation_id,
+        Conversation.user_id == user_id,
+    )
+    return session.exec(query).first()
+
+
+def get_conversation_messages(
+    session: Session,
+    conversation_id: int,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[Message], int]:
+    """获取对话消息
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        limit: 返回数量
+        offset: 偏移量
+
+    Returns:
+        tuple: (消息列表, 总数)
+    """
+    query = select(Message).where(Message.conversation_id == conversation_id)
+
+    # 获取总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total = session.exec(count_query).one()
+
+    # 分页和排序（按时间正序，方便显示）
+    query = query.order_by(Message.created_at.asc())
+    query = query.offset(offset).limit(limit)
+
+    messages = session.exec(query).all()
+    return list(messages), total
+
+
+def update_conversation(
+    session: Session,
+    conversation_id: int,
+    user_id: int,
+    data: ConversationUpdate,
+) -> Conversation | None:
+    """更新对话
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        user_id: 用户 ID
+        data: 更新数据
+
+    Returns:
+        Conversation | None: 更新后的对话或 None
+    """
+    conversation = get_conversation(session, conversation_id, user_id)
+    if not conversation:
+        return None
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(conversation, key, value)
+
+    conversation.updated_at = datetime.now()
+
+    session.add(conversation)
+    session.commit()
+    session.refresh(conversation)
+
+    logger.info(f"更新对话: id={conversation_id}")
+    return conversation
+
+
+def delete_conversation(
+    session: Session,
+    conversation_id: int,
+    user_id: int,
+) -> bool:
+    """删除对话（同时删除所有消息）
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        user_id: 用户 ID
+
+    Returns:
+        bool: 是否删除成功
+    """
+    conversation = get_conversation(session, conversation_id, user_id)
+    if not conversation:
+        return False
+
+    # 删除所有消息
+    messages = session.exec(
+        select(Message).where(Message.conversation_id == conversation_id)
+    ).all()
+    for msg in messages:
+        session.delete(msg)
+
+    # 删除对话
+    session.delete(conversation)
+    session.commit()
+
+    logger.info(f"删除对话: id={conversation_id}, messages={len(messages)}")
+    return True
+
+
+async def send_message(
+    session: Session,
+    conversation_id: int,
+    user_id: int,
+    content: str,
+    ai_provider: str | None = None,
+) -> tuple[Message, Message]:
+    """发送消息并获取 AI 回复
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        user_id: 用户 ID
+        content: 用户消息内容
+        ai_provider: 临时使用的 AI 提供商
+
+    Returns:
+        tuple[Message, Message]: (用户消息, AI 回复消息)
+
+    Raises:
+        ChatServiceError: 对话不存在或 AI 服务错误
+    """
+    # 获取对话
+    conversation = get_conversation(session, conversation_id, user_id)
+    if not conversation:
+        raise ChatServiceError("对话不存在")
+
+    now = datetime.now()
+
+    # 保存用户消息
+    user_message = Message(
+        conversation_id=conversation_id,
+        role=MessageRole.USER,
+        content=content,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(user_message)
+    session.flush()  # 获取 ID
+
+    try:
+        # 获取历史消息作为上下文
+        history_messages, _ = get_conversation_messages(
+            session, conversation_id, limit=20
+        )
+
+        # 构建消息历史（不包括刚添加的用户消息）
+        chat_history = [
+            AIChatMessage(role=msg.role, content=msg.content)
+            for msg in history_messages
+            if msg.id != user_message.id
+        ]
+
+        # 添加当前用户消息
+        chat_history.append(AIChatMessage(role="user", content=content))
+
+        # 获取 AI 客户端
+        provider = ai_provider or conversation.ai_provider
+        provider_id, client, model = _resolve_ai_client(session, provider)
+
+        # 调用 AI
+        response = await client.chat(chat_history, model=model)
+
+        # 保存 AI 回复
+        assistant_message = Message(
+            conversation_id=conversation_id,
+            role=MessageRole.ASSISTANT,
+            content=response.content,
+            tokens_used=response.tokens_used,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+        session.add(assistant_message)
+
+        # 更新对话时间和 provider
+        conversation.updated_at = datetime.now()
+        if ai_provider:
+            conversation.ai_provider = provider_id
+        session.add(conversation)
+
+        # 如果是第一条消息，自动生成标题
+        if len(history_messages) == 0:
+            # 使用用户消息的前 50 个字符作为标题
+            auto_title = content[:50] + ("..." if len(content) > 50 else "")
+            conversation.title = auto_title
+            session.add(conversation)
+
+        session.commit()
+        session.refresh(user_message)
+        session.refresh(assistant_message)
+
+        logger.info(
+            f"对话消息: conversation_id={conversation_id}, "
+            f"provider={provider_id}, tokens={response.tokens_used}"
+        )
+
+        return user_message, assistant_message
+
+    except AIAnalysisError as e:
+        session.rollback()
+        raise ChatServiceError(e.message) from e
+    except AIClientError as e:
+        session.rollback()
+        raise ChatServiceError(f"AI 服务错误: {e.message}") from e
+
+
+def get_available_providers(session: Session) -> list[dict]:
+    """获取可用的 AI 提供商列表
+
+    Args:
+        session: 数据库会话
+
+    Returns:
+        list[dict]: 提供商列表
+    """
+    from app.models.ai_config import AIConfig
+
+    # 从数据库获取启用的配置
+    configs = session.exec(
+        select(AIConfig)
+        .where(AIConfig.is_active == True)  # noqa: E712
+        .order_by(AIConfig.provider)
+    ).all()
+
+    providers = []
+    seen = set()
+
+    for cfg in configs:
+        if cfg.provider not in seen:
+            providers.append({
+                "id": cfg.provider,
+                "name": cfg.name or cfg.provider.upper(),
+                "default_model": cfg.default_model,
+            })
+            seen.add(cfg.provider)
+
+    return providers

@@ -16,12 +16,13 @@ __all__ = [
 ]
 
 
-def get_ai_client(provider: str, api_key: str) -> AIClient:
+def get_ai_client(provider: str, api_key: str, base_url: str | None = None) -> AIClient:
     """获取 AI 客户端实例
 
     Args:
         provider: AI 服务提供商 (kimi / deepseek)
         api_key: API 密钥
+        base_url: API 基础地址（可选）
 
     Returns:
         AIClient: AI 客户端实例
@@ -30,8 +31,8 @@ def get_ai_client(provider: str, api_key: str) -> AIClient:
         ValueError: 不支持的提供商
     """
     if provider == "kimi":
-        return KimiClient(api_key=api_key)
+        return KimiClient(api_key=api_key, base_url=base_url)
     elif provider == "deepseek":
-        return DeepSeekClient(api_key=api_key)
+        return DeepSeekClient(api_key=api_key, base_url=base_url)
     else:
         raise ValueError(f"不支持的 AI 服务提供商: {provider}")

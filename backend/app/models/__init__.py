@@ -111,6 +111,20 @@ from app.models.staff import (
     ApplyToRecordsRequest,
     ApplyToRecordsResponse,
 )
+from app.models.conversation import (
+    Conversation,
+    ConversationCreate,
+    ConversationResponse,
+    ConversationUpdate,
+    ConversationWithMessages,
+    ConversationType,
+    Message,
+    MessageCreate,
+    MessageResponse,
+    MessageRole,
+    SendMessageRequest,
+    SendMessageResponse,
+)
 
 __all__ = [
     "AIProvider",
@@ -197,4 +211,16 @@ __all__ = [
     "StaffWithMappings",
     "ApplyToRecordsRequest",
     "ApplyToRecordsResponse",
+    "Conversation",
+    "ConversationCreate",
+    "ConversationResponse",
+    "ConversationUpdate",
+    "ConversationWithMessages",
+    "ConversationType",
+    "Message",
+    "MessageCreate",
+    "MessageResponse",
+    "MessageRole",
+    "SendMessageRequest",
+    "SendMessageResponse",
 ]

@@ -8,10 +8,11 @@ from datetime import datetime
 from typing import Any
 
 from loguru import logger
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.clients.ai import AIClient, AIClientError, ChatMessage, get_ai_client
 from app.config import settings
+from app.models.ai_config import AIConfig
 from app.models.analysis_result import (
     AnalysisResult,
     AnalysisResultCreate,
@@ -29,30 +30,104 @@ class AIAnalysisError(Exception):
         super().__init__(message)
 
 
-def _get_ai_client(provider: str | None = None) -> AIClient:
-    """获取 AI 客户端
+def _get_active_ai_config(session: Session, provider: str) -> AIConfig | None:
+    """获取指定 provider 的可用 AI 配置（优先取最新一条启用配置）"""
+    provider = provider.strip()
+    if not provider:
+        return None
+
+    query = (
+        select(AIConfig)
+        .where(AIConfig.provider == provider, AIConfig.is_active == True)  # noqa: E712
+        .order_by(AIConfig.updated_at.desc())
+        .limit(1)
+    )
+    return session.exec(query).first()
+
+
+def _get_ai_client_from_env(provider: str) -> AIClient | None:
+    """从环境变量（.env）获取 AI 客户端（兼容旧配置）"""
+    if provider == "kimi":
+        return get_ai_client("kimi", settings.kimi_api_key) if settings.kimi_api_key else None
+    if provider == "deepseek":
+        return (
+            get_ai_client("deepseek", settings.deepseek_api_key)
+            if settings.deepseek_api_key
+            else None
+        )
+    return None
+
+
+def _resolve_ai_client(
+    session: Session, provider: str | None = None
+) -> tuple[str, AIClient, str | None]:
+    """解析并获取 AI 客户端（优先使用数据库 AI 配置，其次 .env）
 
     Args:
+        session: 数据库会话
         provider: AI 服务提供商（可选，使用默认）
 
     Returns:
-        AIClient: AI 客户端实例
+        tuple[str, AIClient, str | None]: (provider, client, default_model)
 
     Raises:
         AIAnalysisError: 配置错误
     """
-    provider = provider or settings.default_ai_provider
+    requested = (provider or "").strip()
 
-    if provider == "kimi":
-        if not settings.kimi_api_key:
-            raise AIAnalysisError("未配置 Kimi API 密钥，请在 .env 中设置 KIMI_API_KEY")
-        return get_ai_client("kimi", settings.kimi_api_key)
-    elif provider == "deepseek":
-        if not settings.deepseek_api_key:
-            raise AIAnalysisError("未配置 DeepSeek API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY")
-        return get_ai_client("deepseek", settings.deepseek_api_key)
-    else:
-        raise AIAnalysisError(f"不支持的 AI 服务: {provider}")
+    def _from_db(p: str) -> tuple[str, AIClient, str | None] | None:
+        cfg = _get_active_ai_config(session, p)
+        if not cfg:
+            return None
+        return (
+            p,
+            get_ai_client(p, cfg.api_key, base_url=cfg.base_url),
+            cfg.default_model,
+        )
+
+    def _from_env(p: str) -> tuple[str, AIClient, str | None] | None:
+        client = _get_ai_client_from_env(p)
+        if not client:
+            return None
+        return p, client, None
+
+    # 1) 优先使用显式指定的 provider
+    if requested:
+        resolved = _from_db(requested) or _from_env(requested)
+        if resolved:
+            return resolved
+        raise AIAnalysisError(
+            f"未配置 {requested} 的 AI 密钥，请在「系统设置 -> AI 配置」中添加并启用，或在 .env 中配置对应 API Key"
+        )
+
+    # 2) 未指定 provider：优先使用默认 provider
+    default_provider = settings.default_ai_provider
+    resolved = _from_db(default_provider) or _from_env(default_provider)
+    if resolved:
+        return resolved
+
+    # 3) 默认 provider 不可用：退化到任意启用的 AI 配置
+    any_cfg = (
+        session.exec(select(AIConfig).where(AIConfig.is_active == True).order_by(AIConfig.updated_at.desc()).limit(1))  # noqa: E712
+        .first()
+    )
+    if any_cfg:
+        provider_id = any_cfg.provider
+        return (
+            provider_id,
+            get_ai_client(provider_id, any_cfg.api_key, base_url=any_cfg.base_url),
+            any_cfg.default_model,
+        )
+
+    # 4) 兼容旧配置：退化到任意可用的 .env
+    for p in ("kimi", "deepseek"):
+        resolved = _from_env(p)
+        if resolved:
+            return resolved
+
+    raise AIAnalysisError(
+        "未配置可用的 AI 服务，请在「系统设置 -> AI 配置」中添加并启用，或在 .env 中配置 KIMI_API_KEY / DEEPSEEK_API_KEY"
+    )
 
 
 def _format_records_for_ai(records: list[CallRecord], max_chars: int = 50000) -> str:
@@ -112,8 +187,6 @@ async def generate_summary(
     Returns:
         AnalysisResult: 分析结果
     """
-    provider = provider or settings.default_ai_provider
-
     try:
         # 获取数据
         records, total = get_call_records(
@@ -143,13 +216,13 @@ async def generate_summary(
 {data_text}"""
 
         # 调用 AI
-        client = _get_ai_client(provider)
-        response = await client.summarize(prompt)
+        provider_id, client, model = _resolve_ai_client(session, provider)
+        response = await client.summarize(prompt, model=model)
 
         # 保存结果
         result = AnalysisResult(
             analysis_type=AnalysisType.SUMMARY,
-            ai_provider=provider,
+            ai_provider=provider_id,
             data_range={
                 "start_time": start_time.isoformat() if start_time else None,
                 "end_time": end_time.isoformat() if end_time else None,
@@ -194,8 +267,6 @@ async def detect_anomalies(
     Returns:
         AnalysisResult: 分析结果
     """
-    provider = provider or settings.default_ai_provider
-
     try:
         # 获取数据
         records, total = get_call_records(
@@ -212,13 +283,13 @@ async def detect_anomalies(
         data_text = _format_records_for_ai(records)
 
         # 调用 AI
-        client = _get_ai_client(provider)
-        response = await client.detect_anomalies(data_text, threshold)
+        provider_id, client, model = _resolve_ai_client(session, provider)
+        response = await client.detect_anomalies(data_text, threshold, model=model)
 
         # 保存结果
         result = AnalysisResult(
             analysis_type=AnalysisType.ANOMALY,
-            ai_provider=provider,
+            ai_provider=provider_id,
             data_range={
                 "start_time": start_time.isoformat() if start_time else None,
                 "end_time": end_time.isoformat() if end_time else None,
@@ -263,8 +334,6 @@ async def analyze_trend(
     Returns:
         AnalysisResult: 分析结果
     """
-    provider = provider or settings.default_ai_provider
-
     try:
         # 获取数据
         records, total = get_call_records(
@@ -295,13 +364,15 @@ async def analyze_trend(
             prompt += f"\n\n请特别关注：{focus}"
 
         # 调用 AI
-        client = _get_ai_client(provider)
-        response = await client.analyze(data_text, prompt, system_prompt=system_prompt)
+        provider_id, client, model = _resolve_ai_client(session, provider)
+        response = await client.analyze(
+            data_text, prompt, system_prompt=system_prompt, model=model
+        )
 
         # 保存结果
         result = AnalysisResult(
             analysis_type=AnalysisType.TREND,
-            ai_provider=provider,
+            ai_provider=provider_id,
             data_range={
                 "start_time": start_time.isoformat() if start_time else None,
                 "end_time": end_time.isoformat() if end_time else None,
@@ -348,8 +419,6 @@ async def chat_with_data(
     Returns:
         AnalysisResult: 分析结果
     """
-    provider = provider or settings.default_ai_provider
-
     try:
         # 获取数据作为上下文
         records, total = get_call_records(
@@ -376,13 +445,13 @@ async def chat_with_data(
             ]
 
         # 调用 AI
-        client = _get_ai_client(provider)
-        response = await client.answer_question(context, question, chat_history)
+        provider_id, client, model = _resolve_ai_client(session, provider)
+        response = await client.answer_question(context, question, chat_history, model=model)
 
         # 保存结果
         result = AnalysisResult(
             analysis_type=AnalysisType.QA,
-            ai_provider=provider,
+            ai_provider=provider_id,
             query=question,
             data_range={
                 "start_time": start_time.isoformat() if start_time else None,

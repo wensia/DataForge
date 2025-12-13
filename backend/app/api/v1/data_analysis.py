@@ -390,17 +390,28 @@ async def get_analysis_history(
 
 
 @router.get("/providers", response_model=ResponseModel)
-async def get_ai_providers() -> ResponseModel:
+async def get_ai_providers(
+    session: Session = Depends(get_session),
+) -> ResponseModel:
     """获取可用的 AI 服务列表
 
     Returns:
         ResponseModel: AI 服务列表
     """
     from app.config import settings
+    from app.models.ai_config import AIConfig
+    from sqlmodel import select
 
-    providers = []
+    active_providers = set(
+        session.exec(
+            select(AIConfig.provider).where(AIConfig.is_active == True)  # noqa: E712
+        ).all()
+    )
 
-    if settings.kimi_api_key:
+    providers: list[dict[str, object]] = []
+
+    kimi_available = ("kimi" in active_providers) or bool(settings.kimi_api_key)
+    if kimi_available:
         providers.append(
             {
                 "id": "kimi",
@@ -414,12 +425,13 @@ async def get_ai_providers() -> ResponseModel:
             {
                 "id": "kimi",
                 "name": "Kimi (月之暗面)",
-                "description": "未配置 API 密钥",
+                "description": "未配置（请在系统设置 -> AI 配置中添加并启用，或在 .env 中配置 KIMI_API_KEY）",
                 "available": False,
             }
         )
 
-    if settings.deepseek_api_key:
+    deepseek_available = ("deepseek" in active_providers) or bool(settings.deepseek_api_key)
+    if deepseek_available:
         providers.append(
             {
                 "id": "deepseek",
@@ -433,14 +445,19 @@ async def get_ai_providers() -> ResponseModel:
             {
                 "id": "deepseek",
                 "name": "DeepSeek",
-                "description": "未配置 API 密钥",
+                "description": "未配置（请在系统设置 -> AI 配置中添加并启用，或在 .env 中配置 DEEPSEEK_API_KEY）",
                 "available": False,
             }
         )
 
+    available_ids = [p["id"] for p in providers if p.get("available")]
+    default_provider = settings.default_ai_provider
+    if available_ids and default_provider not in available_ids:
+        default_provider = str(available_ids[0])
+
     return ResponseModel(
         data={
             "providers": providers,
-            "default": settings.default_ai_provider,
+            "default": default_provider,
         }
     )
