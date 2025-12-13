@@ -1,0 +1,69 @@
+# DataForge 生产环境 Docker Compose
+# 使用 GitHub Container Registry 预构建镜像
+
+services:
+  # ===== Nginx 反向代理 =====
+  nginx:
+    image: nginx:alpine
+    container_name: dataforge-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===== FastAPI 后端（预构建镜像）=====
+  backend:
+    image: ghcr.io/${GITHUB_OWNER:-panyuhang}/dataforge-backend:latest
+    container_name: dataforge-backend
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    volumes:
+      - backend-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8847/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+  # ===== React 前端（预构建镜像）=====
+  frontend:
+    image: ghcr.io/${GITHUB_OWNER:-panyuhang}/dataforge-frontend:latest
+    container_name: dataforge-frontend
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  dataforge-network:
+    driver: bridge
+
+volumes:
+  backend-logs:
+    name: dataforge-backend-logs

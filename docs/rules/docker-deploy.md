@@ -263,3 +263,98 @@ sudo systemctl start nginx
 - 使用 `docker stats` 监控容器资源使用
 - 配置日志轮转避免磁盘占满
 - 定期备份数据库（使用宿主机 cron）
+
+---
+
+## CI/CD 自动部署（GitHub Actions）
+
+### 工作流程
+
+```
+代码推送到 main → GitHub Actions 构建镜像 → 推送到 GHCR → SSH 部署到服务器
+```
+
+### 配置步骤
+
+#### 1. 配置 GitHub Secrets
+
+在 GitHub 仓库 → Settings → Secrets and variables → Actions 添加：
+
+| Secret 名称 | 说明 | 示例值 |
+|------------|------|--------|
+| `SERVER_HOST` | 服务器 IP | `124.220.15.80` |
+| `SERVER_USER` | SSH 用户名 | `ubuntu` |
+| `SERVER_SSH_KEY` | SSH 私钥内容 | `-----BEGIN OPENSSH...` |
+
+#### 2. 设置仓库包权限
+
+GitHub 仓库 → Settings → Actions → General：
+- Workflow permissions: 选择 **Read and write permissions**
+
+#### 3. 首次服务器配置
+
+```bash
+# SSH 到服务器
+ssh ubuntu@124.220.15.80
+
+# 进入部署目录
+cd /www/wwwroot/yunke-transit
+
+# 拉取最新代码（获取 docker-compose.prod.yml）
+git pull
+
+# 配置环境变量
+cp docker/.env.example docker/.env
+vim docker/.env
+
+# 设置 GitHub Token（用于拉取私有镜像）
+# 在 GitHub → Settings → Developer settings → Personal access tokens 创建
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+echo "export GITHUB_TOKEN=ghp_xxxxxxxxxxxx" >> ~/.bashrc
+```
+
+### 部署文件说明
+
+| 文件 | 用途 |
+|------|------|
+| `docker-compose.yml` | 本地开发（本地构建镜像） |
+| `docker-compose.prod.yml` | 生产环境（拉取预构建镜像） |
+| `.github/workflows/deploy.yml` | CI/CD 工作流 |
+| `scripts/deploy.sh` | 手动部署脚本 |
+
+### 自动部署
+
+推送代码到 `main` 分支即可触发自动部署：
+
+```bash
+git add .
+git commit -m "feat: 新功能"
+git push origin main
+# GitHub Actions 自动构建并部署
+```
+
+### 手动部署
+
+```bash
+# 在服务器上执行
+cd /www/wwwroot/yunke-transit
+./scripts/deploy.sh
+```
+
+### 查看部署状态
+
+1. GitHub 仓库 → Actions 查看构建日志
+2. 服务器上执行 `docker compose -f docker-compose.prod.yml ps`
+
+### 回滚到指定版本
+
+```bash
+# 拉取指定 commit 的镜像
+docker pull ghcr.io/你的用户名/dataforge-backend:abc1234
+docker pull ghcr.io/你的用户名/dataforge-frontend:abc1234
+
+# 修改 docker-compose.prod.yml 中的镜像 tag
+# 或设置环境变量
+export IMAGE_TAG=abc1234
+docker compose -f docker-compose.prod.yml up -d
+```
