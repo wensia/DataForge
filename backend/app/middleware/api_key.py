@@ -36,6 +36,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/api/v1/auth/login",  # 用户登录
         "/api/v1/auth/me",  # 获取当前用户（需要JWT，不需要API Key）
         "/api/v1/record-proxy/stream",  # 录音代理（前端播放）
+        "/api/v1/chat/providers",  # AI 服务商列表（公开）
         "/docs",  # Swagger UI
         "/redoc",  # ReDoc
         "/openapi.json",  # OpenAPI Schema
