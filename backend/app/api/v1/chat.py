@@ -3,7 +3,7 @@
 提供 AI 对话的创建、消息发送、历史记录等接口。
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from loguru import logger
 from sqlmodel import Session
 
@@ -121,7 +121,7 @@ async def get_conversation(
     )
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="对话不存在")
+        return ResponseModel.error(code=404, message="对话不存在")
 
     result = ConversationResponse.model_validate(conversation).model_dump()
 
@@ -162,7 +162,7 @@ async def update_conversation(
     )
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="对话不存在")
+        return ResponseModel.error(code=404, message="对话不存在")
 
     return ResponseModel(
         data=ConversationResponse.model_validate(conversation).model_dump()
@@ -190,7 +190,7 @@ async def delete_conversation(
     )
 
     if not success:
-        raise HTTPException(status_code=404, detail="对话不存在")
+        return ResponseModel.error(code=404, message="对话不存在")
 
     return ResponseModel(message="删除成功")
 
@@ -224,7 +224,7 @@ async def get_messages(
     )
 
     if not conversation:
-        raise HTTPException(status_code=404, detail="对话不存在")
+        return ResponseModel.error(code=404, message="对话不存在")
 
     offset = (page - 1) * page_size
 
@@ -282,7 +282,7 @@ async def send_message(
 
     except ChatServiceError as e:
         logger.error(f"发送消息失败: {e.message}")
-        raise HTTPException(status_code=400, detail=e.message)
+        return ResponseModel.error(code=500, message=e.message)
 
 
 # ============ 辅助接口 ============
