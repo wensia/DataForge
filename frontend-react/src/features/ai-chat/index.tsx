@@ -17,11 +17,6 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
-import { Search } from '@/components/search'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -197,17 +192,8 @@ export function AIChat() {
   }, [])
 
   return (
-    <>
-      <Header>
-        <Search />
-        <div className="ms-auto flex items-center space-x-4">
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main fixed>
-        <section className="flex h-full gap-6">
+    <div className="flex h-screen flex-col overflow-hidden">
+      <section className="flex h-full gap-6 px-4 py-6">
           {/* 左侧：对话列表 */}
           <div className="flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80">
             <div className="bg-background sticky top-0 z-10 -mx-4 px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none">
@@ -448,8 +434,7 @@ export function AIChat() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </Main>
-    </>
+    </div>
   )
 }
 
