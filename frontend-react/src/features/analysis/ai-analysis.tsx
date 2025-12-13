@@ -1,7 +1,7 @@
 /**
  * AI 分析页面
  */
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { BarChart3, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
@@ -57,9 +57,11 @@ export function AIAnalysis() {
     [providersData]
   )
 
-  // 初始化默认 provider
+  // 初始化默认 provider（只在首次加载时设置）
+  const hasInitializedProvider = useRef(false)
   useEffect(() => {
-    if (providersData?.default && !selectedProvider) {
+    if (providersData?.default && !hasInitializedProvider.current) {
+      hasInitializedProvider.current = true
       setSelectedProvider(providersData.default)
     }
   }, [providersData?.default])
