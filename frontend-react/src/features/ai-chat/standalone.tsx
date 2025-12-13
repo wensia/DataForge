@@ -64,7 +64,7 @@ import {
 import { useChatStream } from './hooks/use-chat-stream'
 import { MarkdownContent } from './components/markdown-content'
 import type { Conversation, Message } from './types'
-import { useTheme } from '@/context/theme-context'
+import { useTheme } from '@/context/theme-provider'
 
 export function StandaloneAIChat() {
   const [selectedId, setSelectedId] = useState<number | null>(null)

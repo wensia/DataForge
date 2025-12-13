@@ -46,6 +46,7 @@ import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAnalysisStaffMappingRouteImport } from './routes/_authenticated/analysis/staff-mapping'
 import { Route as AuthenticatedAnalysisChatRouteImport } from './routes/_authenticated/analysis/chat'
 import { Route as AuthenticatedAnalysisAiRouteImport } from './routes/_authenticated/analysis/ai'
+import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authenticated/admin/pages'
 
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
@@ -248,6 +249,11 @@ const AuthenticatedAnalysisAiRoute = AuthenticatedAnalysisAiRouteImport.update({
   path: '/analysis/ai',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAdminPagesRoute = AuthenticatedAdminPagesRouteImport.update({
+  id: '/admin/pages',
+  path: '/admin/pages',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
@@ -265,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AuthenticatedAccountsRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByTo {
   '/accounts': typeof AuthenticatedAccountsRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
+  '/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
@@ -342,6 +350,7 @@ export interface FileRoutesById {
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
   '/_authenticated/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/_authenticated/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/_authenticated/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
@@ -382,6 +391,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/task-executions'
     | '/'
+    | '/admin/pages'
     | '/analysis/ai'
     | '/analysis/chat'
     | '/analysis/staff-mapping'
@@ -419,6 +429,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/task-executions'
     | '/'
+    | '/admin/pages'
     | '/analysis/ai'
     | '/analysis/chat'
     | '/analysis/staff-mapping'
@@ -458,6 +469,7 @@ export interface FileRouteTypes {
     | '/_authenticated/accounts'
     | '/_authenticated/task-executions'
     | '/_authenticated/'
+    | '/_authenticated/admin/pages'
     | '/_authenticated/analysis/ai'
     | '/_authenticated/analysis/chat'
     | '/_authenticated/analysis/staff-mapping'
@@ -757,6 +769,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalysisAiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/pages': {
+      id: '/_authenticated/admin/pages'
+      path: '/admin/pages'
+      fullPath: '/admin/pages'
+      preLoaderRoute: typeof AuthenticatedAdminPagesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -798,6 +817,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedTaskExecutionsRoute: typeof AuthenticatedTaskExecutionsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
   AuthenticatedAnalysisAiRoute: typeof AuthenticatedAnalysisAiRoute
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
@@ -816,6 +836,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedTaskExecutionsRoute: AuthenticatedTaskExecutionsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
   AuthenticatedAnalysisAiRoute: AuthenticatedAnalysisAiRoute,
   AuthenticatedAnalysisChatRoute: AuthenticatedAnalysisChatRoute,
   AuthenticatedAnalysisStaffMappingRoute:

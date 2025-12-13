@@ -1,5 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Eye, EyeOff, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

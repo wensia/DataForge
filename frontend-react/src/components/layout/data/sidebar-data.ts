@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Mic,
   UserRoundCog,
+  Layers,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -127,6 +128,11 @@ export const sidebarData: SidebarData = {
           title: '用户管理',
           url: '/settings/users',
           icon: Users,
+        },
+        {
+          title: '页面管理',
+          url: '/admin/pages',
+          icon: Layers,
         },
         {
           title: '个人设置',
