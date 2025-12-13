@@ -6,33 +6,22 @@
 - 用户获取分配给自己的话术
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 
 from app.database import get_session
 from app.models import (
+    AssignUsersRequest,
     Prompt,
     PromptAssignment,
     PromptCreate,
     PromptUpdate,
-    PromptResponse,
-    PromptWithAssignments,
-    AssignUsersRequest,
-    PromptAssignmentResponse,
     User,
-    UserRole,
 )
 from app.schemas.response import ResponseModel
-from app.api.v1.auth import get_current_user
+from app.utils.jwt_auth import TokenPayload, get_current_user, require_admin
 
 router = APIRouter(prefix="/prompts", tags=["prompts"])
-
-
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """要求管理员权限"""
-    if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="需要管理员权限")
-    return current_user
 
 
 # ============ 话术管理 API (仅管理员) ============
@@ -46,7 +35,7 @@ async def get_prompts(
     is_active: bool | None = None,
     search: str | None = None,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """获取话术列表（分页）"""
     query = select(Prompt)
@@ -96,12 +85,12 @@ async def get_prompts(
 async def create_prompt(
     data: PromptCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """创建话术"""
     prompt = Prompt(
         **data.model_dump(),
-        created_by=current_user.id,
+        created_by=current_user.user_id,
     )
     session.add(prompt)
     session.commit()
@@ -113,7 +102,7 @@ async def create_prompt(
 @router.get("/categories", response_model=ResponseModel)
 async def get_categories(
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """获取所有分类"""
     query = select(Prompt.category).where(Prompt.category.isnot(None)).distinct()
@@ -124,13 +113,13 @@ async def get_categories(
 @router.get("/my", response_model=ResponseModel)
 async def get_my_prompts(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
     """获取分配给当前用户的话术列表"""
     query = (
         select(Prompt)
         .join(PromptAssignment, Prompt.id == PromptAssignment.prompt_id)
-        .where(PromptAssignment.user_id == current_user.id)
+        .where(PromptAssignment.user_id == current_user.user_id)
         .where(Prompt.is_active == True)
         .order_by(Prompt.sort_order, Prompt.created_at.desc())
     )
@@ -143,7 +132,7 @@ async def get_my_prompts(
 async def get_prompt(
     prompt_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """获取话术详情"""
     prompt = session.get(Prompt, prompt_id)
@@ -181,7 +170,7 @@ async def update_prompt(
     prompt_id: int,
     data: PromptUpdate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """更新话术"""
     prompt = session.get(Prompt, prompt_id)
@@ -203,7 +192,7 @@ async def update_prompt(
 async def delete_prompt(
     prompt_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """删除话术"""
     prompt = session.get(Prompt, prompt_id)
@@ -232,7 +221,7 @@ async def delete_prompt(
 async def get_prompt_assignments(
     prompt_id: int,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """获取话术的用户分配列表"""
     prompt = session.get(Prompt, prompt_id)
@@ -266,7 +255,7 @@ async def assign_users(
     prompt_id: int,
     data: AssignUsersRequest,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """批量分配用户到话术"""
     prompt = session.get(Prompt, prompt_id)
@@ -303,7 +292,7 @@ async def unassign_users(
     prompt_id: int,
     data: AssignUsersRequest,
     session: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: TokenPayload = Depends(require_admin),
 ):
     """批量取消分配用户"""
     prompt = session.get(Prompt, prompt_id)
