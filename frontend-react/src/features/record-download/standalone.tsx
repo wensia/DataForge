@@ -281,8 +281,8 @@ export function StandaloneRecordDownload() {
                   placeholder="粘贴云客录音详情页 URL，例如：https://crm.yunkecn.com/cms/customer/callDetail?voiceId=phone-xxx..."
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  rows={4}
-                  className="resize-none font-mono text-xs [field-sizing:fixed]"
+                  className="!h-24 !min-h-24 !max-h-24 resize-none overflow-auto font-mono text-xs"
+                  style={{ fieldSizing: 'fixed' } as React.CSSProperties}
                 />
               </div>
 
