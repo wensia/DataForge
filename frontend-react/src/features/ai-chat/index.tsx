@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Bot,
   StopCircle,
+  Pencil,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -49,6 +50,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
   ChatContainer,
   ChatMessages,
   ChatBubble,
@@ -61,6 +72,7 @@ import {
   useConversation,
   useProviders,
   useCreateConversation,
+  useUpdateConversation,
   useDeleteConversation,
 } from './api'
 import { useChatStream } from './hooks/use-chat-stream'
@@ -75,6 +87,11 @@ export function AIChat() {
   const [conversationToDelete, setConversationToDelete] = useState<
     number | null
   >(null)
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+  const [conversationToRename, setConversationToRename] = useState<
+    Conversation | null
+  >(null)
+  const [newTitle, setNewTitle] = useState('')
 
   // API Hooks
   const { data: conversationsData, isLoading: isLoadingConversations } =
@@ -83,6 +100,7 @@ export function AIChat() {
     useConversation(selectedId)
   const { data: providers } = useProviders()
   const createMutation = useCreateConversation()
+  const updateMutation = useUpdateConversation()
   const deleteMutation = useDeleteConversation()
 
   // 流式聊天 Hook
@@ -128,6 +146,31 @@ export function AIChat() {
     } finally {
       setDeleteDialogOpen(false)
       setConversationToDelete(null)
+    }
+  }
+
+  // 打开重命名对话框
+  const handleOpenRename = (conversation: Conversation) => {
+    setConversationToRename(conversation)
+    setNewTitle(conversation.title)
+    setRenameDialogOpen(true)
+  }
+
+  // 重命名对话
+  const handleRenameConversation = async () => {
+    if (!conversationToRename || !newTitle.trim()) return
+    try {
+      await updateMutation.mutateAsync({
+        conversationId: conversationToRename.id,
+        data: { title: newTitle.trim() },
+      })
+      toast.success('重命名成功')
+    } catch {
+      toast.error('重命名失败')
+    } finally {
+      setRenameDialogOpen(false)
+      setConversationToRename(null)
+      setNewTitle('')
     }
   }
 
@@ -226,6 +269,7 @@ export function AIChat() {
                     conversation={conv}
                     isSelected={selectedId === conv.id}
                     onSelect={() => setSelectedId(conv.id)}
+                    onRename={() => handleOpenRename(conv)}
                     onDelete={() => {
                       setConversationToDelete(conv.id)
                       setDeleteDialogOpen(true)
@@ -355,6 +399,48 @@ export function AIChat() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* 重命名对话框 */}
+        <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>重命名对话</DialogTitle>
+              <DialogDescription>
+                为对话设置一个新的名称
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="title">对话名称</Label>
+                <Input
+                  id="title"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="输入对话名称"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRenameConversation()
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={handleRenameConversation}
+                disabled={!newTitle.trim() || updateMutation.isPending}
+              >
+                {updateMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Main>
     </>
   )
@@ -365,11 +451,13 @@ function ConversationItem({
   conversation,
   isSelected,
   onSelect,
+  onRename,
   onDelete,
 }: {
   conversation: Conversation
   isSelected: boolean
   onSelect: () => void
+  onRename: () => void
   onDelete: () => void
 }) {
   return (
@@ -399,6 +487,15 @@ function ConversationItem({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation()
+                onRename()
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              重命名
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive"
               onClick={(e) => {
