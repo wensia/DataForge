@@ -288,14 +288,6 @@ async def send_message(
             if msg.id != user_message.id
         ]
 
-        # 添加系统提示（如果是数据分析对话）
-        if conversation.conversation_type == ConversationType.DATA_ANALYSIS:
-            system_prompt = """你是一个专业的数据分析助手。你可以使用提供的工具来查询通话记录数据。
-当用户询问与通话数据相关的问题时，请使用工具获取数据，然后基于数据给出分析和回答。
-如果需要知道当前日期（例如计算"最近一周"），请先调用 get_current_date 工具。
-请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
-            chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
-
         # 添加当前用户消息
         chat_history.append(AIChatMessage(role="user", content=content))
 
@@ -305,6 +297,14 @@ async def send_message(
 
         # 检查是否支持 Function Calling (目前只有 DeepSeek 支持)
         use_tools = enable_tools and isinstance(client, DeepSeekClient)
+
+        # 添加系统提示（如果启用工具或是数据分析对话）
+        if use_tools or conversation.conversation_type == ConversationType.ANALYSIS:
+            system_prompt = """你是一个专业的数据分析助手。你可以使用提供的工具来查询通话记录数据。
+当用户询问与通话数据相关的问题时，请使用工具获取数据，然后基于数据给出分析和回答。
+如果需要知道当前日期（例如计算"最近一周"），请先调用 get_current_date 工具。
+请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
+            chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
         total_tokens = 0
         final_content = ""
 
