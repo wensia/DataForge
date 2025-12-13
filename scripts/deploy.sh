@@ -17,7 +17,7 @@ print_msg() {
 
 # 配置
 DEPLOY_DIR="/www/wwwroot/yunke-transit"
-GITHUB_OWNER="panyuhang"  # 替换为你的 GitHub 用户名
+GITHUB_OWNER="wensia"  # GitHub 用户名
 REGISTRY="ghcr.io"
 
 # 检查是否在正确目录

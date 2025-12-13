@@ -29,7 +29,7 @@ services:
 
   # ===== FastAPI 后端（预构建镜像）=====
   backend:
-    image: ghcr.io/${GITHUB_OWNER:-panyuhang}/dataforge-backend:latest
+    image: ghcr.io/${GITHUB_OWNER:-wensia}/dataforge-backend:latest
     container_name: dataforge-backend
     env_file:
       - ./docker/.env
@@ -49,7 +49,7 @@ services:
 
   # ===== React 前端（预构建镜像）=====
   frontend:
-    image: ghcr.io/${GITHUB_OWNER:-panyuhang}/dataforge-frontend:latest
+    image: ghcr.io/${GITHUB_OWNER:-wensia}/dataforge-frontend:latest
     container_name: dataforge-frontend
     networks:
       - dataforge-network
