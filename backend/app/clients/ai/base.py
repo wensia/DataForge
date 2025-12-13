@@ -1,7 +1,7 @@
 """AI 客户端基类定义"""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -262,7 +262,9 @@ class AIClient(ABC):
             )
         )
         messages.append(
-            ChatMessage(role="assistant", content="好的，我已经了解这些数据。请问您想了解什么？")
+            ChatMessage(
+                role="assistant", content="好的，我已经了解这些数据。请问您想了解什么？"
+            )
         )
 
         # 添加历史对话

@@ -3,7 +3,14 @@
 支持 Kimi 和 DeepSeek 等 AI 服务。
 """
 
-from app.clients.ai.base import AIClient, AIClientError, ChatMessage
+from app.clients.ai.base import (
+    AIClient,
+    AIClientError,
+    ChatMessage,
+    ChatResponse,
+    FunctionCall,
+    ToolCall,
+)
 from app.clients.ai.deepseek import DeepSeekClient
 from app.clients.ai.kimi import KimiClient
 
@@ -11,6 +18,9 @@ __all__ = [
     "AIClient",
     "AIClientError",
     "ChatMessage",
+    "ChatResponse",
+    "FunctionCall",
+    "ToolCall",
     "KimiClient",
     "DeepSeekClient",
 ]

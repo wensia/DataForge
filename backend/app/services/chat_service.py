@@ -1,6 +1,7 @@
 """对话服务
 
 提供 AI 对话功能，支持多轮会话和历史记录管理。
+支持 Function Calling 让 AI 自主查询数据库。
 """
 
 from datetime import datetime
@@ -9,16 +10,19 @@ from loguru import logger
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from app.clients.ai import AIClientError, ChatMessage as AIChatMessage
+from app.clients.ai import AIClientError
+from app.clients.ai import ChatMessage as AIChatMessage
+from app.clients.ai.deepseek import DeepSeekClient
 from app.models.conversation import (
     Conversation,
     ConversationCreate,
-    ConversationUpdate,
     ConversationType,
+    ConversationUpdate,
     Message,
     MessageRole,
 )
-from app.services.ai_analysis_service import _resolve_ai_client, AIAnalysisError
+from app.services.ai_analysis_service import AIAnalysisError, _resolve_ai_client
+from app.services.chat_tools import CHAT_TOOLS, execute_tool
 
 
 class ChatServiceError(Exception):
@@ -233,8 +237,11 @@ async def send_message(
     user_id: int,
     content: str,
     ai_provider: str | None = None,
+    enable_tools: bool = True,
 ) -> tuple[Message, Message]:
     """发送消息并获取 AI 回复
+
+    支持 Function Calling，让 AI 可以自主查询数据库。
 
     Args:
         session: 数据库会话
@@ -242,6 +249,7 @@ async def send_message(
         user_id: 用户 ID
         content: 用户消息内容
         ai_provider: 临时使用的 AI 提供商
+        enable_tools: 是否启用工具调用 (Function Calling)
 
     Returns:
         tuple[Message, Message]: (用户消息, AI 回复消息)
@@ -274,11 +282,19 @@ async def send_message(
         )
 
         # 构建消息历史（不包括刚添加的用户消息）
-        chat_history = [
+        chat_history: list[AIChatMessage] = [
             AIChatMessage(role=msg.role, content=msg.content)
             for msg in history_messages
             if msg.id != user_message.id
         ]
+
+        # 添加系统提示（如果是数据分析对话）
+        if conversation.conversation_type == ConversationType.DATA_ANALYSIS:
+            system_prompt = """你是一个专业的数据分析助手。你可以使用提供的工具来查询通话记录数据。
+当用户询问与通话数据相关的问题时，请使用工具获取数据，然后基于数据给出分析和回答。
+如果需要知道当前日期（例如计算"最近一周"），请先调用 get_current_date 工具。
+请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
+            chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
 
         # 添加当前用户消息
         chat_history.append(AIChatMessage(role="user", content=content))
@@ -287,15 +303,77 @@ async def send_message(
         provider = ai_provider or conversation.ai_provider
         provider_id, client, model = _resolve_ai_client(session, provider)
 
-        # 调用 AI
-        response = await client.chat(chat_history, model=model)
+        # 检查是否支持 Function Calling (目前只有 DeepSeek 支持)
+        use_tools = enable_tools and isinstance(client, DeepSeekClient)
+        total_tokens = 0
+        final_content = ""
+
+        if use_tools:
+            # 使用 Function Calling
+            response = await client.chat_with_tools(
+                chat_history,
+                tools=CHAT_TOOLS,
+                model=model,
+            )
+            total_tokens += response.tokens_used or 0
+
+            # 处理工具调用循环（最多 5 轮）
+            max_iterations = 5
+            iteration = 0
+
+            while response.tool_calls and iteration < max_iterations:
+                iteration += 1
+                logger.info(
+                    f"工具调用第 {iteration} 轮: {[tc.function.name for tc in response.tool_calls]}"
+                )
+
+                # 添加 AI 的工具调用请求到历史
+                chat_history.append(
+                    AIChatMessage(
+                        role="assistant",
+                        content=response.content,
+                        tool_calls=response.tool_calls,
+                    )
+                )
+
+                # 执行每个工具调用
+                for tool_call in response.tool_calls:
+                    tool_result = await execute_tool(
+                        session,
+                        tool_call.function.name,
+                        tool_call.function.arguments,
+                    )
+
+                    # 添加工具结果到历史
+                    chat_history.append(
+                        AIChatMessage(
+                            role="tool",
+                            content=tool_result,
+                            tool_call_id=tool_call.id,
+                        )
+                    )
+
+                # 继续对话，获取 AI 的下一步响应
+                response = await client.chat_with_tools(
+                    chat_history,
+                    tools=CHAT_TOOLS,
+                    model=model,
+                )
+                total_tokens += response.tokens_used or 0
+
+            final_content = response.content
+        else:
+            # 普通对话
+            response = await client.chat(chat_history, model=model)
+            total_tokens = response.tokens_used or 0
+            final_content = response.content
 
         # 保存 AI 回复
         assistant_message = Message(
             conversation_id=conversation_id,
             role=MessageRole.ASSISTANT,
-            content=response.content,
-            tokens_used=response.tokens_used,
+            content=final_content,
+            tokens_used=total_tokens,
             created_at=datetime.now(),
             updated_at=datetime.now(),
         )
@@ -320,7 +398,8 @@ async def send_message(
 
         logger.info(
             f"对话消息: conversation_id={conversation_id}, "
-            f"provider={provider_id}, tokens={response.tokens_used}"
+            f"provider={provider_id}, tokens={total_tokens}, "
+            f"tools_enabled={use_tools}"
         )
 
         return user_message, assistant_message
@@ -356,11 +435,13 @@ def get_available_providers(session: Session) -> list[dict]:
 
     for cfg in configs:
         if cfg.provider not in seen:
-            providers.append({
-                "id": cfg.provider,
-                "name": cfg.name or cfg.provider.upper(),
-                "default_model": cfg.default_model,
-            })
+            providers.append(
+                {
+                    "id": cfg.provider,
+                    "name": cfg.name or cfg.provider.upper(),
+                    "default_model": cfg.default_model,
+                }
+            )
             seen.add(cfg.provider)
 
     return providers
