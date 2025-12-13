@@ -282,7 +282,7 @@ export function StandaloneRecordDownload() {
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   rows={4}
-                  className="resize-none font-mono text-xs"
+                  className="resize-none font-mono text-xs [field-sizing:fixed]"
                 />
               </div>
 
