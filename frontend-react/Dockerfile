@@ -32,6 +32,9 @@ RUN --mount=type=cache,target=/app/node_modules/.cache \
 # 生产阶段 - 使用 Nginx 服务静态文件
 FROM nginx:alpine AS production
 
+# 安装 curl 用于健康检查
+RUN apk add --no-cache curl
+
 # 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
 
@@ -42,8 +45,8 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://localhost/health || exit 1
 
 # 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]
