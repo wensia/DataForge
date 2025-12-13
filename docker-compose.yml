@@ -9,10 +9,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      - TZ=Asia/Shanghai
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       backend:
         condition: service_healthy
@@ -33,6 +36,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: dataforge-backend
+    environment:
+      - TZ=Asia/Shanghai
     env_file:
       - ./docker/.env
     extra_hosts:
@@ -43,6 +48,7 @@ services:
     restart: unless-stopped
     volumes:
       - backend-logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8847/api/v1/health"]
       interval: 30s
@@ -58,6 +64,10 @@ services:
       args:
         - VITE_API_BASE_URL=/api/v1
     container_name: dataforge-frontend
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     networks:
       - dataforge-network
     restart: unless-stopped
