@@ -341,8 +341,8 @@ export function AIChat() {
                       onEdit={(content) => setInputMessage(content)}
                     />
                   ))}
-                  {/* 待发送的用户消息（立即显示） */}
-                  {pendingUserMessage && (
+                  {/* 待发送的用户消息（立即显示，直到消息出现在列表中） */}
+                  {pendingUserMessage && !messages.some(m => m.role === 'user' && m.content === pendingUserMessage) && (
                     <ChatBubble variant="user" showCopy={false}>
                       <div className="whitespace-pre-wrap break-words">{pendingUserMessage}</div>
                     </ChatBubble>

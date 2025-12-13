@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 
 // SSE 事件类型
@@ -60,12 +61,15 @@ export function useChatStream({
         return
       }
 
-      // 清理之前的状态
-      setError(null)
-      setStreamingContent('')
-      setStreamingReasoning('')
-      setPendingUserMessage(content) // 立即显示用户消息
-      setIsStreaming(true)
+      // 清理之前的状态并立即显示用户消息
+      // 使用 flushSync 强制同步更新，确保用户消息在 fetch 开始前渲染
+      flushSync(() => {
+        setError(null)
+        setStreamingContent('')
+        setStreamingReasoning('')
+        setPendingUserMessage(content) // 立即显示用户消息
+        setIsStreaming(true)
+      })
 
       // 创建 AbortController 用于取消请求
       abortControllerRef.current = new AbortController()
@@ -135,8 +139,9 @@ export function useChatStream({
 
               switch (event.type) {
                 case 'start':
-                  // 用户消息已保存到数据库，清除待发送消息并刷新列表
-                  setPendingUserMessage(null)
+                  // 用户消息已保存到数据库，刷新消息列表
+                  // 注意：不在这里清除 pendingUserMessage，由组件根据消息列表判断是否显示
+                  // 这样可以避免消息闪烁（pending消息消失但query还没刷新的间隙）
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversation', conversationId],
                   })
