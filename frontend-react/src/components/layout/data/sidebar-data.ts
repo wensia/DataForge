@@ -91,6 +91,16 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
+      title: 'AI 对话',
+      items: [
+        {
+          title: 'AI 对话',
+          url: '/ai-chat',
+          icon: Bot,
+        },
+      ],
+    },
+    {
       title: '系统设置',
       items: [
         {

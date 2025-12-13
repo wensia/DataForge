@@ -31,6 +31,7 @@ import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAnalysisIndexRouteImport } from './routes/_authenticated/analysis/index'
+import { Route as AuthenticatedAiChatIndexRouteImport } from './routes/_authenticated/ai-chat/index'
 import { Route as AuthenticatedSettingsUsersRouteImport } from './routes/_authenticated/settings/users'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsFeishuRouteImport } from './routes/_authenticated/settings/feishu'
@@ -159,6 +160,12 @@ const AuthenticatedAnalysisIndexRoute =
     path: '/analysis/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAiChatIndexRoute =
+  AuthenticatedAiChatIndexRouteImport.update({
+    id: '/ai-chat/',
+    path: '/ai-chat/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsUsersRoute =
   AuthenticatedSettingsUsersRouteImport.update({
     id: '/users',
@@ -264,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
@@ -299,6 +307,7 @@ export interface FileRoutesByTo {
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
@@ -337,6 +346,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/_authenticated/ai-chat/': typeof AuthenticatedAiChatIndexRoute
   '/_authenticated/analysis/': typeof AuthenticatedAnalysisIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
@@ -375,6 +385,7 @@ export interface FileRouteTypes {
     | '/settings/feishu'
     | '/settings/notifications'
     | '/settings/users'
+    | '/ai-chat'
     | '/analysis'
     | '/apps'
     | '/chats'
@@ -410,6 +421,7 @@ export interface FileRouteTypes {
     | '/settings/feishu'
     | '/settings/notifications'
     | '/settings/users'
+    | '/ai-chat'
     | '/analysis'
     | '/apps'
     | '/chats'
@@ -447,6 +459,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/feishu'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/settings/users'
+    | '/_authenticated/ai-chat/'
     | '/_authenticated/analysis/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
@@ -626,6 +639,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalysisIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-chat/': {
+      id: '/_authenticated/ai-chat/'
+      path: '/ai-chat'
+      fullPath: '/ai-chat'
+      preLoaderRoute: typeof AuthenticatedAiChatIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings/users': {
       id: '/_authenticated/settings/users'
       path: '/users'
@@ -762,6 +782,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedAiChatIndexRoute: typeof AuthenticatedAiChatIndexRoute
   AuthenticatedAnalysisIndexRoute: typeof AuthenticatedAnalysisIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
@@ -780,6 +801,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalysisStaffMappingRoute:
     AuthenticatedAnalysisStaffMappingRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedAiChatIndexRoute: AuthenticatedAiChatIndexRoute,
   AuthenticatedAnalysisIndexRoute: AuthenticatedAnalysisIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,

@@ -8,6 +8,7 @@ from app.api.v1 import (
     api_keys,
     asr_config,
     auth,
+    chat,
     data_analysis,
     feishu_config,
     health,
@@ -36,3 +37,4 @@ router.include_router(asr_config.router)
 router.include_router(record_proxy.router)
 router.include_router(user_preferences.router)
 router.include_router(staff_mapping.router)
+router.include_router(chat.router)
