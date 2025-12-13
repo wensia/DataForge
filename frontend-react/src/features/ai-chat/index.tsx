@@ -31,6 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +69,7 @@ export function AIChat() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [inputMessage, setInputMessage] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [useDeepThinking, setUseDeepThinking] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -131,6 +140,7 @@ export function AIChat() {
         data: {
           content,
           ai_provider: selectedProvider || undefined,
+          use_deep_thinking: useDeepThinking,
         },
       })
     } catch {
@@ -287,6 +297,32 @@ export function AIChat() {
                       <Send />
                     )}
                   </Button>
+                </div>
+                {/* 深度思考开关 */}
+                <div className="flex items-center justify-end gap-2 mt-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="deep-thinking"
+                            checked={useDeepThinking}
+                            onCheckedChange={setUseDeepThinking}
+                          />
+                          <Label
+                            htmlFor="deep-thinking"
+                            className="text-sm text-muted-foreground cursor-pointer"
+                          >
+                            深度思考
+                          </Label>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>启用后 AI 会进行更深入的思考分析</p>
+                        <p className="text-xs text-muted-foreground">仅 DeepSeek 支持</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
             </div>

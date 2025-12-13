@@ -238,10 +238,11 @@ async def send_message(
     content: str,
     ai_provider: str | None = None,
     enable_tools: bool = True,
+    use_deep_thinking: bool = True,
 ) -> tuple[Message, Message]:
     """发送消息并获取 AI 回复
 
-    支持 Function Calling，让 AI 可以自主查询数据库。
+    支持 Function Calling 和深度思考模式。
 
     Args:
         session: 数据库会话
@@ -250,6 +251,7 @@ async def send_message(
         content: 用户消息内容
         ai_provider: 临时使用的 AI 提供商
         enable_tools: 是否启用工具调用 (Function Calling)
+        use_deep_thinking: 是否启用深度思考模式 (DeepSeek Reasoner)
 
     Returns:
         tuple[Message, Message]: (用户消息, AI 回复消息)
@@ -362,6 +364,15 @@ async def send_message(
                 total_tokens += response.tokens_used or 0
 
             final_content = response.content
+        elif use_deep_thinking and isinstance(client, DeepSeekClient):
+            # 深度思考模式 (DeepSeek Reasoner)
+            logger.info("使用深度思考模式")
+            response = await client.chat_with_thinking(chat_history)
+            total_tokens = response.tokens_used or 0
+            final_content = response.content
+            # 如果有思考过程，可以记录到日志
+            if response.reasoning_content:
+                logger.debug(f"思考过程: {response.reasoning_content[:200]}...")
         else:
             # 普通对话
             response = await client.chat(chat_history, model=model)

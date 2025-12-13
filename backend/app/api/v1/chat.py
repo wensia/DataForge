@@ -269,6 +269,7 @@ async def send_message(
             user_id=current_user.user_id,
             content=data.content,
             ai_provider=data.ai_provider,
+            use_deep_thinking=data.use_deep_thinking,
         )
 
         return ResponseModel(

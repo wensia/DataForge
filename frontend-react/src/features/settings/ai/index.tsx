@@ -14,6 +14,7 @@ import {
   Bot,
   Eye,
   EyeOff,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -22,6 +23,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Card,
@@ -128,6 +130,36 @@ function useCreateAiConfig() {
   })
 }
 
+// 更新 AI 配置
+function useUpdateAiConfig() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: number
+      data: {
+        name?: string
+        base_url?: string
+        api_key?: string
+        default_model?: string
+        is_active?: boolean
+        notes?: string
+      }
+    }) => {
+      const response = await apiClient.put<ApiResponse<AiConfig>>(
+        `/ai-configs/${id}`,
+        data
+      )
+      return response.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: aiKeys.all })
+    },
+  })
+}
+
 // 删除 AI 配置
 function useDeleteAiConfig() {
   const queryClient = useQueryClient()
@@ -169,7 +201,17 @@ const formSchema = z.object({
   notes: z.string().optional(),
 })
 
+const editFormSchema = z.object({
+  name: z.string().min(1, '名称不能为空'),
+  base_url: z.string().url('请输入有效的 URL'),
+  api_key: z.string().optional(), // 编辑时 API 密钥可选，留空表示不修改
+  default_model: z.string().optional(),
+  is_active: z.boolean().optional(),
+  notes: z.string().optional(),
+})
+
 type AiConfigForm = z.infer<typeof formSchema>
+type AiConfigEditForm = z.infer<typeof editFormSchema>
 
 /** API 密钥显示组件 */
 function ApiKeyDisplay({ maskedKey }: { maskedKey: string }) {
@@ -198,12 +240,15 @@ export function AiSettings() {
   const { data: presets = {} } = useProviderPresets()
 
   const createConfig = useCreateAiConfig()
+  const updateConfig = useUpdateAiConfig()
   const deleteConfig = useDeleteAiConfig()
   const testConfig = useTestAiConfig()
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<AiConfig | null>(null)
+  const [editingConfig, setEditingConfig] = useState<AiConfig | null>(null)
   const [testingId, setTestingId] = useState<number | null>(null)
 
   const form = useForm<AiConfigForm>({
@@ -214,6 +259,18 @@ export function AiSettings() {
       base_url: '',
       api_key: '',
       default_model: '',
+      notes: '',
+    },
+  })
+
+  const editForm = useForm<AiConfigEditForm>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: {
+      name: '',
+      base_url: '',
+      api_key: '',
+      default_model: '',
+      is_active: true,
       notes: '',
     },
   })
@@ -238,6 +295,48 @@ export function AiSettings() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : '创建失败，请重试'
+      toast.error(message)
+    }
+  }
+
+  const handleEdit = (config: AiConfig) => {
+    setEditingConfig(config)
+    editForm.reset({
+      name: config.name,
+      base_url: config.base_url,
+      api_key: '', // 不回填 API 密钥，留空表示不修改
+      default_model: config.default_model || '',
+      is_active: config.is_active,
+      notes: config.notes || '',
+    })
+    setEditDialogOpen(true)
+  }
+
+  const onEditSubmit = async (data: AiConfigEditForm) => {
+    if (!editingConfig) return
+    try {
+      // 过滤掉空的 api_key（表示不修改）
+      const updateData: Record<string, unknown> = {
+        name: data.name,
+        base_url: data.base_url,
+        default_model: data.default_model || null,
+        is_active: data.is_active,
+        notes: data.notes || null,
+      }
+      if (data.api_key && data.api_key.trim() !== '') {
+        updateData.api_key = data.api_key
+      }
+      await updateConfig.mutateAsync({
+        id: editingConfig.id,
+        data: updateData,
+      })
+      toast.success('AI 配置更新成功')
+      setEditDialogOpen(false)
+      setEditingConfig(null)
+      editForm.reset()
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '更新失败，请重试'
       toast.error(message)
     }
   }
@@ -369,6 +468,14 @@ export function AiSettings() {
                         )}
                       />
                       测试连接
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleEdit(config)}
+                    >
+                      <Pencil className='mr-1 h-3 w-3' />
+                      编辑
                     </Button>
                     <Button
                       variant='ghost'
@@ -531,6 +638,158 @@ export function AiSettings() {
                 </Button>
                 <Button type='submit' disabled={createConfig.isPending}>
                   {createConfig.isPending ? '创建中...' : '创建'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑配置对话框 */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className='max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>编辑 AI 配置</DialogTitle>
+            <DialogDescription>
+              修改 AI 服务配置。API 密钥留空表示不修改。
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form
+              onSubmit={editForm.handleSubmit(onEditSubmit)}
+              className='space-y-4'
+            >
+              <FormField
+                control={editForm.control}
+                name='name'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>名称</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder='例如：Kimi 主账号' />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className='rounded-md border p-3'>
+                <p className='text-muted-foreground mb-1 text-xs'>提供商</p>
+                <p className='text-sm font-medium'>
+                  {providerOptions.find((p) => p.value === editingConfig?.provider)
+                    ?.label || editingConfig?.provider}
+                </p>
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name='base_url'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Base URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder='https://api.example.com/v1'
+                        className='font-mono text-sm'
+                      />
+                    </FormControl>
+                    <FormDescription>API 端点地址</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='api_key'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>API 密钥</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type='password'
+                        placeholder='留空表示不修改'
+                        className='font-mono'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      当前密钥: {editingConfig?.api_key_masked}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='default_model'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>默认模型（可选）</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder={
+                          editingConfig?.provider === 'kimi'
+                            ? 'moonshot-v1-8k'
+                            : editingConfig?.provider === 'deepseek'
+                              ? 'deepseek-chat'
+                              : '模型名称'
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='is_active'
+                render={({ field }) => (
+                  <FormItem className='flex flex-row items-center justify-between rounded-lg border p-3'>
+                    <div className='space-y-0.5'>
+                      <FormLabel>启用状态</FormLabel>
+                      <FormDescription>
+                        是否启用此 AI 配置
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='notes'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>备注（可选）</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder='输入备注' rows={2} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  variant='outline'
+                  type='button'
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button type='submit' disabled={updateConfig.isPending}>
+                  {updateConfig.isPending ? '保存中...' : '保存'}
                 </Button>
               </DialogFooter>
             </form>

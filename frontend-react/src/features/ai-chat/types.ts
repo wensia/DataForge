@@ -61,4 +61,5 @@ export interface ConversationUpdate {
 export interface SendMessageRequest {
   content: string
   ai_provider?: string
+  use_deep_thinking?: boolean
 }
