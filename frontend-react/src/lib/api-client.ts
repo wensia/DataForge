@@ -27,6 +27,10 @@ apiClient.interceptors.request.use(
 // 响应拦截器 - 统一处理响应
 apiClient.interceptors.response.use(
   (response) => {
+    // blob 类型响应直接返回，不检查 code
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     // 后端统一返回 { code, message, data } 格式
     const data = response.data
     // 如果 code 不是 200，抛出错误
