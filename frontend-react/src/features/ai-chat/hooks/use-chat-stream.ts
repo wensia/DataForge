@@ -6,7 +6,6 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Message } from '../types'
 
 // SSE 事件类型
 interface SSEEvent {

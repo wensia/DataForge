@@ -86,7 +86,7 @@ export function AIChat() {
   const deleteMutation = useDeleteConversation()
 
   // 流式聊天 Hook
-  const { isStreaming, streamingContent, error, sendMessage, stopStreaming } =
+  const { isStreaming, streamingContent, sendMessage, stopStreaming } =
     useChatStream({
       conversationId: selectedId,
       onError: (err) => toast.error(err),

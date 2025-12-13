@@ -39,7 +39,7 @@ interface ChatMessagesProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const ChatMessages = React.forwardRef<HTMLDivElement, ChatMessagesProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children }, _ref) => {
     const scrollRef = React.useRef<HTMLDivElement>(null)
     const [shouldAutoScroll, setShouldAutoScroll] = React.useState(true)
 
@@ -64,14 +64,15 @@ const ChatMessages = React.forwardRef<HTMLDivElement, ChatMessagesProps>(
     }, [])
 
     return (
-      <ScrollArea
-        ref={scrollRef}
-        className={cn('flex-1 px-4', className)}
-        onScrollCapture={handleScroll}
-        {...props}
-      >
-        <div className="flex flex-col gap-4 py-4">{children}</div>
-      </ScrollArea>
+      <div className={cn('min-h-0 flex-1 overflow-hidden', className)}>
+        <ScrollArea
+          ref={scrollRef}
+          className="h-full px-4"
+          onScrollCapture={handleScroll}
+        >
+          <div className="flex flex-col gap-4 py-4">{children}</div>
+        </ScrollArea>
+      </div>
     )
   }
 )
