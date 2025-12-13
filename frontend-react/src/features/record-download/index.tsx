@@ -1,26 +1,17 @@
 /**
  * 录音下载页面
+ *
+ * 通过粘贴云客录音详情页 URL，提取 voiceId 下载录音
  */
-import { useState } from 'react'
-import { format, subDays } from 'date-fns'
-import {
-  Download,
-  Play,
-  Pause,
-  RefreshCw,
-  Search,
-  Phone,
-  PhoneIncoming,
-  PhoneOutgoing,
-  Loader2,
-} from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Download, Play, Pause, Loader2, Link, Volume2, Clock, User, Phone } from 'lucide-react'
 import { toast } from 'sonner'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -29,131 +20,144 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAccounts } from '@/features/accounts/api'
-import { useCallLogs, useDownloadRecord, useRecordUrl } from './api'
-import type { CallLogItem } from './types'
+import { useDownloadRecord, useRecordUrl } from './api'
+
+// 从 URL 中解析的录音信息
+interface ParsedRecordInfo {
+  voiceId: string
+  userId?: string
+  customerName?: string
+  audioFrom?: string
+  audioTo?: string
+  audioTime?: string
+  time?: string // 时长（秒）
+  recordFile?: string
+}
+
+// 从云客 URL 中解析录音信息
+function parseYunkeUrl(url: string): ParsedRecordInfo | null {
+  try {
+    const urlObj = new URL(url)
+    const params = urlObj.searchParams
+
+    const voiceId = params.get('voiceId')
+    if (!voiceId) {
+      return null
+    }
+
+    return {
+      voiceId,
+      userId: params.get('userId') || undefined,
+      customerName: params.get('customerName') || undefined,
+      audioFrom: params.get('audioFrom') ? decodeURIComponent(params.get('audioFrom')!) : undefined,
+      audioTo: params.get('audioTo') || undefined,
+      audioTime: params.get('audioTime') ? decodeURIComponent(params.get('audioTime')!) : undefined,
+      time: params.get('time') || undefined,
+      recordFile: params.get('recordFile') ? decodeURIComponent(params.get('recordFile')!) : undefined,
+    }
+  } catch {
+    return null
+  }
+}
 
 export default function RecordDownload() {
-  // 筛选状态
+  // 状态
   const [accountId, setAccountId] = useState<number>(0)
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [callType, setCallType] = useState<'all' | 'outbound' | 'inbound'>('all')
-  const [searchPhone, setSearchPhone] = useState('')
-  const [page, setPage] = useState(1)
-  const [shouldQuery, setShouldQuery] = useState(false)
-
-  // 播放状态
-  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [urlInput, setUrlInput] = useState('')
+  const [parsedInfo, setParsedInfo] = useState<ParsedRecordInfo | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // 获取账号列表
   const { data: accounts, isLoading: accountsLoading } = useAccounts()
-
-  // 获取通话记录
-  const {
-    data: callLogsData,
-    isLoading: callLogsLoading,
-    refetch,
-  } = useCallLogs(
-    {
-      accountId,
-      startTime: `${startDate} 00:00:00`,
-      endTime: `${endDate} 23:59:59`,
-      page,
-      pageSize: 20,
-      callType: callType === 'all' ? undefined : callType,
-      searchPhone: searchPhone || undefined,
-    },
-    shouldQuery && accountId > 0
-  )
 
   // 获取录音地址
   const recordUrlMutation = useRecordUrl()
   // 下载录音
   const downloadMutation = useDownloadRecord()
 
-  // 处理查询
-  const handleSearch = () => {
-    if (!accountId) {
-      toast.error('请选择账号')
+  // 解析 URL
+  const handleParseUrl = () => {
+    if (!urlInput.trim()) {
+      toast.error('请输入云客录音 URL')
       return
     }
-    setPage(1)
-    setShouldQuery(true)
-    setTimeout(() => refetch(), 100)
+
+    const info = parseYunkeUrl(urlInput.trim())
+    if (!info) {
+      toast.error('无法解析 URL，请确保是有效的云客录音详情页链接')
+      return
+    }
+
+    setParsedInfo(info)
+    toast.success(`已解析 voiceId: ${info.voiceId}`)
   }
 
-  // 处理播放
-  const handlePlay = async (item: CallLogItem) => {
-    if (!item.voiceId) {
-      toast.error('该记录没有录音')
+  // 播放录音
+  const handlePlay = async () => {
+    if (!parsedInfo?.voiceId) {
+      toast.error('请先解析 URL')
       return
     }
 
-    // 如果正在播放同一个，则暂停
-    if (playingId === item.id && audioElement) {
-      audioElement.pause()
-      setPlayingId(null)
+    if (!accountId) {
+      toast.error('请选择云客账号')
       return
     }
 
-    // 停止之前的播放
-    if (audioElement) {
-      audioElement.pause()
+    // 如果正在播放，则暂停
+    if (isPlaying && audioRef.current) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+      return
     }
 
     try {
       const result = await recordUrlMutation.mutateAsync({
         accountId,
-        voiceId: item.voiceId,
+        voiceId: parsedInfo.voiceId,
       })
 
-      const audio = new Audio(result.download_url)
-      audio.onended = () => setPlayingId(null)
-      audio.onerror = () => {
-        toast.error('播放失败')
-        setPlayingId(null)
-      }
-
-      setAudioElement(audio)
       setAudioUrl(result.download_url)
-      setPlayingId(item.id)
-      audio.play()
+
+      // 播放音频
+      if (audioRef.current) {
+        audioRef.current.src = result.download_url
+        audioRef.current.play()
+        setIsPlaying(true)
+      }
     } catch {
       toast.error('获取录音地址失败')
     }
   }
 
-  // 处理下载
-  const handleDownload = async (item: CallLogItem) => {
-    if (!item.voiceId) {
-      toast.error('该记录没有录音')
+  // 下载录音
+  const handleDownload = async () => {
+    if (!parsedInfo?.voiceId) {
+      toast.error('请先解析 URL')
+      return
+    }
+
+    if (!accountId) {
+      toast.error('请选择云客账号')
       return
     }
 
     try {
       const result = await downloadMutation.mutateAsync({
         accountId,
-        voiceId: item.voiceId,
+        voiceId: parsedInfo.voiceId,
       })
 
       // 创建下载链接
       const url = window.URL.createObjectURL(result.blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${item.voiceId}.mp3`
+      a.download = `${parsedInfo.voiceId}.mp3`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -165,10 +169,10 @@ export default function RecordDownload() {
     }
   }
 
-  // 解析通话记录
-  const callLogs: CallLogItem[] = callLogsData?.json?.data?.list || []
-  const total = callLogsData?.json?.data?.total || 0
-  const totalPages = Math.ceil(total / 20)
+  // 音频播放结束
+  const handleAudioEnded = () => {
+    setIsPlaying(false)
+  }
 
   return (
     <>
@@ -182,17 +186,22 @@ export default function RecordDownload() {
       <Main>
         <div className="mb-6">
           <h1 className="text-2xl font-bold">录音下载</h1>
-          <p className="text-muted-foreground">查询云客通话记录并下载录音文件</p>
+          <p className="text-muted-foreground">粘贴云客录音详情页 URL，提取 voiceId 下载录音</p>
         </div>
 
-        {/* 筛选区域 */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">查询条件</CardTitle>
-            <CardDescription>选择账号和时间范围查询通话记录</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* 输入区域 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Link className="h-5 w-5" />
+                输入云客 URL
+              </CardTitle>
+              <CardDescription>
+                从云客 CRM 系统复制录音详情页的完整 URL
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>云客账号</Label>
                 {accountsLoading ? (
@@ -203,7 +212,7 @@ export default function RecordDownload() {
                     onValueChange={(v) => setAccountId(Number(v))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="选择账号" />
+                      <SelectValue placeholder="选择账号（用于获取录音）" />
                     </SelectTrigger>
                     <SelectContent>
                       {accounts.map((account) => (
@@ -221,181 +230,137 @@ export default function RecordDownload() {
               </div>
 
               <div className="space-y-2">
-                <Label>开始日期</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                <Label>录音详情页 URL</Label>
+                <Textarea
+                  placeholder="粘贴云客录音详情页 URL，例如：https://crm.yunkecn.com/cms/customer/callDetail?voiceId=phone-xxx..."
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  rows={4}
+                  className="font-mono text-xs"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>结束日期</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>通话类型</Label>
-                <Select value={callType} onValueChange={(v) => setCallType(v as typeof callType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部</SelectItem>
-                    <SelectItem value="outbound">外呼</SelectItem>
-                    <SelectItem value="inbound">呼入</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>搜索号码</Label>
-                <Input
-                  placeholder="输入号码搜索"
-                  value={searchPhone}
-                  onChange={(e) => setSearchPhone(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Button onClick={handleSearch} disabled={callLogsLoading}>
-                {callLogsLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="mr-2 h-4 w-4" />
-                )}
-                查询
+              <Button onClick={handleParseUrl} className="w-full">
+                解析 URL
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => refetch()}
-                disabled={!shouldQuery || callLogsLoading}
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                刷新
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* 结果列表 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              通话记录
-              {total > 0 && <span className="ml-2 text-sm font-normal text-muted-foreground">共 {total} 条</span>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {callLogsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : callLogs.length === 0 ? (
-              <div className="flex h-32 items-center justify-center text-muted-foreground">
-                {shouldQuery ? '暂无通话记录' : '请选择账号并点击查询'}
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>类型</TableHead>
-                      <TableHead>主叫</TableHead>
-                      <TableHead>被叫</TableHead>
-                      <TableHead>通话时间</TableHead>
-                      <TableHead>时长(秒)</TableHead>
-                      <TableHead>坐席</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {callLogs.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          {item.callType === 1 ? (
-                            <span className="flex items-center gap-1 text-blue-600">
-                              <PhoneOutgoing className="h-4 w-4" />
-                              外呼
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-green-600">
-                              <PhoneIncoming className="h-4 w-4" />
-                              呼入
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>{item.callerNumber || '-'}</TableCell>
-                        <TableCell>{item.calleeNumber || '-'}</TableCell>
-                        <TableCell>{item.callTime}</TableCell>
-                        <TableCell>{item.talkTime || 0}</TableCell>
-                        <TableCell>{item.userName || '-'}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handlePlay(item)}
-                              disabled={!item.voiceId || recordUrlMutation.isPending}
-                              title="播放"
-                            >
-                              {playingId === item.id ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => handleDownload(item)}
-                              disabled={!item.voiceId || downloadMutation.isPending}
-                              title="下载"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          {/* 结果区域 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Volume2 className="h-5 w-5" />
+                录音信息
+              </CardTitle>
+              <CardDescription>
+                解析结果和播放/下载操作
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {parsedInfo ? (
+                <div className="space-y-4">
+                  {/* 解析出的信息 */}
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium text-muted-foreground">Voice ID:</span>
+                      <code className="rounded bg-muted px-2 py-0.5 text-xs">
+                        {parsedInfo.voiceId}
+                      </code>
+                    </div>
 
-                {/* 分页 */}
-                {totalPages > 1 && (
-                  <div className="mt-4 flex items-center justify-center gap-2">
+                    {parsedInfo.audioFrom && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span>坐席: {parsedInfo.audioFrom}</span>
+                      </div>
+                    )}
+
+                    {parsedInfo.audioTo && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span>客户: {parsedInfo.audioTo}</span>
+                      </div>
+                    )}
+
+                    {parsedInfo.audioTime && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>时间: {parsedInfo.audioTime}</span>
+                      </div>
+                    )}
+
+                    {parsedInfo.time && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span>时长: {parsedInfo.time} 秒</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 音频播放器 */}
+                  <audio
+                    ref={audioRef}
+                    onEnded={handleAudioEnded}
+                    onPause={() => setIsPlaying(false)}
+                    onPlay={() => setIsPlaying(true)}
+                    controls
+                    className="w-full"
+                    src={audioUrl || undefined}
+                  />
+
+                  {/* 操作按钮 */}
+                  <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
+                      onClick={handlePlay}
+                      disabled={!accountId || recordUrlMutation.isPending}
+                      className="flex-1"
                     >
-                      上一页
+                      {recordUrlMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : isPlaying ? (
+                        <Pause className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Play className="mr-2 h-4 w-4" />
+                      )}
+                      {isPlaying ? '暂停' : '播放'}
                     </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {page} / {totalPages}
-                    </span>
+
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
+                      onClick={handleDownload}
+                      disabled={!accountId || downloadMutation.isPending}
+                      className="flex-1"
                     >
-                      下一页
+                      {downloadMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                      )}
+                      下载 MP3
                     </Button>
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center text-muted-foreground">
+                  请先粘贴云客 URL 并点击解析
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 使用说明 */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-lg">使用说明</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-2">
+            <p>1. 在云客 CRM 系统中打开通话记录详情页</p>
+            <p>2. 复制浏览器地址栏中的完整 URL</p>
+            <p>3. 选择一个已登录的云客账号</p>
+            <p>4. 将 URL 粘贴到上方输入框，点击"解析 URL"</p>
+            <p>5. 解析成功后可以播放或下载录音文件</p>
           </CardContent>
         </Card>
       </Main>
