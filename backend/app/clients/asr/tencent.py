@@ -168,7 +168,8 @@ class TencentASRClient(ASRClient):
             "ChannelNum": channel_num,
             "SourceType": 0,  # 0=URL 方式
             "Url": audio_url,
-            "ResTextFormat": 0,  # 0=识别结果文本（含分段时间戳）
+            "ResTextFormat": 1,  # 1=返回 ResultDetail（含时间戳和情绪）
+            "EmotionRecognition": 2,  # 2=开启情绪识别并在结果中展示
         }
 
         # 8k 双声道不需要设置 SpeakerDiarization，双声道会自动分离
@@ -276,6 +277,10 @@ class TencentASRClient(ASRClient):
                 end_time = item.get("EndMs", 0) / 1000
                 text = item.get("FinalSentence", "").strip()
 
+                # 提取情绪信息（EmotionType 是数组，如 ["happy"]）
+                emotion_types = item.get("EmotionType") or []
+                emotion = emotion_types[0] if emotion_types else None
+
                 if text:
                     segments.append(
                         TranscriptSegment(
@@ -283,6 +288,7 @@ class TencentASRClient(ASRClient):
                             end_time=end_time,
                             speaker=speaker,
                             text=text,
+                            emotion=emotion,
                         )
                     )
         else:
