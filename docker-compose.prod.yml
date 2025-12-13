@@ -1,5 +1,5 @@
 # DataForge 生产环境 Docker Compose
-# 使用阿里云 ACR 预构建镜像
+# 使用腾讯云 TCR 预构建镜像
 
 services:
   # ===== Nginx 反向代理 =====
@@ -27,9 +27,9 @@ services:
       timeout: 10s
       retries: 3
 
-  # ===== FastAPI 后端（阿里云 ACR 镜像）=====
+  # ===== FastAPI 后端（腾讯云 TCR 镜像）=====
   backend:
-    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    image: ccr.ccs.tencentyun.com/pandw/dataforge-backend:latest
     container_name: dataforge-backend
     env_file:
       - ./docker/.env
@@ -47,9 +47,9 @@ services:
       start_period: 10s
       retries: 3
 
-  # ===== React 前端（阿里云 ACR 镜像）=====
+  # ===== React 前端（腾讯云 TCR 镜像）=====
   frontend:
-    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
+    image: ccr.ccs.tencentyun.com/pandw/dataforge-frontend:latest
     container_name: dataforge-frontend
     networks:
       - dataforge-network
