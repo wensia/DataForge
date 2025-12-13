@@ -93,25 +93,32 @@ jobs:
             set -e
             cd /www/wwwroot/yunke-transit
 
-            echo "===== 1. 拉取最新代码 ====="
+            echo "===== 1. 停止占用 80 端口的服务 ====="
+            sudo systemctl stop nginx 2>/dev/null || true
+            sudo systemctl disable nginx 2>/dev/null || true
+            # 如果还有其他进程占用 80 端口，强制释放
+            sudo fuser -k 80/tcp 2>/dev/null || true
+            sudo fuser -k 443/tcp 2>/dev/null || true
+
+            echo "===== 2. 拉取最新代码 ====="
             git fetch origin main
             git reset --hard origin/main
 
-            echo "===== 2. 登录阿里云 ACR ====="
+            echo "===== 3. 登录阿里云 ACR ====="
             sudo docker login registry.cn-hangzhou.aliyuncs.com -u ${{ secrets.ACR_USERNAME }} -p '${{ secrets.ACR_PASSWORD }}'
 
-            echo "===== 3. 拉取最新镜像 ====="
+            echo "===== 4. 拉取最新镜像 ====="
             sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
             sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
 
-            echo "===== 4. 重启服务 ====="
+            echo "===== 5. 重启服务 ====="
             sudo docker compose -f docker-compose.prod.yml down --remove-orphans || true
             sudo docker compose -f docker-compose.prod.yml up -d
 
-            echo "===== 5. 清理旧镜像 ====="
+            echo "===== 6. 清理旧镜像 ====="
             sudo docker image prune -f
 
-            echo "===== 6. 检查服务状态 ====="
+            echo "===== 7. 检查服务状态 ====="
             sleep 10
             sudo docker compose -f docker-compose.prod.yml ps
 
