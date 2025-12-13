@@ -1,6 +1,6 @@
 # 部署规则
 
-> 服务器部署与运维规范
+> 服务器部署与运维规范（Docker + GitHub Actions 自动化部署）
 
 ## 服务器信息
 
@@ -13,9 +13,128 @@
 | 系统 | Ubuntu 22.04 |
 | 面板 | 1Panel |
 
-## SSH 连接
+## 部署架构
 
-**重要**: 所有 SSH 命令需在项目根目录执行，密钥文件位于 `./claudeCode.pem`
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     GitHub Actions CI/CD                         │
+├─────────────────────────────────────────────────────────────────┤
+│  1. 代码推送到 main 分支                                          │
+│  2. 构建 Docker 镜像 → 推送到阿里云 ACR                            │
+│  3. SSH 连接服务器 → 拉取镜像 → 重启容器                           │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    124.220.15.80 (Docker)                        │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  dataforge-nginx (:80, :443)                            │    │
+│  │  ├── /           → dataforge-frontend (:80)             │    │
+│  │  └── /api/       → dataforge-backend (:8847)            │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  dataforge-backend (:8847)                              │    │
+│  │  └── FastAPI → PostgreSQL (host.docker.internal:5432)   │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  dataforge-frontend (内部 :80)                          │    │
+│  │  └── Nginx 静态文件服务                                  │    │
+│  └─────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│  PostgreSQL 16 (:5432) - 原生安装，非容器化                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## CI/CD 自动部署
+
+### 触发条件
+
+- 推送代码到 `main` 分支
+- 手动触发 GitHub Actions
+
+### 部署流程
+
+| 步骤 | 说明 | 耗时 |
+|------|------|------|
+| build-frontend | 构建前端镜像，推送到阿里云 ACR | ~30-50秒 |
+| build-backend | 构建后端镜像，推送到阿里云 ACR | ~30-90秒 |
+| deploy | SSH 连接服务器，拉取镜像，重启容器 | ~30-60秒 |
+| **总计** | | **~2-3分钟** |
+
+### GitHub Secrets 配置
+
+在 GitHub 仓库 `Settings → Secrets and variables → Actions` 中配置：
+
+| Secret 名称 | 说明 |
+|-------------|------|
+| `SERVER_HOST` | 服务器 IP: `124.220.15.80` |
+| `SERVER_USER` | SSH 用户名: `ubuntu` |
+| `SERVER_SSH_KEY` | SSH 私钥内容（claudeCode.pem 的完整内容） |
+| `ACR_USERNAME` | 阿里云 ACR 用户名 |
+| `ACR_PASSWORD` | 阿里云 ACR 密码 |
+
+### 阿里云 ACR 镜像仓库
+
+| 镜像 | 地址 |
+|------|------|
+| 后端 | `registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend` |
+| 前端 | `registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend` |
+
+### 手动触发部署
+
+```bash
+# 使用 GitHub CLI
+gh workflow run deploy.yml
+
+# 查看运行状态
+gh run list --limit 5
+gh run watch <run-id>
+```
+
+## Docker 配置文件
+
+### 核心文件
+
+| 文件 | 说明 |
+|------|------|
+| `backend/Dockerfile` | 后端 Docker 构建配置 |
+| `frontend-react/Dockerfile` | 前端 Docker 构建配置 |
+| `docker-compose.yml` | 本地开发用（本地构建） |
+| `docker-compose.prod.yml` | 生产环境用（拉取 ACR 镜像） |
+| `docker/.env` | Docker 环境变量配置 |
+| `.github/workflows/deploy.yml` | GitHub Actions 工作流 |
+
+### 生产环境 docker-compose.prod.yml
+
+```yaml
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+  backend:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8847/api/v1/health"]
+
+  frontend:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/health || exit 1"]
+```
+
+## SSH 连接
 
 ```bash
 # 基本连接（在项目根目录执行）
@@ -23,14 +142,11 @@ ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
 # 确保密钥权限正确
 chmod 600 ./claudeCode.pem
-
-# 如果出现 host key 变更警告，清除旧记录
-ssh-keygen -R 124.220.15.80
 ```
 
-### 推荐：配置 SSH 别名（可选）
+### SSH 别名配置（可选）
 
-添加到 `~/.ssh/config` 简化连接：
+添加到 `~/.ssh/config`：
 
 ```bash
 Host dataforge
@@ -39,112 +155,116 @@ Host dataforge
   IdentityFile /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
 ```
 
-配置后可直接使用 `ssh dataforge` 连接
+配置后可直接使用 `ssh dataforge` 连接。
 
-## 1Panel 面板
+## 日常运维
 
-### 访问地址
+### Docker 容器管理
 
+```bash
+# SSH 到服务器后执行
+cd /www/wwwroot/yunke-transit
+
+# 查看容器状态
+sudo docker compose -f docker-compose.prod.yml ps
+
+# 查看容器日志
+sudo docker compose -f docker-compose.prod.yml logs -f
+sudo docker compose -f docker-compose.prod.yml logs -f backend
+sudo docker compose -f docker-compose.prod.yml logs -f frontend
+sudo docker compose -f docker-compose.prod.yml logs -f nginx
+
+# 重启所有服务
+sudo docker compose -f docker-compose.prod.yml restart
+
+# 重启单个服务
+sudo docker compose -f docker-compose.prod.yml restart backend
+
+# 停止所有服务
+sudo docker compose -f docker-compose.prod.yml down
+
+# 启动所有服务
+sudo docker compose -f docker-compose.prod.yml up -d
+
+# 强制重新拉取镜像并重启
+sudo docker compose -f docker-compose.prod.yml pull
+sudo docker compose -f docker-compose.prod.yml up -d
+
+# 清理旧镜像
+sudo docker image prune -f
 ```
-http://124.220.15.80:8090/tencentcloud
+
+### 手动部署（不使用 CI/CD）
+
+```bash
+# SSH 到服务器
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80
+
+cd /www/wwwroot/yunke-transit
+
+# 拉取最新代码
+git pull origin main
+
+# 登录阿里云 ACR
+sudo docker login registry.cn-hangzhou.aliyuncs.com
+
+# 拉取最新镜像
+sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
+
+# 重启服务
+sudo docker compose -f docker-compose.prod.yml down
+sudo docker compose -f docker-compose.prod.yml up -d
 ```
 
-### 常用功能
+### 健康检查
 
-| 功能 | 说明 |
-|------|------|
-| 网站管理 | 创建站点、配置 Nginx 反向代理 |
-| 文件管理 | 在线文件管理器 |
-| 终端 | Web 终端 |
-| 计划任务 | Cron 任务管理 |
+```bash
+# 检查后端 API
+curl http://124.220.15.80/api/v1/health
+
+# 检查前端
+curl -I http://124.220.15.80/
+
+# 检查容器健康状态
+sudo docker compose -f docker-compose.prod.yml ps
+```
 
 ## 端口配置
 
 ### 必须开放的端口
 
-| 端口 | 协议 | 用途 | 说明 |
-|------|------|------|------|
-| 22 | TCP | SSH | 远程登录管理 |
-| 80 | TCP | HTTP | 前端访问 + API |
-
-### 可选端口
-
-| 端口 | 协议 | 用途 | 说明 |
-|------|------|------|------|
-| 443 | TCP | HTTPS | 如果配置 SSL 证书 |
-| 8090 | TCP | 1Panel | 面板管理（建议限制 IP） |
-| 5432 | TCP | PostgreSQL | 仅开发环境需要（限制 IP） |
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 22 | TCP | SSH 远程登录 |
+| 80 | TCP | HTTP 访问 |
+| 443 | TCP | HTTPS 访问（如配置 SSL） |
 
 ### 内部端口（无需对外开放）
 
 | 端口 | 说明 |
 |------|------|
-| 8847 | 后端服务端口，通过 Nginx 代理 |
-| 5432 | PostgreSQL 端口（服务器上通过 127.0.0.1 访问） |
+| 8847 | 后端服务端口（Docker 内部） |
+| 5432 | PostgreSQL 端口 |
 
-### 腾讯云安全组配置
+## 首次部署
 
-```
-协议    端口      来源            说明
-TCP     22       你的IP          SSH登录
-TCP     80       0.0.0.0/0       HTTP访问
-TCP     443      0.0.0.0/0       HTTPS（可选）
-TCP     8090     你的IP          1Panel管理（限制IP）
-```
-
-## 项目部署
-
-### 部署架构
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    124.220.15.80                        │
-├─────────────────────────────────────────────────────────┤
-│  Nginx (:80)                                            │
-│  ├── /           → 前端静态文件 (dist/)                 │
-│  └── /api/       → 后端服务 (127.0.0.1:8847)           │
-├─────────────────────────────────────────────────────────┤
-│  后端服务 (systemd: yunke-backend)                      │
-│  └── FastAPI (:8847) → PostgreSQL (:5432)              │
-├─────────────────────────────────────────────────────────┤
-│  PostgreSQL 16 (:5432)                                  │
-│  └── 数据库: production                                 │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 部署目录
-
-```
-/www/wwwroot/yunke-transit/
-├── backend/                    # 后端代码
-│   ├── app/                    # 应用代码
-│   ├── .venv/                  # Python 虚拟环境
-│   ├── .env                    # 环境变量配置
-│   └── pyproject.toml          # 依赖配置
-├── frontend/                   # 前端代码
-│   ├── dist/                   # 构建产物
-│   └── src/                    # 源代码
-├── docs/                       # 文档
-└── manage.sh                   # 管理脚本
-```
-
-## 首次部署（完整流程）
-
-### 1. 安装系统依赖
+### 1. 安装 Docker
 
 ```bash
-# 添加 Python 3.11 源
-sudo add-apt-repository ppa:deadsnakes/ppa -y
-sudo apt update
+# 安装 Docker
+curl -fsSL https://get.docker.com | sh
 
-# 安装 Python 3.11
-sudo apt install python3.11 python3.11-venv python3.11-dev -y
+# 添加用户到 docker 组
+sudo usermod -aG docker ubuntu
 
-# 安装 uv（使用国内镜像）
-python3.11 -m pip install uv -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 重新登录使权限生效
+exit
+ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
-# 安装 Nginx
-sudo apt install nginx -y
+# 验证 Docker
+docker --version
+docker compose version
 ```
 
 ### 2. 安装 PostgreSQL 16
@@ -161,297 +281,108 @@ sudo apt install postgresql-16 -y
 # 启动服务
 sudo systemctl start postgresql
 sudo systemctl enable postgresql
-```
 
-### 3. 配置 PostgreSQL
-
-```bash
-# 切换到 postgres 用户
+# 配置数据库
 sudo -u postgres psql
-
-# 在 psql 中执行：
 ALTER USER postgres PASSWORD 'YOUR_SECURE_PASSWORD';
 CREATE DATABASE production;
 \q
 ```
 
-### 4. 配置远程访问（可选，用于本地开发连接）
+### 3. 克隆代码
 
 ```bash
-# 修改监听地址
-sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/16/main/postgresql.conf
-
-# 添加远程访问规则
-echo "host    all    all    0.0.0.0/0    md5" | sudo tee -a /etc/postgresql/16/main/pg_hba.conf
-
-# 重启 PostgreSQL
-sudo systemctl restart postgresql
+cd /www/wwwroot
+git clone https://github.com/wensia/DataForge.git yunke-transit
+cd yunke-transit
 ```
 
-**注意**: 远程访问需要开放 5432 端口，仅在需要本地开发连接时配置
-
-### 5. 创建项目目录
+### 4. 配置环境变量
 
 ```bash
-sudo mkdir -p /www/wwwroot
-sudo chown -R ubuntu:ubuntu /www/wwwroot
+cp docker/.env.example docker/.env
+vim docker/.env
+
+# 配置数据库连接
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@host.docker.internal:5432/production
 ```
 
-### 6. 上传代码（本地执行）
-
-由于服务器访问 GitHub 较慢，推荐从本地上传：
+### 5. 配置 Nginx
 
 ```bash
-# 在项目根目录执行
-rsync -avz \
-  --exclude 'node_modules' \
-  --exclude '.venv' \
-  --exclude '__pycache__' \
-  --exclude '*.db' \
-  --exclude 'logs' \
-  --exclude '.git' \
-  --exclude '*.pem' \
-  --exclude '.cursor' \
-  --exclude '.claude' \
-  -e "ssh -i ./claudeCode.pem" \
-  ./ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/
+# 创建 SSL 目录（即使不用 HTTPS 也需要）
+mkdir -p docker/nginx/ssl
+
+# 检查 Nginx 配置文件
+ls docker/nginx/
 ```
 
-### 7. 配置后端环境变量
+### 6. 停止系统 Nginx（如果有）
 
 ```bash
-# 创建 .env 文件
-cat > /www/wwwroot/yunke-transit/backend/.env << 'EOF'
-# 数据库连接（服务器部署使用本地回环）
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@127.0.0.1:5432/production
-
-# 调试模式（生产环境设为 false）
-DEBUG=false
-
-# API 密钥
-API_KEYS=your-api-key-here
-EOF
+sudo systemctl stop nginx
+sudo systemctl disable nginx
 ```
 
-### 8. 部署后端
+### 7. 首次启动
 
 ```bash
-# SSH 到服务器（在项目根目录执行）
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80
+# 登录阿里云 ACR
+sudo docker login registry.cn-hangzhou.aliyuncs.com
 
-# 进入后端目录
-cd /www/wwwroot/yunke-transit/backend
-
-# 创建虚拟环境（指定 Python 3.11）
-~/.local/bin/uv venv --python python3.11
-
-# 安装依赖（使用国内镜像，包含 PostgreSQL 驱动）
-source .venv/bin/activate
-~/.local/bin/uv pip install -e . psycopg2-binary -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-### 9. 配置 systemd 服务
-
-创建服务文件：
-
-```bash
-sudo tee /etc/systemd/system/yunke-backend.service > /dev/null << 'EOF'
-[Unit]
-Description=Yunke Transit Backend
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/www/wwwroot/yunke-transit/backend
-Environment="PATH=/www/wwwroot/yunke-transit/backend/.venv/bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/www/wwwroot/yunke-transit/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8847
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
-
-启动服务：
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable yunke-backend
-sudo systemctl start yunke-backend
+# 拉取镜像并启动
+sudo docker compose -f docker-compose.prod.yml pull
+sudo docker compose -f docker-compose.prod.yml up -d
 
 # 检查状态
-sudo systemctl status yunke-backend
+sudo docker compose -f docker-compose.prod.yml ps
 ```
 
-### 10. 构建前端（本地执行）
+## 故障排查
 
-由于服务器网络限制，在本地构建后上传：
+### 容器无法启动
 
 ```bash
-# 在项目根目录执行
-cd frontend-react && pnpm build && cd ..
+# 查看详细日志
+sudo docker compose -f docker-compose.prod.yml logs --tail=100
 
-# 上传构建产物
-rsync -avz \
-  -e "ssh -i ./claudeCode.pem" \
-  frontend-react/dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
+# 检查容器状态
+sudo docker ps -a
+
+# 进入容器调试
+sudo docker exec -it dataforge-backend /bin/bash
 ```
 
-### 11. 配置 Nginx
-
-```bash
-# SSH 到服务器后执行
-sudo tee /etc/nginx/sites-available/yunke-transit > /dev/null << 'EOF'
-server {
-    listen 80;
-    server_name _;
-
-    # 前端静态文件
-    location / {
-        root /www/wwwroot/yunke-transit/frontend/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API 代理
-    location /api/ {
-        proxy_pass http://127.0.0.1:8847;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
-
-# 启用站点
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo ln -sf /etc/nginx/sites-available/yunke-transit /etc/nginx/sites-enabled/
-
-# 测试并重载
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### 12. 验证部署
-
-```bash
-# 测试后端 API
-curl http://127.0.0.1:8847/api/v1/health
-
-# 测试前端（从外部访问）
-curl http://124.220.15.80/
-```
-
-## 日常运维
-
-### 服务管理
-
-```bash
-# 后端服务
-sudo systemctl start yunke-backend     # 启动
-sudo systemctl stop yunke-backend      # 停止
-sudo systemctl restart yunke-backend   # 重启
-sudo systemctl status yunke-backend    # 状态
-
-# Nginx
-sudo systemctl reload nginx            # 重载配置
-sudo systemctl restart nginx           # 重启
-```
-
-### 日志查看
-
-```bash
-# 后端日志
-sudo journalctl -u yunke-backend -f
-
-# Nginx 日志
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
-```
-
-### 常用运维命令
+### 端口被占用
 
 ```bash
 # 查看端口占用
-sudo lsof -i :8847
-sudo netstat -tlnp | grep 8847
+sudo lsof -i :80
+sudo netstat -tlnp | grep :80
 
-# 查看进程
-ps aux | grep uvicorn
-
-# 查看磁盘空间
-df -h
-
-# 查看内存使用
-free -h
+# 强制释放端口
+sudo fuser -k 80/tcp
 ```
 
-## 更新部署
-
-### 快速更新脚本（在项目根目录执行）
+### 健康检查失败
 
 ```bash
-#!/bin/bash
-# deploy.sh - 一键部署脚本
-
-SERVER="ubuntu@124.220.15.80"
-KEY="./claudeCode.pem"
-REMOTE_DIR="/www/wwwroot/yunke-transit"
-
-# 1. 构建前端
-echo "Building frontend..."
-cd frontend-react && pnpm build && cd ..
-
-# 2. 上传代码
-echo "Uploading code..."
-rsync -avz \
-  --exclude 'node_modules' \
-  --exclude '.venv' \
-  --exclude '__pycache__' \
-  --exclude '*.db' \
-  --exclude 'logs' \
-  --exclude '.git' \
-  --exclude '*.pem' \
-  --exclude '.cursor' \
-  --exclude '.claude' \
-  -e "ssh -i $KEY" \
-  ./ $SERVER:$REMOTE_DIR/
-
-# 3. 重启后端
-echo "Restarting backend..."
-ssh -i $KEY $SERVER "sudo systemctl restart yunke-backend"
-
-echo "Deploy completed!"
+# 检查容器内部服务
+sudo docker exec dataforge-backend curl -f http://localhost:8847/api/v1/health
+sudo docker exec dataforge-frontend curl -f http://localhost/health
 ```
 
-### 仅更新后端（在项目根目录执行）
+### 数据库连接问题
 
 ```bash
-# 上传后端代码
-rsync -avz \
-  --exclude '__pycache__' \
-  --exclude '.venv' \
-  --exclude '*.db' \
-  -e "ssh -i ./claudeCode.pem" \
-  backend/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/backend/
+# 检查 PostgreSQL 服务
+sudo systemctl status postgresql
 
-# 重启服务
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80 "sudo systemctl restart yunke-backend"
-```
+# 测试数据库连接
+sudo -u postgres psql -c "SELECT 1"
 
-### 仅更新前端（在项目根目录执行）
-
-```bash
-# 构建
-cd frontend-react && pnpm build && cd ..
-
-# 上传
-rsync -avz \
-  -e "ssh -i ./claudeCode.pem" \
-  frontend-react/dist/ ubuntu@124.220.15.80:/www/wwwroot/yunke-transit/frontend/dist/
+# 检查后端日志
+sudo docker compose -f docker-compose.prod.yml logs backend | grep -i error
 ```
 
 ## 备份策略
@@ -459,107 +390,30 @@ rsync -avz \
 ### PostgreSQL 数据库备份
 
 ```bash
-# 手动备份（在服务器上执行）
+# 手动备份
 sudo -u postgres pg_dump production > ~/backup/production_$(date +%Y%m%d).sql
 
-# 下载到本地（在项目根目录执行）
-scp -i ./claudeCode.pem \
-  ubuntu@124.220.15.80:~/backup/production_$(date +%Y%m%d).sql \
-  ./backup/
-
-# 远程执行备份并下载（在项目根目录执行）
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80 \
-  "sudo -u postgres pg_dump production" > ./backup/production_$(date +%Y%m%d).sql
+# 下载到本地
+scp -i ./claudeCode.pem ubuntu@124.220.15.80:~/backup/production_*.sql ./backup/
 ```
 
-### 数据库恢复
+### 自动备份（cron）
 
 ```bash
-# 恢复数据库
-sudo -u postgres psql production < ~/backup/production_20241208.sql
-```
-
-### 自动备份（使用 cron）
-
-```bash
-# 编辑 crontab
 crontab -e
 
-# 添加每日凌晨2点备份任务
+# 每日凌晨2点备份
 0 2 * * * sudo -u postgres pg_dump production > /home/ubuntu/backup/production_$(date +\%Y\%m\%d).sql
 
 # 清理 7 天前的备份
 0 3 * * * find /home/ubuntu/backup -name "production_*.sql" -mtime +7 -delete
 ```
 
-## 故障排查
-
-### 后端服务无法启动
-
-```bash
-# 检查端口占用
-sudo lsof -i :8847
-
-# 检查详细日志
-sudo journalctl -u yunke-backend -n 100 --no-pager
-
-# 检查 Python 环境
-/www/wwwroot/yunke-transit/backend/.venv/bin/python --version
-```
-
-### 前端无法访问
-
-```bash
-# 检查 Nginx 配置
-sudo nginx -t
-
-# 检查前端文件是否存在
-ls -la /www/wwwroot/yunke-transit/frontend/dist/
-
-# 检查 Nginx 状态
-sudo systemctl status nginx
-```
-
-### API 请求失败
-
-```bash
-# 测试后端是否运行
-curl http://127.0.0.1:8847/api/v1/health
-
-# 检查 Nginx 代理日志
-tail -f /var/log/nginx/error.log
-```
-
-### PostgreSQL 连接问题
-
-```bash
-# 检查 PostgreSQL 服务状态
-sudo systemctl status postgresql
-
-# 检查 PostgreSQL 日志
-sudo tail -f /var/log/postgresql/postgresql-16-main.log
-
-# 测试数据库连接
-sudo -u postgres psql -c "SELECT 1"
-
-# 检查数据库是否存在
-sudo -u postgres psql -l
-
-# 检查监听端口
-sudo ss -tlnp | grep 5432
-
-# 重启 PostgreSQL
-sudo systemctl restart postgresql
-```
-
 ## 安全注意事项
 
-1. **密钥安全**: `claudeCode.pem` 密钥文件不要提交到代码仓库
-2. **端口暴露**: 仅暴露必要端口（22、80、443）
-3. **1Panel 安全**: 8090 端口建议仅对管理员 IP 开放
-4. **PostgreSQL 安全**:
-   - 生产环境使用 127.0.0.1 连接，不对外暴露 5432 端口
-   - 开发环境如需远程访问，务必限制 IP 白名单
-   - 使用强密码
-5. **定期更新**: 定期更新系统和依赖包
+1. **密钥安全**: `claudeCode.pem` 不要提交到代码仓库
+2. **Secrets 安全**: GitHub Secrets 中的密码定期更换
+3. **端口暴露**: 仅暴露必要端口（22、80、443）
+4. **ACR 安全**: 阿里云 ACR 使用独立的 RAM 子账号
+5. **定期更新**: 定期更新 Docker 镜像和系统包
 6. **备份**: 定期备份 PostgreSQL 数据库
