@@ -1,5 +1,6 @@
 #!/bin/bash
 # DataForge Docker 管理脚本
+# 仅管理应用容器，数据库在宿主机上
 
 set -e
 
@@ -68,8 +69,22 @@ restart() {
 
 # 查看状态
 status() {
-    print_msg $BLUE "服务状态:"
+    print_msg $BLUE "Docker 容器状态:"
     docker compose ps
+    echo ""
+    print_msg $BLUE "宿主机服务状态:"
+    echo -n "  PostgreSQL: "
+    if pg_isready -q 2>/dev/null; then
+        print_msg $GREEN "运行中"
+    else
+        print_msg $RED "未运行或无法连接"
+    fi
+    echo -n "  Redis: "
+    if redis-cli ping &>/dev/null; then
+        print_msg $GREEN "运行中"
+    else
+        print_msg $RED "未运行或无法连接"
+    fi
 }
 
 # 查看日志
@@ -97,38 +112,9 @@ update() {
     status
 }
 
-# 备份数据库
-backup() {
-    local backup_file="backup_$(date +%Y%m%d_%H%M%S).sql"
-    print_msg $BLUE "备份数据库到 ${backup_file}..."
-    docker compose exec -T postgres pg_dump -U postgres dataforge > "$backup_file"
-    print_msg $GREEN "备份完成: ${backup_file}"
-}
-
-# 恢复数据库
-restore() {
-    if [ -z "$1" ]; then
-        print_msg $RED "用法: $0 restore <备份文件>"
-        exit 1
-    fi
-    if [ ! -f "$1" ]; then
-        print_msg $RED "错误: 文件 $1 不存在"
-        exit 1
-    fi
-    print_msg $YELLOW "警告: 这将覆盖现有数据库！"
-    read -p "确认继续？(y/N) " confirm
-    if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-        print_msg $BLUE "恢复数据库..."
-        docker compose exec -T postgres psql -U postgres -d dataforge < "$1"
-        print_msg $GREEN "恢复完成"
-    else
-        print_msg $YELLOW "操作已取消"
-    fi
-}
-
 # 清理资源
 clean() {
-    print_msg $YELLOW "警告: 这将删除所有容器、镜像和卷！"
+    print_msg $YELLOW "警告: 这将删除所有容器和镜像！"
     read -p "确认继续？(y/N) " confirm
     if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
         print_msg $BLUE "停止并删除容器..."
@@ -149,6 +135,7 @@ shell() {
 # 显示帮助
 help() {
     echo "DataForge Docker 管理脚本"
+    echo "（仅管理应用容器，数据库在宿主机上）"
     echo ""
     echo "用法: $0 <命令> [参数]"
     echo ""
@@ -156,21 +143,21 @@ help() {
     echo "  start [服务...]   启动服务 (默认所有服务)"
     echo "  stop [服务...]    停止服务"
     echo "  restart [服务...] 重启服务"
-    echo "  status            查看服务状态"
+    echo "  status            查看服务状态（含宿主机数据库）"
     echo "  logs [服务] [-f]  查看日志"
     echo "  build [服务...]   构建镜像"
     echo "  update            拉取代码并重新部署"
-    echo "  backup            备份数据库"
-    echo "  restore <文件>    恢复数据库"
     echo "  shell [服务]      进入容器 (默认 backend)"
-    echo "  clean             清理所有容器和卷"
+    echo "  clean             清理所有容器和镜像"
     echo "  help              显示帮助"
     echo ""
+    echo "容器服务: nginx, backend, frontend"
+    echo "宿主机服务: PostgreSQL, Redis（需单独管理）"
+    echo ""
     echo "示例:"
-    echo "  $0 start                    # 启动所有服务"
-    echo "  $0 start backend postgres   # 只启动后端和数据库"
-    echo "  $0 logs backend -f          # 实时查看后端日志"
-    echo "  $0 shell postgres           # 进入 PostgreSQL 容器"
+    echo "  $0 start              # 启动所有容器"
+    echo "  $0 logs backend -f    # 实时查看后端日志"
+    echo "  $0 shell backend      # 进入后端容器"
 }
 
 # 主入口
@@ -205,13 +192,6 @@ main() {
         update)
             check_env
             update
-            ;;
-        backup)
-            backup
-            ;;
-        restore)
-            shift
-            restore "$@"
             ;;
         shell)
             shift

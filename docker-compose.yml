@@ -1,5 +1,5 @@
 # DataForge Docker Compose
-# 包含: nginx, backend, frontend, postgres, redis
+# 只容器化应用服务，数据库保持原生安装
 
 services:
   # ===== Nginx 反向代理 =====
@@ -35,14 +35,9 @@ services:
     container_name: dataforge-backend
     env_file:
       - ./docker/.env
-    environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    extra_hosts:
+      # Linux 下让容器能访问宿主机服务
+      - "host.docker.internal:host-gateway"
     networks:
       - dataforge-network
     restart: unless-stopped
@@ -72,53 +67,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # ===== PostgreSQL 数据库 =====
-  postgres:
-    image: postgres:16-alpine
-    container_name: dataforge-postgres
-    env_file:
-      - ./docker/.env
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
-    networks:
-      - dataforge-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # 仅内部访问，如需外部访问请取消注释
-    # ports:
-    #   - "5432:5432"
-
-  # ===== Redis 缓存 =====
-  redis:
-    image: redis:7-alpine
-    container_name: dataforge-redis
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
-    env_file:
-      - ./docker/.env
-    volumes:
-      - redis-data:/data
-    networks:
-      - dataforge-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # 仅内部访问，如需外部访问请取消注释
-    # ports:
-    #   - "6379:6379"
-
 # ===== 网络配置 =====
 networks:
   dataforge-network:
@@ -126,9 +74,5 @@ networks:
 
 # ===== 数据卷 =====
 volumes:
-  postgres-data:
-    name: dataforge-postgres-data
-  redis-data:
-    name: dataforge-redis-data
   backend-logs:
     name: dataforge-backend-logs
