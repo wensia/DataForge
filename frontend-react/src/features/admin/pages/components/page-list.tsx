@@ -136,7 +136,7 @@ export function PageList({
         items={sortedGroups.map(g => g.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {sortedGroups.map((group) => (
             <SortableGroup
               key={group.id}
