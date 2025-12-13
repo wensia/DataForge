@@ -9,11 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RecordDownloadRouteImport } from './routes/record-download'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTaskExecutionsRouteImport } from './routes/_authenticated/task-executions'
-import { Route as AuthenticatedRecordDownloadRouteImport } from './routes/_authenticated/record-download'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
@@ -49,6 +49,11 @@ import { Route as AuthenticatedAnalysisChatRouteImport } from './routes/_authent
 import { Route as AuthenticatedAnalysisAiRouteImport } from './routes/_authenticated/analysis/ai'
 import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authenticated/admin/pages'
 
+const RecordDownloadRoute = RecordDownloadRouteImport.update({
+  id: '/record-download',
+  path: '/record-download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -67,12 +72,6 @@ const AuthenticatedTaskExecutionsRoute =
   AuthenticatedTaskExecutionsRouteImport.update({
     id: '/task-executions',
     path: '/task-executions',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedRecordDownloadRoute =
-  AuthenticatedRecordDownloadRouteImport.update({
-    id: '/record-download',
-    path: '/record-download',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
@@ -264,6 +263,7 @@ const AuthenticatedAdminPagesRoute = AuthenticatedAdminPagesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
+  '/record-download': typeof RecordDownloadRoute
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -276,7 +276,6 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
-  '/record-download': typeof AuthenticatedRecordDownloadRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -304,6 +303,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
+  '/record-download': typeof RecordDownloadRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -315,7 +315,6 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
-  '/record-download': typeof AuthenticatedRecordDownloadRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -345,6 +344,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/chat': typeof ChatRoute
+  '/record-download': typeof RecordDownloadRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
@@ -357,7 +357,6 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
-  '/_authenticated/record-download': typeof AuthenticatedRecordDownloadRoute
   '/_authenticated/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -387,6 +386,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/chat'
+    | '/record-download'
     | '/settings'
     | '/forgot-password'
     | '/otp'
@@ -399,7 +399,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
-    | '/record-download'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -427,6 +426,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/chat'
+    | '/record-download'
     | '/forgot-password'
     | '/otp'
     | '/sign-in'
@@ -438,7 +438,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
-    | '/record-download'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -467,6 +466,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/chat'
+    | '/record-download'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
@@ -479,7 +479,6 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/accounts'
-    | '/_authenticated/record-download'
     | '/_authenticated/task-executions'
     | '/_authenticated/'
     | '/_authenticated/admin/pages'
@@ -509,6 +508,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ChatRoute: typeof ChatRoute
+  RecordDownloadRoute: typeof RecordDownloadRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
@@ -523,6 +523,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/record-download': {
+      id: '/record-download'
+      path: '/record-download'
+      fullPath: '/record-download'
+      preLoaderRoute: typeof RecordDownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/chat': {
       id: '/chat'
       path: '/chat'
@@ -549,13 +556,6 @@ declare module '@tanstack/react-router' {
       path: '/task-executions'
       fullPath: '/task-executions'
       preLoaderRoute: typeof AuthenticatedTaskExecutionsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/record-download': {
-      id: '/_authenticated/record-download'
-      path: '/record-download'
-      fullPath: '/record-download'
-      preLoaderRoute: typeof AuthenticatedRecordDownloadRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/accounts': {
@@ -835,7 +835,6 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
-  AuthenticatedRecordDownloadRoute: typeof AuthenticatedRecordDownloadRoute
   AuthenticatedTaskExecutionsRoute: typeof AuthenticatedTaskExecutionsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
@@ -855,7 +854,6 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
-  AuthenticatedRecordDownloadRoute: AuthenticatedRecordDownloadRoute,
   AuthenticatedTaskExecutionsRoute: AuthenticatedTaskExecutionsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
@@ -879,6 +877,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ChatRoute: ChatRoute,
+  RecordDownloadRoute: RecordDownloadRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
