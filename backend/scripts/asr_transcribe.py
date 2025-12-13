@@ -28,7 +28,7 @@ from sqlalchemy import or_, text
 from sqlmodel import Session, select
 
 from app.database import engine
-from app.models import ASRProvider, CallRecord
+from app.models import ASRProvider, CallRecord, TranscriptStatus
 from app.scheduler import task_log
 from app.services.asr_service import asr_service
 from scripts._utils import normalize_time_param
@@ -97,8 +97,16 @@ def _get_records_to_transcribe(
         )
 
         if skip_existing:
-            # 跳过已有转写结果的记录（JSON 字段只需检查 None）
-            statement = statement.where(CallRecord.transcript == None)
+            # 跳过已完成和空内容的记录
+            # - transcript_status 为 None 或 pending：待处理
+            # - transcript_status 为 completed：已完成，跳过
+            # - transcript_status 为 empty：空音频，跳过
+            statement = statement.where(
+                or_(
+                    CallRecord.transcript_status == None,
+                    CallRecord.transcript_status == TranscriptStatus.PENDING,
+                )
+            )
 
         if min_duration > 0:
             # 过滤通话时长
@@ -182,23 +190,33 @@ async def _process_single_record(
             # 3. 处理结果
             if transcript:
                 # 同步 DB 写入放到线程，避免阻塞事件循环
+                # 转写成功，标记状态为 completed
                 await asyncio.to_thread(
-                    asr_service.update_record_transcript, record.id, transcript
+                    asr_service.update_record_transcript,
+                    record.id,
+                    transcript,
+                    TranscriptStatus.COMPLETED,
                 )
                 current = await stats.inc_success()
                 max_display = max_records if max_records > 0 else "∞"
                 task_log(f"[Record {record.id}] ✓ 转写成功 ({current}/{max_display})")
             else:
+                # 空结果，标记为 empty（下次不再重试）
+                await asyncio.to_thread(
+                    asr_service.update_record_transcript_status,
+                    record.id,
+                    TranscriptStatus.EMPTY,
+                )
                 await stats.inc_failed(
                     {
                         "id": record.id,
                         "caller": record.caller,
                         "callee": record.callee,
                         "duration": record.duration,
-                        "error": "转写结果为空（可能是空音频或无语音内容）",
+                        "error": "空音频（已标记跳过）",
                     }
                 )
-                task_log(f"[Record {record.id}] ✗ 转写结果为空")
+                task_log(f"[Record {record.id}] ✗ 空音频，已标记跳过")
 
         except Exception as e:
             await stats.inc_failed(

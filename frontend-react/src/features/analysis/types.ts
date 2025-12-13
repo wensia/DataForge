@@ -3,6 +3,11 @@
  */
 
 /**
+ * 转写状态枚举
+ */
+export type TranscriptStatus = 'pending' | 'completed' | 'empty'
+
+/**
  * ASR 转写片段
  * 与后端 TranscriptSegment 数据结构对应
  */
@@ -28,6 +33,7 @@ export interface CallRecord {
   staff_name: string | null
   department: string | null
   transcript: TranscriptSegment[] | null
+  transcript_status: TranscriptStatus | null
   raw_data: Record<string, unknown>
   created_at: string
   updated_at: string

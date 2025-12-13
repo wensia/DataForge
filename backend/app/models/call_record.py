@@ -23,6 +23,14 @@ class DataSource(str, Enum):
     YUNKE = "yunke"
 
 
+class TranscriptStatus(str, Enum):
+    """转写状态"""
+
+    PENDING = "pending"  # 待转写
+    COMPLETED = "completed"  # 已完成
+    EMPTY = "empty"  # 空内容（无语音）
+
+
 class CallRecord(BaseTable, table=True):
     """通话记录表
 
@@ -57,6 +65,11 @@ class CallRecord(BaseTable, table=True):
         sa_column=Column(JSON),
         description="通话录音转写文本(JSON格式)",
     )
+    transcript_status: str | None = Field(
+        default=None,
+        index=True,
+        description="转写状态: pending/completed/empty",
+    )
 
     # 员工映射字段（通过 staff_mapping 回写）
     staff_id: int | None = Field(default=None, foreign_key="staff.id", description="关联的员工ID")
@@ -87,6 +100,7 @@ class CallRecordCreate(SQLModel):
     staff_name: str | None = None
     department: str | None = None
     transcript: list[dict[str, Any]] | None = None
+    transcript_status: str | None = None
     raw_data: dict[str, Any] = {}
 
 
@@ -103,6 +117,7 @@ class CallRecordUpdate(SQLModel):
     staff_name: str | None = None
     department: str | None = None
     transcript: list[dict[str, Any]] | None = None
+    transcript_status: str | None = None
     raw_data: dict[str, Any] | None = None
 
 
@@ -122,6 +137,7 @@ class CallRecordResponse(SQLModel):
     staff_name: str | None
     department: str | None
     transcript: list[dict[str, Any]] | None
+    transcript_status: str | None = None
     raw_data: dict[str, Any]
     created_at: datetime
     updated_at: datetime

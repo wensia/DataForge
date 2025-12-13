@@ -19,6 +19,7 @@ from app.models.call_record import (
     CallRecordStats,
     CallRecordUpdate,
     DataSource,
+    TranscriptStatus,
 )
 from app.models.feishu_bitable import (
     FeishuBitable,
@@ -146,6 +147,7 @@ __all__ = [
     "ChatMessage",
     "ChatRequest",
     "DataSource",
+    "TranscriptStatus",
     "ExecutionStatus",
     "FeishuBitable",
     "FeishuBitableCreate",

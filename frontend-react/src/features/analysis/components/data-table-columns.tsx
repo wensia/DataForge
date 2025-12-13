@@ -209,10 +209,18 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
           | string
           | undefined
         const hasTranscript = !!row.original.transcript
+        const transcriptStatus = row.original.transcript_status
 
         // 无录音
         if (!recordUrl) {
           return <span className='text-muted-foreground'>-</span>
+        }
+
+        // 空音频（已标记）
+        if (transcriptStatus === 'empty') {
+          return (
+            <span className='text-muted-foreground text-xs'>空音频</span>
+          )
         }
 
         // 有录音，根据是否有转写结果显示不同样式

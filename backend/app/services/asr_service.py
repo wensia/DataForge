@@ -21,7 +21,7 @@ from app.clients.asr import (
 )
 from app.database import engine
 from app.models.asr_config import ASRConfig, ASRProvider
-from app.models.call_record import CallRecord
+from app.models.call_record import CallRecord, TranscriptStatus
 from app.scheduler.task_logger import task_log
 
 logger = logging.getLogger(__name__)
@@ -335,12 +335,14 @@ class ASRService:
         self,
         record_id: int,
         transcript: list[dict],
+        status: str = TranscriptStatus.COMPLETED,
     ) -> bool:
-        """更新通话记录的转写文本
+        """更新通话记录的转写文本和状态
 
         Args:
             record_id: 通话记录 ID
             transcript: 转写数据列表
+            status: 转写状态，默认为 completed
 
         Returns:
             bool: 是否更新成功
@@ -352,9 +354,36 @@ class ASRService:
                 return False
 
             record.transcript = transcript
+            record.transcript_status = status
             session.add(record)
             session.commit()
-            logger.info(f"更新通话记录 {record_id} 转写文本成功")
+            logger.info(f"更新通话记录 {record_id} 转写文本成功 (status={status})")
+            return True
+
+    def update_record_transcript_status(
+        self,
+        record_id: int,
+        status: str,
+    ) -> bool:
+        """仅更新通话记录的转写状态（用于标记空音频）
+
+        Args:
+            record_id: 通话记录 ID
+            status: 转写状态
+
+        Returns:
+            bool: 是否更新成功
+        """
+        with Session(engine) as session:
+            record = session.get(CallRecord, record_id)
+            if not record:
+                logger.error(f"通话记录不存在: {record_id}")
+                return False
+
+            record.transcript_status = status
+            session.add(record)
+            session.commit()
+            logger.info(f"更新通话记录 {record_id} 转写状态: {status}")
             return True
 
 
