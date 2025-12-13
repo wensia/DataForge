@@ -1,5 +1,7 @@
+# syntax=docker/dockerfile:1.4
 # DataForge Backend Dockerfile
 # 基于 Python 3.11 构建 FastAPI 应用
+# 使用 BuildKit 缓存加速构建
 
 FROM python:3.11-slim AS base
 
@@ -7,7 +9,6 @@ FROM python:3.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # 设置工作目录
@@ -23,8 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制依赖文件
 COPY pyproject.toml ./
 
-# 安装 Python 依赖
-RUN pip install --upgrade pip && \
+# 使用 BuildKit 缓存挂载加速 pip 安装
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
     pip install .
 
 # 生产阶段

@@ -1,5 +1,7 @@
+# syntax=docker/dockerfile:1.4
 # DataForge Frontend Dockerfile
 # 多阶段构建：Node 构建 + Nginx 服务
+# 使用 BuildKit 缓存加速构建
 
 # 构建阶段
 FROM node:20-alpine AS builder
@@ -12,8 +14,9 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 # 复制依赖文件
 COPY package.json pnpm-lock.yaml ./
 
-# 安装依赖
-RUN pnpm install --frozen-lockfile
+# 使用 BuildKit 缓存挂载加速 pnpm 安装
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # 复制源代码
 COPY . .
@@ -23,7 +26,8 @@ ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # 构建应用
-RUN pnpm build
+RUN --mount=type=cache,target=/app/node_modules/.cache \
+    pnpm build
 
 # 生产阶段 - 使用 Nginx 服务静态文件
 FROM nginx:alpine AS production
