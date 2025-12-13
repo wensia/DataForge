@@ -4,7 +4,7 @@
  * 无需登录即可使用的录音下载界面。
  * 通过粘贴云客录音详情页 URL，提取 voiceId 下载录音。
  */
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Download,
   Play,
@@ -109,6 +109,38 @@ export function StandaloneRecordDownload() {
   // 下载录音
   const downloadMutation = useDownloadRecord()
 
+  // 加载音频（不自动播放）
+  const loadAudio = useCallback(async () => {
+    if (!parsedInfo?.voiceId || !accountId) return
+    if (audioUrl) return // 已加载过
+
+    try {
+      // 1. 获取云客录音 URL
+      const result = await recordUrlMutation.mutateAsync({
+        accountId,
+        voiceId: parsedInfo.voiceId,
+      })
+
+      // 2. 通过代理获取录音（解决跨域问题）
+      const blob = await proxyRecordMutation.mutateAsync({
+        url: result.download_url,
+      })
+
+      // 3. 创建 Blob URL
+      const blobUrl = window.URL.createObjectURL(blob)
+      setAudioUrl(blobUrl)
+    } catch {
+      toast.error('加载录音失败')
+    }
+  }, [parsedInfo?.voiceId, accountId, audioUrl, recordUrlMutation, proxyRecordMutation])
+
+  // 解析 URL 后自动加载音频
+  useEffect(() => {
+    if (parsedInfo?.voiceId && accountId && !audioUrl) {
+      loadAudio()
+    }
+  }, [parsedInfo?.voiceId, accountId, audioUrl, loadAudio])
+
   // 解析 URL
   const handleParseUrl = () => {
     if (!urlInput.trim()) {
@@ -123,60 +155,20 @@ export function StandaloneRecordDownload() {
     }
 
     setParsedInfo(info)
-    setAudioUrl(null) // 清除旧的音频
+    setAudioUrl(null) // 清除旧的音频，触发重新加载
     toast.success(`已解析 voiceId: ${info.voiceId}`)
   }
 
-  // 播放录音
-  const handlePlay = async () => {
-    if (!parsedInfo?.voiceId) {
-      toast.error('请先解析 URL')
-      return
-    }
+  // 播放/暂停录音
+  const handlePlay = () => {
+    if (!audioRef.current || !audioUrl) return
 
-    if (!accountId) {
-      toast.error('请选择云客账号')
-      return
-    }
-
-    // 如果正在播放，则暂停
-    if (isPlaying && audioRef.current) {
+    if (isPlaying) {
       audioRef.current.pause()
       setIsPlaying(false)
-      return
-    }
-
-    // 如果已有音频 URL，直接播放
-    if (audioUrl && audioRef.current) {
+    } else {
       audioRef.current.play()
       setIsPlaying(true)
-      return
-    }
-
-    try {
-      // 1. 获取云客录音 URL
-      const result = await recordUrlMutation.mutateAsync({
-        accountId,
-        voiceId: parsedInfo.voiceId,
-      })
-
-      // 2. 通过代理获取录音（解决跨域问题）
-      const blob = await proxyRecordMutation.mutateAsync({
-        url: result.download_url,
-      })
-
-      // 3. 创建 Blob URL 播放
-      const blobUrl = window.URL.createObjectURL(blob)
-      setAudioUrl(blobUrl)
-
-      // 播放音频
-      if (audioRef.current) {
-        audioRef.current.src = blobUrl
-        audioRef.current.play()
-        setIsPlaying(true)
-      }
-    } catch {
-      toast.error('获取录音失败')
     }
   }
 
@@ -363,22 +355,29 @@ export function StandaloneRecordDownload() {
                   </div>
 
                   {/* 音频播放器 */}
-                  <audio
-                    ref={audioRef}
-                    onEnded={handleAudioEnded}
-                    onPause={() => setIsPlaying(false)}
-                    onPlay={() => setIsPlaying(true)}
-                    controls
-                    className="w-full"
-                    src={audioUrl || undefined}
-                  />
+                  {(recordUrlMutation.isPending || proxyRecordMutation.isPending) && !audioUrl ? (
+                    <div className="flex h-14 items-center justify-center gap-2 rounded-lg border bg-muted/30">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">正在加载录音...</span>
+                    </div>
+                  ) : (
+                    <audio
+                      ref={audioRef}
+                      onEnded={handleAudioEnded}
+                      onPause={() => setIsPlaying(false)}
+                      onPlay={() => setIsPlaying(true)}
+                      controls
+                      className="w-full"
+                      src={audioUrl || undefined}
+                    />
+                  )}
 
                   {/* 操作按钮 */}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       onClick={handlePlay}
-                      disabled={!accountId || recordUrlMutation.isPending || proxyRecordMutation.isPending}
+                      disabled={!audioUrl || recordUrlMutation.isPending || proxyRecordMutation.isPending}
                       className="flex-1"
                     >
                       {recordUrlMutation.isPending || proxyRecordMutation.isPending ? (
