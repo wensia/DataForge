@@ -5,6 +5,8 @@
       https://api-docs.deepseek.com/zh-cn/guides/reasoning_model
 """
 
+import json
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
@@ -15,6 +17,7 @@ from app.clients.ai.base import (
     AIClientError,
     ChatMessage,
     ChatResponse,
+    StreamChunk,
     ToolCall,
 )
 
@@ -374,4 +377,128 @@ class DeepSeekClient(AIClient):
             raise AIClientError("API 请求超时，请重试") from e
         except httpx.RequestError as e:
             logger.error(f"DeepSeek API 请求错误: {e}")
+            raise AIClientError(f"API 请求失败: {e}") from e
+
+    async def chat_stream(
+        self,
+        messages: list[ChatMessage],
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """流式聊天 - 返回 AsyncGenerator
+
+        文档: https://api-docs.deepseek.com/zh-cn/api-reference/chat
+
+        Args:
+            messages: 消息列表
+            model: 模型名称
+            temperature: 温度参数 (0-2)
+            max_tokens: 最大生成 token 数
+            **kwargs: 其他参数
+
+        Yields:
+            StreamChunk: 流式响应块
+        """
+        model = model or self.default_model
+
+        # 构建请求体
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [msg.to_dict() for msg in messages],
+            "temperature": temperature,
+            "stream": True,
+        }
+
+        if max_tokens:
+            body["max_tokens"] = max_tokens
+
+        # 合并其他参数
+        body.update(kwargs)
+
+        logger.debug(f"DeepSeek 流式请求: model={model}")
+
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=body,
+                ) as response:
+                    if response.status_code != 200:
+                        # 读取错误响应
+                        error_text = await response.aread()
+                        try:
+                            error_data = json.loads(error_text)
+                            error_msg = error_data.get("error", {}).get(
+                                "message", "未知错误"
+                            )
+                            error_code = error_data.get("error", {}).get(
+                                "code", "unknown"
+                            )
+                        except json.JSONDecodeError:
+                            error_msg = error_text.decode() if error_text else "未知错误"
+                            error_code = "unknown"
+                        logger.error(
+                            f"DeepSeek 流式 API 错误: {error_msg} (code={error_code})"
+                        )
+                        raise AIClientError(error_msg, error_code)
+
+                    # 逐行读取 SSE 响应
+                    async for line in response.aiter_lines():
+                        line = line.strip()
+                        if not line:
+                            continue
+
+                        # SSE 格式: data: {...}
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # 去掉 "data: " 前缀
+
+                            # 检查结束标记
+                            if data_str == "[DONE]":
+                                logger.debug("DeepSeek 流式响应完成")
+                                break
+
+                            try:
+                                data = json.loads(data_str)
+                                choice = data.get("choices", [{}])[0]
+                                delta = choice.get("delta", {})
+                                finish_reason = choice.get("finish_reason")
+
+                                # 提取增量内容
+                                content = delta.get("content", "")
+                                reasoning_content = delta.get("reasoning_content")
+
+                                # 提取 usage (仅最后一块可能包含)
+                                usage = data.get("usage")
+                                tokens_used = (
+                                    usage.get("total_tokens") if usage else None
+                                )
+
+                                # 只有有内容时才 yield
+                                if content or reasoning_content or finish_reason:
+                                    yield StreamChunk(
+                                        content=content or "",
+                                        finish_reason=finish_reason,
+                                        reasoning_content=reasoning_content,
+                                        tokens_used=tokens_used,
+                                        model=model,
+                                    )
+
+                            except json.JSONDecodeError as e:
+                                logger.warning(
+                                    f"DeepSeek 流式响应解析失败: {e}, line={line}"
+                                )
+                                continue
+
+        except httpx.TimeoutException as e:
+            logger.error(f"DeepSeek 流式 API 超时: {e}")
+            raise AIClientError("API 请求超时，请重试") from e
+        except httpx.RequestError as e:
+            logger.error(f"DeepSeek 流式 API 请求错误: {e}")
             raise AIClientError(f"API 请求失败: {e}") from e

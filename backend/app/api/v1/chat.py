@@ -3,7 +3,10 @@
 提供 AI 对话的创建、消息发送、历史记录等接口。
 """
 
+import json
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlmodel import Session
 
@@ -12,7 +15,6 @@ from app.models.conversation import (
     ConversationCreate,
     ConversationResponse,
     ConversationUpdate,
-    ConversationWithMessages,
     MessageResponse,
     SendMessageRequest,
     SendMessageResponse,
@@ -283,6 +285,56 @@ async def send_message(
     except ChatServiceError as e:
         logger.error(f"发送消息失败: {e.message}")
         return ResponseModel.error(code=500, message=e.message)
+
+
+@router.post("/conversations/{conversation_id}/messages/stream")
+async def send_message_stream(
+    conversation_id: int,
+    data: SendMessageRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """流式发送消息并获取 AI 回复
+
+    使用 SSE (Server-Sent Events) 实时返回 AI 响应内容。
+
+    事件格式:
+        - type: "start" - 开始响应，包含 user_message_id
+        - type: "content" - 增量内容
+        - type: "done" - 响应完成，包含 assistant_message_id 和 tokens_used
+        - type: "error" - 发生错误
+
+    Args:
+        conversation_id: 对话 ID
+        data: 发送消息请求数据
+
+    Returns:
+        StreamingResponse: SSE 流式响应
+    """
+
+    async def event_generator():
+        """生成 SSE 事件流"""
+        async for event in chat_service.send_message_stream(
+            session=session,
+            conversation_id=conversation_id,
+            user_id=current_user.user_id,
+            content=data.content,
+            ai_provider=data.ai_provider,
+        ):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        # 发送结束标记
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用 nginx 缓冲
+        },
+    )
 
 
 # ============ 辅助接口 ============

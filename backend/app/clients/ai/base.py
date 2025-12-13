@@ -90,6 +90,20 @@ class ChatResponse:
     tool_calls: list[ToolCall] | None = None  # 工具调用请求
 
 
+@dataclass
+class StreamChunk:
+    """流式响应块
+
+    用于流式输出时的单个响应块。
+    """
+
+    content: str  # 增量内容
+    finish_reason: str | None = None  # 完成原因 (stop, length, tool_calls 等)
+    reasoning_content: str | None = None  # 增量思考内容
+    tokens_used: int | None = None  # 累计 token 数（仅最后一块包含）
+    model: str | None = None  # 模型名称
+
+
 class AIClient(ABC):
     """AI 客户端抽象基类
 

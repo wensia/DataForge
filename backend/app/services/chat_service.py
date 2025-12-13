@@ -4,7 +4,9 @@
 支持 Function Calling 让 AI 自主查询数据库。
 """
 
+from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 from loguru import logger
 from sqlalchemy import func
@@ -456,3 +458,149 @@ def get_available_providers(session: Session) -> list[dict]:
             seen.add(cfg.provider)
 
     return providers
+
+
+async def send_message_stream(
+    session: Session,
+    conversation_id: int,
+    user_id: int,
+    content: str,
+    ai_provider: str | None = None,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """流式发送消息并获取 AI 回复
+
+    Args:
+        session: 数据库会话
+        conversation_id: 对话 ID
+        user_id: 用户 ID
+        content: 用户消息内容
+        ai_provider: 临时使用的 AI 提供商
+
+    Yields:
+        dict: SSE 事件数据
+            - type: "start" | "content" | "done" | "error"
+            - content: 增量内容 (content 类型)
+            - user_message_id: 用户消息 ID (start 类型)
+            - assistant_message_id: AI 消息 ID (done 类型)
+            - tokens_used: token 消耗 (done 类型)
+            - error: 错误信息 (error 类型)
+
+    Raises:
+        ChatServiceError: 对话不存在或 AI 服务错误
+    """
+    # 获取对话
+    conversation = get_conversation(session, conversation_id, user_id)
+    if not conversation:
+        yield {"type": "error", "error": "对话不存在"}
+        return
+
+    now = datetime.now()
+
+    # 保存用户消息
+    user_message = Message(
+        conversation_id=conversation_id,
+        role=MessageRole.USER,
+        content=content,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(user_message)
+    session.flush()  # 获取 ID
+
+    # 发送开始事件
+    yield {"type": "start", "user_message_id": user_message.id}
+
+    try:
+        # 获取历史消息作为上下文
+        history_messages, _ = get_conversation_messages(
+            session, conversation_id, limit=20
+        )
+
+        # 构建消息历史（不包括刚添加的用户消息）
+        chat_history: list[AIChatMessage] = [
+            AIChatMessage(role=msg.role, content=msg.content)
+            for msg in history_messages
+            if msg.id != user_message.id
+        ]
+
+        # 添加当前用户消息
+        chat_history.append(AIChatMessage(role="user", content=content))
+
+        # 获取 AI 客户端
+        provider = ai_provider or conversation.ai_provider
+        provider_id, client, model = _resolve_ai_client(session, provider)
+
+        # 添加系统提示（如果是数据分析对话）
+        if conversation.conversation_type == ConversationType.ANALYSIS:
+            system_prompt = """你是一个专业的数据分析助手。
+请用中文回答问题，并以清晰、结构化的方式呈现分析结果。"""
+            chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
+
+        # 检查客户端是否支持流式输出
+        if not hasattr(client, "chat_stream"):
+            yield {"type": "error", "error": "当前 AI 服务不支持流式输出"}
+            return
+
+        # 收集完整内容
+        full_content = ""
+        total_tokens = 0
+
+        # 流式调用 AI
+        logger.info(
+            f"开始流式对话: conversation_id={conversation_id}, "
+            f"provider={provider_id}"
+        )
+
+        async for chunk in client.chat_stream(chat_history, model=model):
+            if chunk.content:
+                full_content += chunk.content
+                yield {"type": "content", "content": chunk.content}
+
+            if chunk.tokens_used:
+                total_tokens = chunk.tokens_used
+
+            if chunk.finish_reason:
+                logger.debug(f"流式响应完成: finish_reason={chunk.finish_reason}")
+
+        # 保存 AI 回复
+        assistant_message = Message(
+            conversation_id=conversation_id,
+            role=MessageRole.ASSISTANT,
+            content=full_content,
+            tokens_used=total_tokens,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+        session.add(assistant_message)
+
+        # 更新对话时间和 provider
+        conversation.updated_at = datetime.now()
+        if ai_provider:
+            conversation.ai_provider = provider_id
+        session.add(conversation)
+
+        # 如果是第一条消息，自动生成标题
+        if len(history_messages) == 0:
+            auto_title = content[:50] + ("..." if len(content) > 50 else "")
+            conversation.title = auto_title
+            session.add(conversation)
+
+        session.commit()
+        session.refresh(assistant_message)
+
+        logger.info(
+            f"流式对话完成: conversation_id={conversation_id}, "
+            f"provider={provider_id}, tokens={total_tokens}"
+        )
+
+        # 发送完成事件
+        yield {
+            "type": "done",
+            "assistant_message_id": assistant_message.id,
+            "tokens_used": total_tokens,
+        }
+
+    except AIClientError as e:
+        session.rollback()
+        logger.error(f"流式对话 AI 错误: {e.message}")
+        yield {"type": "error", "error": f"AI 服务错误: {e.message}"}

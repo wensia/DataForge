@@ -1,17 +1,18 @@
 /**
  * AI 对话页面
+ *
+ * 支持流式响应、Markdown 渲染、代码高亮。
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import {
   MessageSquare,
   Plus,
-  Send,
   Loader2,
   Trash2,
   MoreVertical,
   Bot,
-  User,
+  StopCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -23,7 +24,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -31,14 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,31 +49,48 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  ChatContainer,
+  ChatMessages,
+  ChatBubble,
+  ChatInput,
+  ChatTypingIndicator,
+  ChatEmpty,
+} from '@/components/ui/chat'
+import {
   useConversations,
   useConversation,
   useProviders,
   useCreateConversation,
   useDeleteConversation,
-  useSendMessage,
 } from './api'
+import { useChatStream } from './hooks/use-chat-stream'
+import { MarkdownContent } from './components/markdown-content'
 import type { Conversation, Message } from './types'
 
 export function AIChat() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [inputMessage, setInputMessage] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
-  const [useDeepThinking, setUseDeepThinking] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [conversationToDelete, setConversationToDelete] = useState<number | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [conversationToDelete, setConversationToDelete] = useState<
+    number | null
+  >(null)
 
   // API Hooks
-  const { data: conversationsData, isLoading: isLoadingConversations } = useConversations()
-  const { data: conversationData, isLoading: isLoadingConversation } = useConversation(selectedId)
+  const { data: conversationsData, isLoading: isLoadingConversations } =
+    useConversations()
+  const { data: conversationData, isLoading: isLoadingConversation } =
+    useConversation(selectedId)
   const { data: providers } = useProviders()
   const createMutation = useCreateConversation()
   const deleteMutation = useDeleteConversation()
-  const sendMutation = useSendMessage()
+
+  // 流式聊天 Hook
+  const { isStreaming, streamingContent, error, sendMessage, stopStreaming } =
+    useChatStream({
+      conversationId: selectedId,
+      onError: (err) => toast.error(err),
+    })
 
   const conversations = conversationsData?.items || []
   const messages = conversationData?.messages || []
@@ -91,12 +101,6 @@ export function AIChat() {
       setSelectedProvider(providers[0].id)
     }
   }, [providers, selectedProvider])
-
-  // 滚动到底部
-  const messagesLength = messages.length
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messagesLength])
 
   // 创建新对话
   const handleCreateConversation = async () => {
@@ -127,35 +131,26 @@ export function AIChat() {
     }
   }
 
-  // 发送消息
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedId) return
+  // 发送消息（流式）
+  const handleSendMessage = useCallback(async () => {
+    if (!inputMessage.trim() || !selectedId || isStreaming) return
 
     const content = inputMessage.trim()
     setInputMessage('')
 
     try {
-      await sendMutation.mutateAsync({
-        conversationId: selectedId,
-        data: {
-          content,
-          ai_provider: selectedProvider || undefined,
-          use_deep_thinking: useDeepThinking,
-        },
-      })
+      await sendMessage(content, selectedProvider || undefined)
     } catch {
       toast.error('发送失败，请重试')
-      setInputMessage(content) // 恢复输入
+      setInputMessage(content)
     }
-  }
+  }, [inputMessage, selectedId, isStreaming, sendMessage, selectedProvider])
 
-  // 处理键盘事件
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
+  // 复制消息内容
+  const handleCopyMessage = useCallback((content: string) => {
+    navigator.clipboard.writeText(content)
+    toast.success('已复制到剪贴板')
+  }, [])
 
   return (
     <>
@@ -194,7 +189,10 @@ export function AIChat() {
 
               {/* AI 服务选择 */}
               {providers && providers.length > 0 && (
-                <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                <Select
+                  value={selectedProvider}
+                  onValueChange={setSelectedProvider}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="选择 AI 服务" />
                   </SelectTrigger>
@@ -216,7 +214,7 @@ export function AIChat() {
                   <Loader2 className="animate-spin text-muted-foreground" />
                 </div>
               ) : conversations.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="py-8 text-center text-muted-foreground">
                   <MessageSquare className="mx-auto mb-2 h-8 w-8" />
                   <p className="text-sm">暂无对话</p>
                   <p className="text-xs">点击 + 创建新对话</p>
@@ -240,92 +238,75 @@ export function AIChat() {
 
           {/* 右侧：对话内容 */}
           {selectedId ? (
-            <div className="bg-background flex flex-1 flex-col rounded-md border shadow-xs">
+            <ChatContainer className="bg-background flex-1 rounded-md border shadow-xs">
               {/* 对话头部 */}
-              <div className="bg-card flex items-center justify-between p-4 shadow-sm rounded-t-md">
+              <div className="bg-card flex items-center justify-between rounded-t-md p-4 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Bot className="text-primary" />
                   <span className="font-medium">
                     {conversationData?.title || '新对话'}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {conversationData?.ai_provider?.toUpperCase()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {conversationData?.ai_provider?.toUpperCase()}
+                  </Badge>
+                  {isStreaming && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={stopStreaming}
+                      className="h-7 gap-1"
+                    >
+                      <StopCircle className="h-3 w-3" />
+                      停止
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {/* 消息列表 */}
-              <ScrollArea className="flex-1 p-4">
-                {isLoadingConversation ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader2 className="animate-spin text-muted-foreground" />
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mb-4" />
-                    <p>发送消息开始对话</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => (
-                      <MessageBubble key={message.id} message={message} />
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
-              </ScrollArea>
+              {isLoadingConversation ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <Loader2 className="animate-spin text-muted-foreground" />
+                </div>
+              ) : messages.length === 0 && !isStreaming ? (
+                <ChatEmpty
+                  title="开始对话"
+                  description="发送消息与 AI 开始交流"
+                />
+              ) : (
+                <ChatMessages>
+                  {messages.map((message) => (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      onCopy={() => handleCopyMessage(message.content)}
+                    />
+                  ))}
+                  {/* 流式响应中的消息 */}
+                  {isStreaming && streamingContent && (
+                    <ChatBubble variant="assistant" showCopy={false}>
+                      <MarkdownContent content={streamingContent} />
+                    </ChatBubble>
+                  )}
+                  {/* 正在等待响应 */}
+                  {isStreaming && !streamingContent && (
+                    <ChatTypingIndicator />
+                  )}
+                </ChatMessages>
+              )}
 
               {/* 输入框 */}
-              <div className="p-4 border-t">
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="输入消息... (Enter 发送，Shift+Enter 换行)"
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="min-h-[60px] max-h-[120px] resize-none"
-                    disabled={sendMutation.isPending}
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!inputMessage.trim() || sendMutation.isPending}
-                    className="h-auto"
-                  >
-                    {sendMutation.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Send />
-                    )}
-                  </Button>
-                </div>
-                {/* 深度思考开关 */}
-                <div className="flex items-center justify-end gap-2 mt-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id="deep-thinking"
-                            checked={useDeepThinking}
-                            onCheckedChange={setUseDeepThinking}
-                          />
-                          <Label
-                            htmlFor="deep-thinking"
-                            className="text-sm text-muted-foreground cursor-pointer"
-                          >
-                            深度思考
-                          </Label>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>启用后 AI 会进行更深入的思考分析</p>
-                        <p className="text-xs text-muted-foreground">仅 DeepSeek 支持</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </div>
-            </div>
+              <ChatInput
+                value={inputMessage}
+                onChange={setInputMessage}
+                onSubmit={handleSendMessage}
+                placeholder="输入消息..."
+                disabled={!selectedId}
+                isLoading={isStreaming}
+              />
+            </ChatContainer>
           ) : (
             <div className="bg-card flex flex-1 flex-col items-center justify-center rounded-md border shadow-xs">
               <div className="flex flex-col items-center space-y-6">
@@ -334,11 +315,14 @@ export function AIChat() {
                 </div>
                 <div className="space-y-2 text-center">
                   <h1 className="text-xl font-semibold">AI 对话助手</h1>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm text-muted-foreground">
                     选择或创建一个对话开始聊天
                   </p>
                 </div>
-                <Button onClick={handleCreateConversation} disabled={createMutation.isPending}>
+                <Button
+                  onClick={handleCreateConversation}
+                  disabled={createMutation.isPending}
+                >
                   {createMutation.isPending ? (
                     <Loader2 className="mr-2 animate-spin" />
                   ) : (
@@ -392,14 +376,14 @@ function ConversationItem({
     <>
       <div
         className={cn(
-          'group flex items-center justify-between rounded-md px-2 py-2 cursor-pointer',
+          'group flex cursor-pointer items-center justify-between rounded-md px-2 py-2',
           'hover:bg-accent hover:text-accent-foreground',
           isSelected && 'bg-muted'
         )}
         onClick={onSelect}
       >
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{conversation.title}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{conversation.title}</p>
           <p className="text-xs text-muted-foreground">
             {format(new Date(conversation.updated_at), 'MM-dd HH:mm')}
           </p>
@@ -434,41 +418,38 @@ function ConversationItem({
 }
 
 // 消息气泡组件
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  onCopy,
+}: {
+  message: Message
+  onCopy: () => void
+}) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
+    <ChatBubble
+      variant={isUser ? 'user' : 'assistant'}
+      showCopy={!isUser}
+      onCopy={onCopy}
+    >
+      {isUser ? (
+        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+      ) : (
+        <MarkdownContent content={message.content} />
+      )}
       <div
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+          'mt-2 text-xs opacity-60',
+          isUser ? 'text-right' : 'text-left'
         )}
       >
-        {isUser ? <User size={16} /> : <Bot size={16} />}
-      </div>
-      <div
-        className={cn(
-          'max-w-[80%] rounded-lg px-4 py-2',
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted'
+        {format(new Date(message.created_at), 'HH:mm')}
+        {message.tokens_used && (
+          <span className="ml-2">({message.tokens_used} tokens)</span>
         )}
-      >
-        <div className="whitespace-pre-wrap break-words text-sm">{message.content}</div>
-        <div
-          className={cn(
-            'mt-1 text-xs opacity-70',
-            isUser ? 'text-right' : 'text-left'
-          )}
-        >
-          {format(new Date(message.created_at), 'HH:mm')}
-          {message.tokens_used && (
-            <span className="ml-2">({message.tokens_used} tokens)</span>
-          )}
-        </div>
       </div>
-    </div>
+    </ChatBubble>
   )
 }
 

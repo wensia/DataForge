@@ -9,6 +9,7 @@ from app.clients.ai.base import (
     ChatMessage,
     ChatResponse,
     FunctionCall,
+    StreamChunk,
     ToolCall,
 )
 from app.clients.ai.deepseek import DeepSeekClient
@@ -20,6 +21,7 @@ __all__ = [
     "ChatMessage",
     "ChatResponse",
     "FunctionCall",
+    "StreamChunk",
     "ToolCall",
     "KimiClient",
     "DeepSeekClient",
