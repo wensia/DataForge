@@ -77,6 +77,7 @@ import {
 } from './api'
 import { useChatStream } from './hooks/use-chat-stream'
 import { MarkdownContent } from './components/markdown-content'
+import { QuickPrompts } from './components/quick-prompts'
 import type { Conversation, Message } from './types'
 
 export function AIChat() {
@@ -340,6 +341,12 @@ export function AIChat() {
                   )}
                 </ChatMessages>
               )}
+
+              {/* 快捷话术 */}
+              <QuickPrompts
+                onSelect={(content) => setInputMessage(content)}
+                className="border-t px-4 pt-2"
+              />
 
               {/* 输入框 */}
               <ChatInput

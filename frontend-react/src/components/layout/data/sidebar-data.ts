@@ -15,6 +15,7 @@ import {
   UserRoundCog,
   Layers,
   Download,
+  MessageCircle,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -134,6 +135,11 @@ export const sidebarData: SidebarData = {
           title: '用户管理',
           url: '/settings/users',
           icon: Users,
+        },
+        {
+          title: '快捷话术',
+          url: '/settings/prompts',
+          icon: MessageCircle,
         },
         {
           title: '页面管理',

@@ -35,6 +35,7 @@ import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAnalysisIndexRouteImport } from './routes/_authenticated/analysis/index'
 import { Route as AuthenticatedAiChatIndexRouteImport } from './routes/_authenticated/ai-chat/index'
 import { Route as AuthenticatedSettingsUsersRouteImport } from './routes/_authenticated/settings/users'
+import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_authenticated/settings/prompts'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsFeishuRouteImport } from './routes/_authenticated/settings/feishu'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
@@ -185,6 +186,12 @@ const AuthenticatedSettingsUsersRoute =
     path: '/users',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedSettingsPromptsRoute =
+  AuthenticatedSettingsPromptsRouteImport.update({
+    id: '/prompts',
+    path: '/prompts',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
@@ -291,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
@@ -330,6 +338,7 @@ export interface FileRoutesByTo {
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
@@ -372,6 +381,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/_authenticated/settings/users': typeof AuthenticatedSettingsUsersRoute
   '/_authenticated/ai-chat/': typeof AuthenticatedAiChatIndexRoute
   '/_authenticated/analysis/': typeof AuthenticatedAnalysisIndexRoute
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/feishu'
     | '/settings/notifications'
+    | '/settings/prompts'
     | '/settings/users'
     | '/ai-chat'
     | '/analysis'
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/feishu'
     | '/settings/notifications'
+    | '/settings/prompts'
     | '/settings/users'
     | '/ai-chat'
     | '/analysis'
@@ -494,6 +506,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/feishu'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/settings/prompts'
     | '/_authenticated/settings/users'
     | '/_authenticated/ai-chat/'
     | '/_authenticated/analysis/'
@@ -705,6 +718,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsUsersRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/prompts': {
+      id: '/_authenticated/settings/prompts'
+      path: '/prompts'
+      fullPath: '/settings/prompts'
+      preLoaderRoute: typeof AuthenticatedSettingsPromptsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/notifications': {
       id: '/_authenticated/settings/notifications'
       path: '/notifications'
@@ -808,6 +828,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
   AuthenticatedSettingsFeishuRoute: typeof AuthenticatedSettingsFeishuRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
+  AuthenticatedSettingsPromptsRoute: typeof AuthenticatedSettingsPromptsRoute
   AuthenticatedSettingsUsersRoute: typeof AuthenticatedSettingsUsersRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
 }
@@ -823,6 +844,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsFeishuRoute: AuthenticatedSettingsFeishuRoute,
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
+    AuthenticatedSettingsPromptsRoute: AuthenticatedSettingsPromptsRoute,
     AuthenticatedSettingsUsersRoute: AuthenticatedSettingsUsersRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
   }

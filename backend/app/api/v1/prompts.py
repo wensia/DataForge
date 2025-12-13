@@ -22,7 +22,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.utils.response import ResponseModel, success_response, error_response
+from app.schemas.response import ResponseModel
 from app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/prompts", tags=["prompts"])
@@ -81,7 +81,7 @@ async def get_prompts(
         prompt_dict["assigned_count"] = assignment_count
         result.append(prompt_dict)
 
-    return success_response(
+    return ResponseModel.success(
         data={
             "items": result,
             "total": total,
@@ -107,7 +107,7 @@ async def create_prompt(
     session.commit()
     session.refresh(prompt)
 
-    return success_response(data=prompt.model_dump(), message="创建成功")
+    return ResponseModel.success(data=prompt.model_dump(), message="创建成功")
 
 
 @router.get("/categories", response_model=ResponseModel)
@@ -118,7 +118,7 @@ async def get_categories(
     """获取所有分类"""
     query = select(Prompt.category).where(Prompt.category.isnot(None)).distinct()
     categories = session.exec(query).all()
-    return success_response(data=[c for c in categories if c])
+    return ResponseModel.success(data=[c for c in categories if c])
 
 
 @router.get("/my", response_model=ResponseModel)
@@ -136,7 +136,7 @@ async def get_my_prompts(
     )
 
     prompts = session.exec(query).all()
-    return success_response(data=[p.model_dump() for p in prompts])
+    return ResponseModel.success(data=[p.model_dump() for p in prompts])
 
 
 @router.get("/{prompt_id}", response_model=ResponseModel)
@@ -148,7 +148,7 @@ async def get_prompt(
     """获取话术详情"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     # 获取分配的用户列表
     query = (
@@ -173,7 +173,7 @@ async def get_prompt(
     result["assigned_users"] = assigned_users
     result["assigned_count"] = len(assigned_users)
 
-    return success_response(data=result)
+    return ResponseModel.success(data=result)
 
 
 @router.put("/{prompt_id}", response_model=ResponseModel)
@@ -186,7 +186,7 @@ async def update_prompt(
     """更新话术"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -196,7 +196,7 @@ async def update_prompt(
     session.commit()
     session.refresh(prompt)
 
-    return success_response(data=prompt.model_dump(), message="更新成功")
+    return ResponseModel.success(data=prompt.model_dump(), message="更新成功")
 
 
 @router.delete("/{prompt_id}", response_model=ResponseModel)
@@ -208,7 +208,7 @@ async def delete_prompt(
     """删除话术"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     # 删除关联的分配记录
     session.exec(
@@ -222,7 +222,7 @@ async def delete_prompt(
     session.delete(prompt)
     session.commit()
 
-    return success_response(message="删除成功")
+    return ResponseModel.success(message="删除成功")
 
 
 # ============ 话术分配 API (仅管理员) ============
@@ -237,7 +237,7 @@ async def get_prompt_assignments(
     """获取话术的用户分配列表"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     query = (
         select(PromptAssignment, User)
@@ -258,7 +258,7 @@ async def get_prompt_assignments(
         for assignment, user in assignments
     ]
 
-    return success_response(data=result)
+    return ResponseModel.success(data=result)
 
 
 @router.post("/{prompt_id}/assignments", response_model=ResponseModel)
@@ -271,7 +271,7 @@ async def assign_users(
     """批量分配用户到话术"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     # 获取已分配的用户 ID
     existing_query = select(PromptAssignment.user_id).where(
@@ -292,7 +292,7 @@ async def assign_users(
 
     session.commit()
 
-    return success_response(
+    return ResponseModel.success(
         message=f"成功分配 {added} 个用户",
         data={"added": added, "total_requested": len(data.user_ids)},
     )
@@ -308,7 +308,7 @@ async def unassign_users(
     """批量取消分配用户"""
     prompt = session.get(Prompt, prompt_id)
     if not prompt:
-        return error_response(message="话术不存在", code=404)
+        return ResponseModel.error(message="话术不存在", code=404)
 
     # 删除分配记录
     removed = 0
@@ -325,7 +325,7 @@ async def unassign_users(
 
     session.commit()
 
-    return success_response(
+    return ResponseModel.success(
         message=f"成功取消分配 {removed} 个用户",
         data={"removed": removed, "total_requested": len(data.user_ids)},
     )
