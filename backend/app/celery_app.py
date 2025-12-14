@@ -30,44 +30,35 @@ celery_app.conf.update(
     task_serializer=settings.celery_task_serializer,
     result_serializer=settings.celery_result_serializer,
     accept_content=["json"],
-
     # ---------- 时区配置 ----------
     timezone=settings.celery_timezone,
     enable_utc=False,
-
     # ---------- 任务追踪 ----------
     task_track_started=settings.celery_task_track_started,
-
     # ---------- 任务结果配置 ----------
     result_expires=settings.celery_result_expires,
-
     # ---------- Worker 配置 ----------
     worker_prefetch_multiplier=settings.celery_worker_prefetch_multiplier,
     worker_concurrency=settings.celery_worker_concurrency,
-
     # ---------- 任务确认模式（重要！）----------
     # 任务完成后才确认，防止 worker 崩溃导致任务丢失
     task_acks_late=True,
     # 任务被拒绝时重新入队（配合 acks_late）
     task_reject_on_worker_lost=True,
-
     # ---------- Redis Broker 配置（关键！）----------
     # visibility_timeout: 任务被取出后未确认的最长时间
     # 必须大于最长任务的执行时间，否则任务会被重复投递
     broker_transport_options={
         "visibility_timeout": settings.celery_broker_visibility_timeout,
     },
-
     # ---------- Redis Backend 配置 ----------
     # 同样需要设置 visibility_timeout
     result_backend_transport_options={
         "visibility_timeout": settings.celery_broker_visibility_timeout,
     },
-
     # ---------- 软关闭机制（Celery 5.5+）----------
     # Worker 收到 SIGTERM 后的优雅关闭超时
     worker_soft_shutdown_timeout=settings.celery_worker_soft_shutdown_timeout,
-
     # ---------- Beat 配置 ----------
     beat_scheduler="app.celery_scheduler:DatabaseScheduler",
 )
@@ -76,6 +67,7 @@ celery_app.conf.update(
 # ============================================================================
 # Worker 信号处理
 # ============================================================================
+
 
 @worker_init.connect
 def on_worker_init(sender=None, **kwargs):
@@ -90,7 +82,9 @@ def on_worker_init(sender=None, **kwargs):
     # 1. 初始化数据库连接（预热连接池）
     try:
         from sqlalchemy import text
+
         from app.database import engine
+
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         logger.info("数据库连接池已预热")
@@ -100,6 +94,7 @@ def on_worker_init(sender=None, **kwargs):
     # 2. 初始化 Redis 连接
     try:
         from app.utils.redis_client import get_redis_client
+
         client = get_redis_client()
         if client:
             client.ping()
@@ -110,6 +105,7 @@ def on_worker_init(sender=None, **kwargs):
     # 3. 发现并注册任务处理函数
     try:
         from app.scheduler.registry import discover_handlers
+
         discover_handlers()
         logger.info("任务处理函数已加载")
     except Exception as e:
@@ -130,6 +126,7 @@ def on_worker_shutdown(sender=None, **kwargs):
     # 1. 关闭数据库连接池
     try:
         from app.database import engine
+
         engine.dispose()
         logger.info("数据库连接池已关闭")
     except Exception as e:
