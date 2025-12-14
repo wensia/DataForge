@@ -22,6 +22,9 @@ import {
   XCircle,
   Shield,
   User as UserIcon,
+  Dices,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -169,11 +172,30 @@ const roleOptions = [
 ]
 
 const formSchema = z.object({
-  email: z.string().email('请输入有效的邮箱'),
+  email: z.string().email('请输入有效的邮箱').optional().or(z.literal('')),
   password: z.string().min(6, '密码至少 6 个字符'),
   name: z.string().min(1, '名称不能为空'),
   role: z.string().min(1, '请选择角色'),
 })
+
+/** 生成随机密码：2位大写 + 2位小写 + 4位数字 */
+function generateRandomPassword(): string {
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+  const digits = '0123456789'
+
+  let password = ''
+  for (let i = 0; i < 2; i++) {
+    password += uppercase[Math.floor(Math.random() * uppercase.length)]
+  }
+  for (let i = 0; i < 2; i++) {
+    password += lowercase[Math.floor(Math.random() * lowercase.length)]
+  }
+  for (let i = 0; i < 4; i++) {
+    password += digits[Math.floor(Math.random() * digits.length)]
+  }
+  return password
+}
 
 type UserForm = z.infer<typeof formSchema>
 
@@ -189,6 +211,11 @@ export function UsersSettings() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    name: string
+    password: string
+  } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const columns: ColumnDef<User>[] = [
     {
@@ -337,15 +364,27 @@ export function UsersSettings() {
 
   const onSubmit = async (data: UserForm) => {
     try {
+      const password = data.password
       await createUser.mutateAsync(data)
       toast.success('用户创建成功')
       setCreateDialogOpen(false)
+      // 保存凭证用于复制
+      setCreatedCredentials({ name: data.name, password })
       form.reset()
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : '创建失败，请重试'
       toast.error(message)
     }
+  }
+
+  const handleCopyCredentials = () => {
+    if (!createdCredentials) return
+    const text = `用户名: ${createdCredentials.name}\n密码: ${createdCredentials.password}`
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+    toast.success('凭证已复制到剪贴板')
   }
 
   const handleDelete = async () => {
@@ -488,7 +527,9 @@ export function UsersSettings() {
                 name='email'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>邮箱</FormLabel>
+                    <FormLabel>
+                      邮箱 <span className='text-muted-foreground'>(可选)</span>
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -507,14 +548,28 @@ export function UsersSettings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>密码</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type='password'
-                        placeholder='输入密码'
-                        autoComplete='new-password'
-                      />
-                    </FormControl>
+                    <div className='flex gap-2'>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='text'
+                          placeholder='输入密码'
+                          autoComplete='new-password'
+                        />
+                      </FormControl>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='icon'
+                        onClick={() => {
+                          const pwd = generateRandomPassword()
+                          form.setValue('password', pwd)
+                        }}
+                        title='生成随机密码'
+                      >
+                        <Dices className='h-4 w-4' />
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -583,6 +638,60 @@ export function UsersSettings() {
         }
         confirmText='删除'
       />
+
+      {/* 凭证复制对话框 */}
+      <Dialog
+        open={!!createdCredentials}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedCredentials(null)
+            setCopied(false)
+          }
+        }}
+      >
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>用户创建成功</DialogTitle>
+            <DialogDescription>
+              请保存以下登录凭证，密码不会再次显示。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-3 rounded-md border bg-muted/50 p-4'>
+            <div className='flex items-center justify-between'>
+              <span className='text-muted-foreground text-sm'>用户名</span>
+              <span className='font-mono font-medium'>
+                {createdCredentials?.name}
+              </span>
+            </div>
+            <Separator />
+            <div className='flex items-center justify-between'>
+              <span className='text-muted-foreground text-sm'>密码</span>
+              <span className='font-mono font-medium'>
+                {createdCredentials?.password}
+              </span>
+            </div>
+          </div>
+          <DialogFooter className='sm:justify-between'>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setCreatedCredentials(null)
+                setCopied(false)
+              }}
+            >
+              关闭
+            </Button>
+            <Button onClick={handleCopyCredentials} className='gap-2'>
+              {copied ? (
+                <Check className='h-4 w-4' />
+              ) : (
+                <Copy className='h-4 w-4' />
+              )}
+              {copied ? '已复制' : '复制凭证'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
