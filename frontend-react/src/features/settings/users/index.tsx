@@ -103,7 +103,7 @@ function useCreateUser() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: {
-      email: string
+      email?: string
       password: string
       name: string
       role: string
