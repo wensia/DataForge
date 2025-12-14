@@ -29,7 +29,7 @@ from app.models.task_execution import (
     TaskExecution,
     TaskExecutionDetailResponse,
 )
-from app.scheduler.core import get_scheduler
+from app.scheduler.core import get_scheduler, is_scheduler_initialized
 from app.scheduler.executor import execute_task
 from app.scheduler.registry import get_handler
 
@@ -486,6 +486,9 @@ def init_default_tasks() -> None:
 
 def _add_task_to_scheduler(task: ScheduledTask) -> None:
     """将任务添加到调度器"""
+    if not is_scheduler_initialized():
+        return  # 非 leader 实例，跳过调度器同步
+
     if task.status != TaskStatus.ACTIVE:
         return
 
@@ -539,6 +542,9 @@ def _add_task_to_scheduler(task: ScheduledTask) -> None:
 
 def _update_task_in_scheduler(task: ScheduledTask) -> None:
     """更新调度器中的任务"""
+    if not is_scheduler_initialized():
+        return  # 非 leader 实例，跳过调度器同步
+
     _remove_task_from_scheduler(task.id)
     if task.status == TaskStatus.ACTIVE:
         _add_task_to_scheduler(task)
@@ -546,6 +552,9 @@ def _update_task_in_scheduler(task: ScheduledTask) -> None:
 
 def _remove_task_from_scheduler(task_id: int) -> None:
     """从调度器移除任务"""
+    if not is_scheduler_initialized():
+        return  # 非 leader 实例，跳过调度器同步
+
     scheduler = get_scheduler()
     job_id = f"task_{task_id}"
     if scheduler.get_job(job_id):
