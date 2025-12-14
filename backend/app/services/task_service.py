@@ -529,11 +529,12 @@ def _add_task_to_scheduler(task: ScheduledTask) -> None:
     )
 
     # 更新下次执行时间
-    if job.next_run_time:
+    next_run_time = getattr(job, "next_run_time", None)
+    if next_run_time:
         with Session(engine) as session:
             db_task = session.get(ScheduledTask, task.id)
             if db_task:
-                db_task.next_run_at = job.next_run_time
+                db_task.next_run_at = next_run_time
                 session.add(db_task)
                 session.commit()
 
