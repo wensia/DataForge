@@ -39,9 +39,10 @@ function useMyPrompts() {
 interface QuickPromptsProps {
   onSelect: (content: string) => void
   className?: string
+  compact?: boolean
 }
 
-export function QuickPrompts({ onSelect, className }: QuickPromptsProps) {
+export function QuickPrompts({ onSelect, className, compact = false }: QuickPromptsProps) {
   const { data: prompts = [], isLoading } = useMyPrompts()
   const [isOpen, setIsOpen] = useState(true)
 
@@ -64,6 +65,25 @@ export function QuickPrompts({ onSelect, className }: QuickPromptsProps) {
   )
 
   const categories = Object.keys(groupedPrompts)
+
+  // 紧凑模式：直接显示横向滚动的按钮
+  if (compact) {
+    return (
+      <ScrollArea className={cn('w-full whitespace-nowrap', className)}>
+        <div className='flex gap-2'>
+          {prompts.slice(0, 6).map((prompt) => (
+            <PromptButton
+              key={prompt.id}
+              prompt={prompt}
+              onClick={() => onSelect(prompt.content)}
+              compact
+            />
+          ))}
+        </div>
+        <ScrollBar orientation='horizontal' />
+      </ScrollArea>
+    )
+  }
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className={className}>
@@ -124,16 +144,20 @@ export function QuickPrompts({ onSelect, className }: QuickPromptsProps) {
 interface PromptButtonProps {
   prompt: Prompt
   onClick: () => void
+  compact?: boolean
 }
 
-function PromptButton({ prompt, onClick }: PromptButtonProps) {
+function PromptButton({ prompt, onClick, compact }: PromptButtonProps) {
   return (
     <Button
       variant='outline'
       size='sm'
       onClick={onClick}
       className={cn(
-        'h-auto shrink-0 px-3 py-1.5 text-xs',
+        'shrink-0',
+        compact
+          ? 'h-7 px-2.5 py-1 text-[11px]'
+          : 'h-auto px-3 py-1.5 text-xs',
         'hover:bg-primary/10 hover:border-primary'
       )}
       title={prompt.description || prompt.content}
