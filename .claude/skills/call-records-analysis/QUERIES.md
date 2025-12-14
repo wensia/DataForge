@@ -549,3 +549,103 @@ ORDER BY 总通话数 DESC;
    - `-t -A`：无表头，适合脚本处理
    - `-F','`：CSV 格式输出
 6. **周报生成**：必须按顺序执行第七节的查询，并进行数据校验
+
+---
+
+## 九、客户/被叫号码查询
+
+> **重要说明**：
+> - 被叫手机号存储在 `callee` 字段（**不是** `customer_name`）
+> - `customer_name` 字段可能为空，不要用它匹配手机号
+> - 手机号匹配使用 `IN ('号码1', '号码2', ...)` 或 `LIKE '%号码%'`
+
+### 1. 按被叫号码列表查询通话记录
+
+```sql
+-- 查询指定被叫号码的通话记录
+SELECT
+    callee as 被叫号码,
+    customer_name as 客户名称,
+    staff_name as 员工,
+    department as 部门,
+    call_time as 通话时间,
+    duration as 时长秒,
+    call_type as 类型,
+    call_result as 结果
+FROM call_records
+WHERE call_time >= '{START_DATE}'
+  AND call_time < '{END_DATE}'
+  AND callee IN ('{PHONE1}', '{PHONE2}', '{PHONE3}')  -- 精确匹配
+ORDER BY call_time DESC;
+```
+
+### 2. 按被叫号码列表统计汇总
+
+```sql
+-- 统计每个被叫号码的通话情况
+SELECT
+    callee as 被叫号码,
+    COUNT(*) as 通话数,
+    COUNT(DISTINCT staff_name) as 对接员工数,
+    SUM(duration) as 总时长秒,
+    ROUND(AVG(duration)::numeric, 1) as 平均时长秒,
+    MAX(call_time) as 最后通话时间
+FROM call_records
+WHERE call_time >= '{START_DATE}'
+  AND call_time < '{END_DATE}'
+  AND callee IN ('{PHONE1}', '{PHONE2}', '{PHONE3}')
+GROUP BY callee
+ORDER BY 通话数 DESC;
+```
+
+### 3. 模糊匹配被叫号码（多个号码用 OR）
+
+```sql
+-- 模糊匹配多个被叫号码（号码可能带前缀或格式不同时使用）
+SELECT callee, COUNT(*) as cnt
+FROM call_records
+WHERE call_time >= '{START_DATE}'
+  AND (
+    callee LIKE '%13812345678%' OR
+    callee LIKE '%13987654321%'
+  )
+GROUP BY callee
+ORDER BY cnt DESC;
+```
+
+### 4. 检查被叫号码是否存在
+
+```sql
+-- 先检查号码是否存在于系统中（不限时间）
+SELECT DISTINCT callee
+FROM call_records
+WHERE callee IN ('{PHONE1}', '{PHONE2}', '{PHONE3}');
+```
+
+### 5. 被叫号码详细分析报告
+
+```sql
+-- 生成被叫号码分析报告
+WITH phone_stats AS (
+    SELECT
+        callee,
+        COUNT(*) as total_calls,
+        COUNT(DISTINCT staff_name) as staff_count,
+        SUM(duration) as total_duration,
+        SUM(CASE WHEN duration >= 60 THEN 1 ELSE 0 END) as effective_calls,
+        MAX(call_time) as last_call_time
+    FROM call_records
+    WHERE callee IN ('{PHONE1}', '{PHONE2}', '{PHONE3}')
+    GROUP BY callee
+)
+SELECT
+    callee as 被叫号码,
+    total_calls as 总通话数,
+    staff_count as 对接员工数,
+    total_duration as 总时长秒,
+    ROUND(total_duration / 60.0, 1) as 总时长分钟,
+    effective_calls as 有效通话数,
+    ROUND(effective_calls * 100.0 / total_calls, 1) as 有效率,
+    last_call_time as 最后通话时间
+FROM phone_stats
+ORDER BY total_calls DESC;
