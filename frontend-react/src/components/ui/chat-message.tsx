@@ -13,7 +13,7 @@ import { FilePreview } from "@/components/ui/file-preview"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
 
 const chatBubbleVariants = cva(
-  "group/message relative break-words rounded-lg p-3 text-sm sm:max-w-[70%]",
+  "group/message relative break-words rounded-xl p-4 text-sm sm:max-w-[70%]",
   {
     variants: {
       isUser: {
@@ -210,7 +210,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
             <div className={cn(chatBubbleVariants({ isUser, animation }))}>
               <MarkdownRenderer>{part.text}</MarkdownRenderer>
               {actions ? (
-                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+                <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-xl border bg-background p-1.5 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
                   {actions}
                 </div>
               ) : null}
@@ -252,7 +252,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       <div className={cn(chatBubbleVariants({ isUser, animation }))}>
         <MarkdownRenderer>{content}</MarkdownRenderer>
         {actions ? (
-          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-lg border bg-background p-1 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
+          <div className="absolute -bottom-4 right-2 flex space-x-1 rounded-xl border bg-background p-1.5 text-foreground opacity-0 transition-opacity group-hover/message:opacity-100">
             {actions}
           </div>
         ) : null}
@@ -287,7 +287,7 @@ const ReasoningBlock = ({ part }: { part: ReasoningPart }) => {
       <Collapsible
         open={isOpen}
         onOpenChange={setIsOpen}
-        className="group w-full overflow-hidden rounded-lg border bg-muted/50"
+        className="group w-full overflow-hidden rounded-xl border bg-muted/50"
       >
         <div className="flex items-center p-2">
           <CollapsibleTrigger asChild>
@@ -336,7 +336,7 @@ function ToolCall({
           return (
             <div
               key={index}
-              className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+              className="flex items-center gap-2.5 rounded-xl border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground"
             >
               <Ban className="h-4 w-4" />
               <span>
@@ -357,7 +357,7 @@ function ToolCall({
             return (
               <div
                 key={index}
-                className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
+                className="flex items-center gap-2.5 rounded-xl border bg-muted/50 px-4 py-2.5 text-sm text-muted-foreground"
               >
                 <Terminal className="h-4 w-4" />
                 <span>
@@ -376,7 +376,7 @@ function ToolCall({
             return (
               <div
                 key={index}
-                className="flex flex-col gap-1.5 rounded-lg border bg-muted/50 px-3 py-2 text-sm"
+                className="flex flex-col gap-2 rounded-xl border bg-muted/50 px-4 py-3 text-sm"
               >
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Code2 className="h-4 w-4" />

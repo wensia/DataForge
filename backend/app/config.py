@@ -31,6 +31,25 @@ class Settings(BaseSettings):
     celery_beat_sync_every: int = 60  # Beat 从数据库同步任务的间隔（秒）
     celery_worker_soft_shutdown_timeout: float = 30.0  # 软关闭超时（秒）
 
+    # Celery Redis 配置（重要！防止长任务被重复投递）
+    celery_broker_visibility_timeout: int = 7200  # 必须大于最长任务执行时间（2小时）
+
+    # Celery 任务超时配置
+    celery_task_default_timeout: int = 3600  # 默认任务超时 1 小时
+
+    # Celery 任务重试配置
+    celery_task_default_max_retries: int = 3  # 默认最大重试次数
+    celery_task_retry_delay: int = 60  # 重试延迟基础值（秒）
+    celery_task_retry_backoff: bool = True  # 指数退避
+    celery_task_retry_jitter: bool = True  # 随机抖动
+
+    # Celery Worker 配置
+    celery_worker_concurrency: int = 100  # gevent 并发数
+    celery_worker_prefetch_multiplier: int = 1  # 预取数量
+
+    # Celery 任务结果配置
+    celery_result_expires: int = 3600  # 结果过期时间（秒）
+
     # 任务配置
     timezone: str = "Asia/Shanghai"
     max_execution_history_days: int = 30  # 执行历史保留天数
