@@ -3,6 +3,7 @@
 from app.scheduler.core import (
     get_scheduler,
     init_scheduler,
+    is_scheduler_initialized,
     shutdown_scheduler,
     start_scheduler,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "get_scheduler",
     "init_scheduler",
     "is_execution_running",
+    "is_scheduler_initialized",
     "register_handler",
     "shutdown_scheduler",
     "start_scheduler",

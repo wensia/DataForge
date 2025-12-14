@@ -17,7 +17,6 @@ import {
   Moon,
   Sun,
   Menu,
-  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -163,8 +162,8 @@ export function StandaloneAIChat() {
 
   return (
     <div className="bg-background flex h-screen flex-col">
-      {/* 顶部导航栏 */}
-      <header className="bg-card border-b px-4 py-3 shadow-sm">
+      {/* 顶部导航栏 - 桌面端 */}
+      <header className="bg-card hidden border-b px-4 py-3 shadow-sm md:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-primary flex h-10 w-10 items-center justify-center rounded-lg">
@@ -209,9 +208,9 @@ export function StandaloneAIChat() {
       </header>
 
       {/* 主内容区 */}
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-4 overflow-hidden p-4">
-        {/* 左侧：对话列表 */}
-        <div className="bg-card flex w-64 flex-col rounded-lg border shadow-sm">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-4 overflow-hidden p-0 md:p-4">
+        {/* 左侧：对话列表 - 桌面端显示 */}
+        <div className="bg-card hidden w-64 flex-col rounded-lg border shadow-sm md:flex">
           <div className="flex items-center justify-between border-b p-3">
             <span className="text-sm font-medium">对话列表</span>
             <Button
@@ -259,9 +258,37 @@ export function StandaloneAIChat() {
 
         {/* 右侧：对话内容 */}
         {selectedId ? (
-          <ChatContainer className="bg-card flex-1 rounded-lg border shadow-sm">
-            {/* 对话头部 */}
-            <div className="flex items-center justify-between border-b p-4">
+          <ChatContainer className="bg-card flex-1 rounded-none border-0 md:rounded-lg md:border md:shadow-sm">
+            {/* 移动端顶部栏 */}
+            <div className="bg-card flex items-center justify-between border-b p-3 md:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(true)}
+                className="h-9 w-9"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <span className="max-w-[200px] truncate font-medium">
+                {conversationData?.title || '新对话'}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleCreateConversation}
+                disabled={createMutation.isPending}
+                className="h-9 w-9"
+              >
+                {createMutation.isPending ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Plus size={18} />
+                )}
+              </Button>
+            </div>
+
+            {/* 对话头部 - 桌面端 */}
+            <div className="hidden items-center justify-between border-b p-4 md:flex">
               <div className="flex items-center gap-2">
                 <Bot className="text-primary" />
                 <span className="font-medium">
@@ -327,32 +354,154 @@ export function StandaloneAIChat() {
             />
           </ChatContainer>
         ) : (
-          <div className="bg-card flex flex-1 flex-col items-center justify-center rounded-lg border shadow-sm">
-            <div className="flex flex-col items-center space-y-6">
-              <div className="border-border flex size-20 items-center justify-center rounded-full border-2">
-                <Bot className="size-10" />
-              </div>
-              <div className="space-y-2 text-center">
-                <h2 className="text-xl font-semibold">AI 对话助手</h2>
-                <p className="text-muted-foreground text-sm">
-                  选择或创建一个对话开始聊天
-                </p>
-              </div>
+          <div className="bg-card flex flex-1 flex-col rounded-none border-0 md:rounded-lg md:border md:shadow-sm">
+            {/* 移动端顶部栏 */}
+            <div className="flex items-center justify-between border-b p-3 md:hidden">
               <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(true)}
+                className="h-9 w-9"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <span className="font-medium">AI 对话助手</span>
+              <Button
+                size="icon"
+                variant="ghost"
                 onClick={handleCreateConversation}
+                disabled={createMutation.isPending}
+                className="h-9 w-9"
+              >
+                {createMutation.isPending ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Plus size={18} />
+                )}
+              </Button>
+            </div>
+
+            {/* 空状态内容 */}
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <div className="flex flex-col items-center space-y-6">
+                <div className="border-border flex size-20 items-center justify-center rounded-full border-2">
+                  <Bot className="size-10" />
+                </div>
+                <div className="space-y-2 text-center">
+                  <h2 className="text-xl font-semibold">AI 对话助手</h2>
+                  <p className="text-muted-foreground text-sm">
+                    选择或创建一个对话开始聊天
+                  </p>
+                </div>
+                <Button
+                  onClick={handleCreateConversation}
+                  disabled={createMutation.isPending}
+                  className="hidden md:inline-flex"
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 className="mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2" />
+                  )}
+                  新建对话
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 移动端侧边栏抽屉 */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="border-b p-4">
+            <SheetTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              对话列表
+            </SheetTitle>
+          </SheetHeader>
+
+          {/* AI 服务选择 */}
+          {providers && providers.length > 0 && (
+            <div className="border-b p-3">
+              <Select
+                value={selectedProvider}
+                onValueChange={setSelectedProvider}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择 AI 服务" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.id} value={provider.id}>
+                      {provider.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* 对话列表 */}
+          <ScrollArea className="h-[calc(100vh-140px)] p-2">
+            {isLoadingConversations ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="text-muted-foreground animate-spin" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-muted-foreground py-8 text-center">
+                <MessageSquare className="mx-auto mb-2 h-8 w-8" />
+                <p className="text-sm">暂无对话</p>
+                <p className="text-xs">点击右上角 + 创建</p>
+              </div>
+            ) : (
+              conversations.map((conv) => (
+                <ConversationItem
+                  key={conv.id}
+                  conversation={conv}
+                  isSelected={selectedId === conv.id}
+                  onSelect={() => {
+                    setSelectedId(conv.id)
+                    setSidebarOpen(false)
+                  }}
+                  onDelete={() => {
+                    setConversationToDelete(conv.id)
+                    setDeleteDialogOpen(true)
+                  }}
+                />
+              ))
+            )}
+          </ScrollArea>
+
+          {/* 底部操作 */}
+          <div className="absolute bottom-0 left-0 right-0 border-t p-3">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              >
+                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  handleCreateConversation()
+                  setSidebarOpen(false)
+                }}
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? (
-                  <Loader2 className="mr-2 animate-spin" />
+                  <Loader2 size={16} className="mr-1 animate-spin" />
                 ) : (
-                  <Plus className="mr-2" />
+                  <Plus size={16} className="mr-1" />
                 )}
                 新建对话
               </Button>
             </div>
           </div>
-        )}
-      </div>
+        </SheetContent>
+      </Sheet>
 
       {/* 删除确认对话框 */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

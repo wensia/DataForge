@@ -10,6 +10,11 @@ from app.config import settings
 _scheduler: AsyncIOScheduler | None = None
 
 
+def is_scheduler_initialized() -> bool:
+    """检查调度器是否已初始化"""
+    return _scheduler is not None
+
+
 def get_scheduler() -> AsyncIOScheduler:
     """获取调度器单例"""
     global _scheduler
