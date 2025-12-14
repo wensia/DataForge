@@ -255,8 +255,8 @@ const formSchema = z.object({
   content: z.string().min(1, '内容不能为空'),
   category: z.string().optional(),
   description: z.string().max(500, '描述最多500字符').optional(),
-  sort_order: z.number().default(0),
-  is_active: z.boolean().default(true),
+  sort_order: z.number(),
+  is_active: z.boolean(),
 })
 
 type PromptForm = z.infer<typeof formSchema>
@@ -517,12 +517,6 @@ export function PromptsSettings() {
         error instanceof Error ? error.message : '删除失败，请重试'
       toast.error(message)
     }
-  }
-
-  // 打开分配对话框时初始化选中用户
-  const openAssignDialog = (prompt: Prompt) => {
-    setSelectedPrompt(prompt)
-    setAssignDialogOpen(true)
   }
 
   // 当获取到话术详情时，更新选中的用户 ID

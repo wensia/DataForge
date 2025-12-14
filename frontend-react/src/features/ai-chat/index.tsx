@@ -17,8 +17,6 @@ import {
   Copy,
   Check,
   Brain,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
