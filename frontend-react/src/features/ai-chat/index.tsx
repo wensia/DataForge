@@ -316,7 +316,7 @@ export function AIChat() {
       {/* 主内容区 */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* 顶部栏 */}
-        <header className="flex h-12 items-center justify-between border-b px-2 sm:px-4">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-2 sm:px-4">
           <div className="flex items-center gap-2">
             {/* 移动端菜单按钮 */}
             <Button
@@ -429,8 +429,8 @@ export function AIChat() {
         </ScrollArea>
 
         {/* 输入区域 */}
-        <div className="border-t bg-background px-2 py-2 sm:px-4 sm:py-4">
-          <div className="mx-auto max-w-3xl overflow-hidden">
+        <div className="shrink-0 border-t bg-background px-2 py-2 sm:px-4 sm:py-4">
+          <div className="mx-auto max-w-3xl">
             {/* 快捷提示（有消息时显示在输入框上方） */}
             {messages.length > 0 && (
               <QuickPrompts onSelect={(content) => setInputMessage(content)} className="mb-2" compact />
