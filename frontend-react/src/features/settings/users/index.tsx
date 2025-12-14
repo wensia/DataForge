@@ -378,13 +378,31 @@ export function UsersSettings() {
     }
   }
 
-  const handleCopyCredentials = () => {
+  const handleCopyCredentials = async () => {
     if (!createdCredentials) return
     const text = `用户名: ${createdCredentials.name}\n密码: ${createdCredentials.password}`
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success('凭证已复制到剪贴板')
+
+    try {
+      // 优先使用现代 Clipboard API（需要 HTTPS）
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // HTTP 环境下的备用方案
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success('凭证已复制到剪贴板')
+    } catch {
+      toast.error('复制失败，请手动复制')
+    }
   }
 
   const handleDelete = async () => {
