@@ -292,7 +292,7 @@ export function AIChat() {
   )
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* 桌面端侧边栏 */}
       <div
         className={cn(
@@ -314,7 +314,7 @@ export function AIChat() {
       </Sheet>
 
       {/* 主内容区 */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* 顶部栏 */}
         <header className="flex h-12 items-center justify-between border-b px-2 sm:px-4">
           <div className="flex items-center gap-2">
@@ -369,8 +369,8 @@ export function AIChat() {
         </header>
 
         {/* 消息区域 */}
-        <ScrollArea className="flex-1">
-          <div className="mx-auto max-w-3xl px-4 py-4">
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="mx-auto max-w-3xl px-2 sm:px-4 py-4">
             {isLoadingConversation ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="animate-spin text-muted-foreground" size={24} />
@@ -386,7 +386,7 @@ export function AIChat() {
                 <QuickPrompts onSelect={(content) => setInputMessage(content)} className="max-w-md" />
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-6 w-full overflow-hidden">
                 {messages.map((message) => (
                   <MessageItem key={message.id} message={message} onCopy={() => handleCopyMessage(message.content)} />
                 ))}
@@ -429,8 +429,8 @@ export function AIChat() {
         </ScrollArea>
 
         {/* 输入区域 */}
-        <div className="border-t bg-background p-2 sm:p-4">
-          <div className="mx-auto max-w-3xl">
+        <div className="border-t bg-background px-2 py-2 sm:px-4 sm:py-4">
+          <div className="mx-auto max-w-3xl overflow-hidden">
             {/* 快捷提示（有消息时显示在输入框上方） */}
             {messages.length > 0 && (
               <QuickPrompts onSelect={(content) => setInputMessage(content)} className="mb-2" compact />
@@ -598,7 +598,7 @@ function MessageItem({
   }
 
   return (
-    <div className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
+    <div className={cn('flex gap-3 w-full', isUser && 'flex-row-reverse')}>
       <div
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
@@ -611,11 +611,11 @@ function MessageItem({
           <Bot className="h-4 w-4" />
         )}
       </div>
-      <div className={cn('group flex-1 min-w-0', isUser && 'flex justify-end')}>
+      <div className={cn('group min-w-0 flex-1', isUser && 'flex justify-end')}>
         <div
           className={cn(
-            'inline-block max-w-full rounded-2xl px-4 py-2.5 text-sm',
-            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+            'inline-block max-w-full rounded-2xl px-3 sm:px-4 py-2.5 text-sm',
+            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted overflow-x-auto'
           )}
         >
           {isUser ? (

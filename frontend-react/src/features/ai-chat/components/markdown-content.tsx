@@ -22,7 +22,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
   return (
     <div
       className={cn(
-        'prose prose-sm dark:prose-invert max-w-full',
+        'prose prose-sm dark:prose-invert max-w-none',
         // 重置一些 prose 样式
         'prose-p:my-2 prose-p:leading-relaxed',
         'prose-ul:my-2 prose-ol:my-2',
@@ -31,8 +31,8 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
         'prose-code:before:content-none prose-code:after:content-none',
         'prose-headings:my-3 prose-headings:font-semibold',
         'prose-table:my-2',
-        // 移动端优化：限制宽度，允许内容滚动
-        'w-full overflow-x-auto',
+        // 宽度约束
+        'w-full',
         className
       )}
     >
@@ -70,8 +70,8 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
           // 表格样式 - 移动端优化
           table({ children }) {
             return (
-              <div className="my-2 -mx-2 overflow-x-auto rounded-lg border sm:mx-0">
-                <table className="w-full min-w-[400px]">{children}</table>
+              <div className="my-2 overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-max">{children}</table>
               </div>
             )
           },
