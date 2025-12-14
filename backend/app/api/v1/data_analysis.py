@@ -80,7 +80,12 @@ async def get_records(
         ResponseModel: 包含记录列表和分页信息
     """
     # 如果 end_time 只有日期（时间为零点），设置为当天末尾
-    if end_time and end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
+    if (
+        end_time
+        and end_time.hour == 0
+        and end_time.minute == 0
+        and end_time.second == 0
+    ):
         end_time = end_time.replace(hour=23, minute=59, second=59)
 
     offset = (page - 1) * page_size
@@ -337,7 +342,9 @@ async def chat_with_data(
         # 转换历史记录格式
         history = None
         if request.history:
-            history = [{"role": msg.role, "content": msg.content} for msg in request.history]
+            history = [
+                {"role": msg.role, "content": msg.content} for msg in request.history
+            ]
 
         result = await ai_svc.chat_with_data(
             session=session,
@@ -527,7 +534,9 @@ async def get_ai_providers(
             }
         )
 
-    deepseek_available = ("deepseek" in active_providers) or bool(settings.deepseek_api_key)
+    deepseek_available = ("deepseek" in active_providers) or bool(
+        settings.deepseek_api_key
+    )
     if deepseek_available:
         providers.append(
             {

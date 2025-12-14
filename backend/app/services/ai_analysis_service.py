@@ -15,11 +15,10 @@ from app.config import settings
 from app.models.ai_config import AIConfig
 from app.models.analysis_result import (
     AnalysisResult,
-    AnalysisResultCreate,
     AnalysisType,
 )
 from app.models.call_record import CallRecord
-from app.services.data_sync_service import get_call_records, get_call_record_stats
+from app.services.data_sync_service import get_call_record_stats, get_call_records
 
 
 class AIAnalysisError(Exception):
@@ -48,7 +47,11 @@ def _get_active_ai_config(session: Session, provider: str) -> AIConfig | None:
 def _get_ai_client_from_env(provider: str) -> AIClient | None:
     """从环境变量（.env）获取 AI 客户端（兼容旧配置）"""
     if provider == "kimi":
-        return get_ai_client("kimi", settings.kimi_api_key) if settings.kimi_api_key else None
+        return (
+            get_ai_client("kimi", settings.kimi_api_key)
+            if settings.kimi_api_key
+            else None
+        )
     if provider == "deepseek":
         return (
             get_ai_client("deepseek", settings.deepseek_api_key)
@@ -107,10 +110,12 @@ def _resolve_ai_client(
         return resolved
 
     # 3) 默认 provider 不可用：退化到任意启用的 AI 配置
-    any_cfg = (
-        session.exec(select(AIConfig).where(AIConfig.is_active == True).order_by(AIConfig.updated_at.desc()).limit(1))  # noqa: E712
-        .first()
-    )
+    any_cfg = session.exec(
+        select(AIConfig)
+        .where(AIConfig.is_active == True)
+        .order_by(AIConfig.updated_at.desc())
+        .limit(1)
+    ).first()  # noqa: E712
     if any_cfg:
         provider_id = any_cfg.provider
         return (
@@ -145,7 +150,7 @@ def _format_records_for_ai(records: list[CallRecord], max_chars: int = 50000) ->
 
     for i, record in enumerate(records):
         line = (
-            f"[{i+1}] 时间: {record.call_time}, "
+            f"[{i + 1}] 时间: {record.call_time}, "
             f"主叫: {record.caller or '未知'}, "
             f"被叫: {record.callee or '未知'}, "
             f"时长: {record.duration or 0}秒, "
@@ -239,7 +244,9 @@ async def generate_summary(
         session.commit()
         session.refresh(result)
 
-        logger.info(f"生成摘要完成: result_id={result.id}, tokens={response.tokens_used}")
+        logger.info(
+            f"生成摘要完成: result_id={result.id}, tokens={response.tokens_used}"
+        )
         return result
 
     except AIClientError as e:
@@ -306,7 +313,9 @@ async def detect_anomalies(
         session.commit()
         session.refresh(result)
 
-        logger.info(f"异常检测完成: result_id={result.id}, tokens={response.tokens_used}")
+        logger.info(
+            f"异常检测完成: result_id={result.id}, tokens={response.tokens_used}"
+        )
         return result
 
     except AIClientError as e:
@@ -389,7 +398,9 @@ async def analyze_trend(
         session.commit()
         session.refresh(result)
 
-        logger.info(f"趋势分析完成: result_id={result.id}, tokens={response.tokens_used}")
+        logger.info(
+            f"趋势分析完成: result_id={result.id}, tokens={response.tokens_used}"
+        )
         return result
 
     except AIClientError as e:
@@ -446,7 +457,9 @@ async def chat_with_data(
 
         # 调用 AI
         provider_id, client, model = _resolve_ai_client(session, provider)
-        response = await client.answer_question(context, question, chat_history, model=model)
+        response = await client.answer_question(
+            context, question, chat_history, model=model
+        )
 
         # 保存结果
         result = AnalysisResult(
@@ -468,7 +481,9 @@ async def chat_with_data(
         session.commit()
         session.refresh(result)
 
-        logger.info(f"智能问答完成: result_id={result.id}, tokens={response.tokens_used}")
+        logger.info(
+            f"智能问答完成: result_id={result.id}, tokens={response.tokens_used}"
+        )
         return result
 
     except AIClientError as e:

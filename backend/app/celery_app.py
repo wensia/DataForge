@@ -34,4 +34,6 @@ celery_app.conf.update(
     task_acks_late=True,  # 任务完成后才确认，防止任务丢失
     # Beat 配置 - 使用自定义 DatabaseScheduler
     beat_scheduler="app.celery_scheduler:DatabaseScheduler",
+    # 软关闭机制（Celery 5.5+）- Worker 收到 SIGTERM 后优雅关闭
+    worker_soft_shutdown_timeout=settings.celery_worker_soft_shutdown_timeout,
 )

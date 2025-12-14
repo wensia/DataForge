@@ -73,13 +73,17 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             payload = decode_token(token)
             if payload:
                 # JWT 验证成功，设置用户信息
-                logger.info(f"JWT 认证成功: user_id={payload.user_id}, path={request_path}")
+                logger.info(
+                    f"JWT 认证成功: user_id={payload.user_id}, path={request_path}"
+                )
                 request.state.user_id = payload.user_id  # 使用整数格式
                 request.state.user_email = payload.email
                 request.state.user_role = payload.role
                 return await call_next(request)
             else:
-                logger.warning(f"JWT 认证失败, path={request_path}, 将尝试 API Key 认证")
+                logger.warning(
+                    f"JWT 认证失败, path={request_path}, 将尝试 API Key 认证"
+                )
 
         # 从查询参数提取API密钥
         api_key = request.query_params.get("api_key")

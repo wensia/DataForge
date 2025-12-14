@@ -112,7 +112,9 @@ async def fetch_bitable_name(client_id: int, request: FetchBitableNameRequest):
                 if token_result.get("code") != 0:
                     error_msg = token_result.get("msg", "获取 token 失败")
                     logger.warning(f"获取飞书 token 失败: {error_msg}")
-                    return ResponseModel.error(code=500, message=f"获取飞书凭证失败: {error_msg}")
+                    return ResponseModel.error(
+                        code=500, message=f"获取飞书凭证失败: {error_msg}"
+                    )
 
                 tenant_access_token = token_result.get("tenant_access_token")
 
@@ -176,7 +178,9 @@ async def fetch_feishu_bitable_tables(bitable_id: int):
 
                 if token_result.get("code") != 0:
                     error_msg = token_result.get("msg", "获取 token 失败")
-                    return ResponseModel.error(code=500, message=f"飞书认证失败: {error_msg}")
+                    return ResponseModel.error(
+                        code=500, message=f"飞书认证失败: {error_msg}"
+                    )
 
                 tenant_access_token = token_result.get("tenant_access_token")
 
@@ -189,7 +193,9 @@ async def fetch_feishu_bitable_tables(bitable_id: int):
 
                 if tables_result.get("code") != 0:
                     error_msg = tables_result.get("msg", "获取数据表列表失败")
-                    return ResponseModel.error(code=500, message=f"获取数据表失败: {error_msg}")
+                    return ResponseModel.error(
+                        code=500, message=f"获取数据表失败: {error_msg}"
+                    )
 
                 # 提取数据表信息
                 items = tables_result.get("data", {}).get("items", [])
@@ -202,7 +208,9 @@ async def fetch_feishu_bitable_tables(bitable_id: int):
                     for item in items
                 ]
 
-                logger.info(f"获取多维表格 {bitable.name} 的数据表列表: {len(table_list)} 个")
+                logger.info(
+                    f"获取多维表格 {bitable.name} 的数据表列表: {len(table_list)} 个"
+                )
 
                 return ResponseModel.success(
                     data=table_list,
@@ -332,7 +340,12 @@ async def sync_bitable_tables(
         f"新增 {added}, 更新 {updated}, 标记无效 {deactivated}"
     )
 
-    return {"added": added, "updated": updated, "deactivated": deactivated, "error": None}
+    return {
+        "added": added,
+        "updated": updated,
+        "deactivated": deactivated,
+        "error": None,
+    }
 
 
 @router.post("/bitables/{bitable_id}/sync-tables", response_model=ResponseModel)
@@ -545,7 +558,7 @@ async def list_all_feishu_bitables():
             tables = session.exec(
                 select(FeishuTable)
                 .where(FeishuTable.bitable_id == bitable.id)
-                .where(FeishuTable.is_active == True)
+                .where(FeishuTable.is_active)
                 .order_by(FeishuTable.id)
             ).all()
 
@@ -557,8 +570,12 @@ async def list_all_feishu_bitables():
                     "app_token": bitable.app_token,
                     "is_active": bitable.is_active,
                     "notes": bitable.notes,
-                    "created_at": bitable.created_at.isoformat() if bitable.created_at else None,
-                    "updated_at": bitable.updated_at.isoformat() if bitable.updated_at else None,
+                    "created_at": bitable.created_at.isoformat()
+                    if bitable.created_at
+                    else None,
+                    "updated_at": bitable.updated_at.isoformat()
+                    if bitable.updated_at
+                    else None,
                     "client_name": client.name,
                     "client_app_id": client.app_id,
                     "table_count": len(tables),
@@ -590,7 +607,7 @@ async def list_feishu_bitables(client_id: int):
             tables = session.exec(
                 select(FeishuTable)
                 .where(FeishuTable.bitable_id == bitable.id)
-                .where(FeishuTable.is_active == True)
+                .where(FeishuTable.is_active)
                 .order_by(FeishuTable.id)
             ).all()
 
@@ -602,8 +619,12 @@ async def list_feishu_bitables(client_id: int):
                     "app_token": bitable.app_token,
                     "is_active": bitable.is_active,
                     "notes": bitable.notes,
-                    "created_at": bitable.created_at.isoformat() if bitable.created_at else None,
-                    "updated_at": bitable.updated_at.isoformat() if bitable.updated_at else None,
+                    "created_at": bitable.created_at.isoformat()
+                    if bitable.created_at
+                    else None,
+                    "updated_at": bitable.updated_at.isoformat()
+                    if bitable.updated_at
+                    else None,
                     "table_count": len(tables),
                     "table_preview": [t.name for t in tables[:3]],
                 }
@@ -632,7 +653,9 @@ async def create_feishu_bitable(client_id: int, bitable_data: FeishuBitableCreat
             )
         ).first()
         if existing:
-            return ResponseModel.error(code=400, message="该客户端下已存在相同的 App Token")
+            return ResponseModel.error(
+                code=400, message="该客户端下已存在相同的 App Token"
+            )
 
         # 创建新多维表格
         new_bitable = FeishuBitable(
@@ -817,7 +840,9 @@ async def create_feishu_table(bitable_id: int, table_data: FeishuTableCreate):
             )
         ).first()
         if existing:
-            return ResponseModel.error(code=400, message="该多维表格下已存在相同的 Table ID")
+            return ResponseModel.error(
+                code=400, message="该多维表格下已存在相同的 Table ID"
+            )
 
         # 创建新数据表
         new_table = FeishuTable(

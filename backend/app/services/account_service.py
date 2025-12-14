@@ -3,12 +3,11 @@
 import base64
 import json
 from datetime import datetime
-from typing import Optional
 
 from loguru import logger
 from sqlmodel import Session, select
 
-from app.clients.yunke import check_and_get_users, password_login
+from app.clients.yunke import password_login
 from app.database import engine
 from app.models.yunke_account import (
     YunkeAccount,
@@ -77,7 +76,9 @@ def _get_or_create_company(
         if updated:
             company.updated_at = datetime.now()
             session.add(company)
-            logger.info(f"更新公司信息: {company_name} ({company_code}), domain={domain}")
+            logger.info(
+                f"更新公司信息: {company_name} ({company_code}), domain={domain}"
+            )
         return company
 
     # 创建新公司
@@ -92,7 +93,9 @@ def _get_or_create_company(
     return company
 
 
-def _account_to_response(account: YunkeAccount, company: YunkeCompany) -> YunkeAccountResponse:
+def _account_to_response(
+    account: YunkeAccount, company: YunkeCompany
+) -> YunkeAccountResponse:
     """转换账号为响应模型
 
     Args:
@@ -128,7 +131,7 @@ def get_all_accounts() -> list[YunkeAccountResponse]:
         return [_account_to_response(acc, comp) for acc, comp in results]
 
 
-def get_account_by_id(account_id: int) -> Optional[tuple[YunkeAccount, YunkeCompany]]:
+def get_account_by_id(account_id: int) -> tuple[YunkeAccount, YunkeCompany] | None:
     """根据ID获取账号
 
     Args:
@@ -145,7 +148,7 @@ def get_account_by_id(account_id: int) -> Optional[tuple[YunkeAccount, YunkeComp
         return (account, company)
 
 
-def get_account_by_phone_company(phone: str, company_code: str) -> Optional[YunkeAccount]:
+def get_account_by_phone_company(phone: str, company_code: str) -> YunkeAccount | None:
     """根据手机号和公司代码获取账号
 
     Args:
@@ -165,7 +168,9 @@ def get_account_by_phone_company(phone: str, company_code: str) -> Optional[Yunk
         return session.exec(statement).first()
 
 
-def create_or_update_account(data: YunkeAccountCreate) -> tuple[YunkeAccountResponse, bool]:
+def create_or_update_account(
+    data: YunkeAccountCreate,
+) -> tuple[YunkeAccountResponse, bool]:
     """创建或更新账号（Upsert）
 
     如果手机号+公司代码已存在则更新，否则创建新账号
@@ -218,7 +223,9 @@ def create_or_update_account(data: YunkeAccountCreate) -> tuple[YunkeAccountResp
         return (_account_to_response(account, company), True)
 
 
-def update_account(account_id: int, data: YunkeAccountUpdate) -> Optional[YunkeAccountResponse]:
+def update_account(
+    account_id: int, data: YunkeAccountUpdate
+) -> YunkeAccountResponse | None:
     """更新账号信息
 
     Args:
@@ -311,7 +318,9 @@ async def auto_login(account_id: int) -> dict:
                 session.add(account)
                 session.commit()
 
-                logger.info(f"账号登录成功: phone={account.phone}, company={company.company_name}")
+                logger.info(
+                    f"账号登录成功: phone={account.phone}, company={company.company_name}"
+                )
                 return {
                     "success": True,
                     "message": "登录成功",
@@ -331,7 +340,9 @@ async def auto_login(account_id: int) -> dict:
                 session.commit()
 
                 message = login_data.get("message", "登录失败")
-                logger.warning(f"账号登录失败: phone={account.phone}, message={message}")
+                logger.warning(
+                    f"账号登录失败: phone={account.phone}, message={message}"
+                )
                 return {"success": False, "message": message}
 
         except Exception as e:
@@ -362,7 +373,9 @@ async def check_account_status(account_id: int) -> dict:
 
         # 检查最后登录时间（超过24小时认为失效）
         if account.last_login:
-            hours_since_login = (datetime.now() - account.last_login).total_seconds() / 3600
+            hours_since_login = (
+                datetime.now() - account.last_login
+            ).total_seconds() / 3600
             if hours_since_login > 24:
                 account.status = 0
                 session.add(account)
@@ -373,11 +386,13 @@ async def check_account_status(account_id: int) -> dict:
             "valid": account.status == 1,
             "message": "正常" if account.status == 1 else "失效",
             "status": account.status,
-            "last_login": account.last_login.isoformat() if account.last_login else None,
+            "last_login": account.last_login.isoformat()
+            if account.last_login
+            else None,
         }
 
 
-async def get_valid_account(phone: str = None, company_code: str = None) -> Optional[dict]:
+async def get_valid_account(phone: str = None, company_code: str = None) -> dict | None:
     """获取有效账号供外部API使用
 
     Args:

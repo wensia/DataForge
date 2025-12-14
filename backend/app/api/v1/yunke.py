@@ -761,7 +761,9 @@ async def yunke_get_dept_data(account_id: int):
     with Session(engine) as session:
         db_company = session.get(YunkeCompany, company.id)
         if not db_company or not db_company.dept_tree:
-            return ResponseModel.error(code=404, message="部门数据不存在，请先同步部门数据")
+            return ResponseModel.error(
+                code=404, message="部门数据不存在，请先同步部门数据"
+            )
 
         try:
             dept_tree = json.loads(db_company.dept_tree)

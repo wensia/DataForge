@@ -1,7 +1,6 @@
 """JWT 认证工具函数"""
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 import bcrypt
 from fastapi import Depends, HTTPException, Request
@@ -65,7 +64,7 @@ def create_access_token(user_id: int, email: str, role: str) -> TokenResponse:
     )
 
 
-def decode_token(token: str) -> Optional[TokenPayload]:
+def decode_token(token: str) -> TokenPayload | None:
     """解码并验证 JWT token"""
     try:
         # 禁用 sub claim 验证，因为旧 token 中 sub 是整数
@@ -75,7 +74,9 @@ def decode_token(token: str) -> Optional[TokenPayload]:
             algorithms=["HS256"],
             options={"verify_sub": False},
         )
-        logger.debug(f"JWT 解码成功: user_id={payload.get('sub')}, email={payload.get('email')}")
+        logger.debug(
+            f"JWT 解码成功: user_id={payload.get('sub')}, email={payload.get('email')}"
+        )
         return TokenPayload(**payload)
     except JWTError as e:
         logger.warning(f"JWT 解码失败: {type(e).__name__}: {e}")
@@ -106,7 +107,9 @@ def get_current_user(request: Request) -> TokenPayload:
     )
 
 
-def require_admin(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
+def require_admin(
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TokenPayload:
     """要求管理员权限 (FastAPI 依赖)
 
     Raises:

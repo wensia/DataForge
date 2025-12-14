@@ -19,7 +19,9 @@ class Prompt(BaseTable, table=True):
     title: str = Field(max_length=100, description="话术标题")
     content: str = Field(description="话术内容")
     category: str | None = Field(default=None, max_length=50, description="分类")
-    description: str | None = Field(default=None, max_length=500, description="描述说明")
+    description: str | None = Field(
+        default=None, max_length=500, description="描述说明"
+    )
     sort_order: int = Field(default=0, description="排序顺序")
     is_active: bool = Field(default=True, description="是否启用")
     created_by: int = Field(foreign_key="users.id", description="创建者用户ID")

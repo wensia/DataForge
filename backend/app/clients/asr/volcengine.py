@@ -113,7 +113,9 @@ class VolcengineASRClient(ASRClient):
             # 注意：不能在这里关闭旧客户端，因为它绑定到不同的事件循环
             self._client = httpx.AsyncClient(timeout=30.0)
             self._client_loop = current_loop
-            logger.debug(f"[volcengine] 创建新的 httpx.AsyncClient (loop={id(current_loop)})")
+            logger.debug(
+                f"[volcengine] 创建新的 httpx.AsyncClient (loop={id(current_loop)})"
+            )
 
         return self._client
 
@@ -210,9 +212,7 @@ class VolcengineASRClient(ASRClient):
 
         # 添加替换词本配置（如果有配置）
         if correct_table_name:
-            payload["request"]["corpus"] = {
-                "correct_table_name": correct_table_name
-            }
+            payload["request"]["corpus"] = {"correct_table_name": correct_table_name}
             logger.info(f"[volcengine] 使用替换词本: {correct_table_name}")
 
         for attempt in range(max_retries + 1):

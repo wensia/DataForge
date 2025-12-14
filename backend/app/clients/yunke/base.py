@@ -1,7 +1,6 @@
 """云客API基础配置"""
 
 import httpx
-from loguru import logger
 
 # 云客API基础URL
 BASE_URL = "https://crm.yunkecn.com"
@@ -74,4 +73,3 @@ def create_client(
         verify=False,  # 云客API可能存在证书问题
         cookies=cookies or {},
     )
-

@@ -104,7 +104,10 @@ def validate_sql(sql: str) -> tuple[bool, str]:
     if from_match:
         table_name = from_match.group(1).lower()
         if table_name not in ALLOWED_TABLES:
-            return False, f"不允许查询表: {table_name}，允许的表: {', '.join(ALLOWED_TABLES)}"
+            return (
+                False,
+                f"不允许查询表: {table_name}，允许的表: {', '.join(ALLOWED_TABLES)}",
+            )
 
     # 4. 检查 JOIN 子句中的表名
     join_tables = re.findall(r"\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)", sql_upper)

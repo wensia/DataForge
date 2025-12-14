@@ -7,7 +7,7 @@
 """
 
 from fastapi import APIRouter, Depends
-from sqlmodel import Session, select, func
+from sqlmodel import Session, func, select
 
 from app.database import get_session
 from app.models import (
@@ -120,7 +120,7 @@ async def get_my_prompts(
         select(Prompt)
         .join(PromptAssignment, Prompt.id == PromptAssignment.prompt_id)
         .where(PromptAssignment.user_id == current_user.user_id)
-        .where(Prompt.is_active == True)
+        .where(Prompt.is_active)
         .order_by(Prompt.sort_order, Prompt.created_at.desc())
     )
 

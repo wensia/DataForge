@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Request
 from loguru import logger
-from sqlmodel import Session, select, and_
+from sqlmodel import Session, and_, select
 
 from app.database import engine
 from app.models.user_preference import (

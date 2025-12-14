@@ -9,7 +9,6 @@ from enum import Enum
 from typing import Any
 
 from sqlalchemy import Column, Index
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 from sqlmodel import Field, SQLModel
 
@@ -72,7 +71,9 @@ class CallRecord(BaseTable, table=True):
     )
 
     # 员工映射字段（通过 staff_mapping 回写）
-    staff_id: int | None = Field(default=None, foreign_key="staff.id", description="关联的员工ID")
+    staff_id: int | None = Field(
+        default=None, foreign_key="staff.id", description="关联的员工ID"
+    )
     mapped_position: str | None = Field(default=None, description="映射的职位")
     mapped_campus: str | None = Field(default=None, description="映射的校区")
     mapped_department: str | None = Field(default=None, description="映射的部门")

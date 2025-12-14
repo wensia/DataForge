@@ -49,7 +49,9 @@ async def sync_all_accounts() -> dict:
             logger.error(f"同步账号 {acc.id} 失败: {e}")
             results["failed"] += 1
 
-    task_log(f"账号同步完成: 共 {results['total']} 个，同步 {results['synced']} 个，跳过 {results['skipped']} 个，失败 {results['failed']} 个")
+    task_log(
+        f"账号同步完成: 共 {results['total']} 个，同步 {results['synced']} 个，跳过 {results['skipped']} 个，失败 {results['failed']} 个"
+    )
     logger.info(f"账号同步完成: {results}")
     return results
 

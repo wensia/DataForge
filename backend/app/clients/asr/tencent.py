@@ -64,7 +64,9 @@ class TencentASRClient(ASRClient):
         canonical_querystring = ""
         ct = "application/json; charset=utf-8"
         payload_str = json.dumps(payload)
-        canonical_headers = f"content-type:{ct}\nhost:{host}\nx-tc-action:{action.lower()}\n"
+        canonical_headers = (
+            f"content-type:{ct}\nhost:{host}\nx-tc-action:{action.lower()}\n"
+        )
         signed_headers = "content-type;host;x-tc-action"
         hashed_request_payload = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
         canonical_request = (
@@ -413,7 +415,7 @@ class TencentASRClient(ASRClient):
 
         # 2. 等待完成
         result = await self.wait_for_task(task_id)
-        task_log(f"  - 任务完成，开始解析结果...")
+        task_log("  - 任务完成，开始解析结果...")
 
         # 3. 记录原始结果（用于调试）
         result_text = result.get("Result") or ""
@@ -423,7 +425,7 @@ class TencentASRClient(ASRClient):
 
         # 如果没有 ResultDetail，尝试从 Result 文本中解析
         if not result_detail and result_text:
-            task_log(f"  - 无 ResultDetail，将使用 Result 文本")
+            task_log("  - 无 ResultDetail，将使用 Result 文本")
 
         # 4. 解析结果
         segments = self._parse_result(result, speaker_labels)

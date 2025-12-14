@@ -1,6 +1,6 @@
 """JWT 认证中间件"""
 
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse

@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -19,16 +18,20 @@ class User(SQLModel, table=True):
 
     __tablename__ = "users"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     email: str = Field(index=True, unique=True, description="邮箱(登录账号)")
     password_hash: str = Field(description="密码哈希")
     name: str = Field(description="显示名称")
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
     is_active: bool = Field(default=True, description="是否启用")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
-    last_login_at: Optional[datetime] = Field(default=None, description="最后登录时间")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="创建时间"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="更新时间"
+    )
+    last_login_at: datetime | None = Field(default=None, description="最后登录时间")
 
 
 class UserCreate(SQLModel):
@@ -43,10 +46,10 @@ class UserCreate(SQLModel):
 class UserUpdate(SQLModel):
     """更新用户请求模型（name 不可修改）"""
 
-    email: Optional[str] = None
-    password: Optional[str] = None
-    role: Optional[UserRole] = None
-    is_active: Optional[bool] = None
+    email: str | None = None
+    password: str | None = None
+    role: UserRole | None = None
+    is_active: bool | None = None
 
 
 class UserResponse(SQLModel):
@@ -58,4 +61,4 @@ class UserResponse(SQLModel):
     role: UserRole
     is_active: bool
     created_at: datetime
-    last_login_at: Optional[datetime]
+    last_login_at: datetime | None

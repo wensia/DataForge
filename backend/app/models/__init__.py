@@ -1,5 +1,12 @@
 """SQLModel 数据模型"""
 
+from app.models.ai_config import (
+    PROVIDER_PRESETS,
+    AIConfig,
+    AIConfigCreate,
+    AIConfigResponse,
+    AIConfigUpdate,
+)
 from app.models.analysis_result import (
     AIProvider,
     AnalysisRequest,
@@ -11,6 +18,14 @@ from app.models.analysis_result import (
     ChatRequest,
 )
 from app.models.api_key import ApiKey, ApiKeyCreate, ApiKeyResponse, ApiKeyUpdate
+from app.models.asr_config import (
+    ASR_PROVIDER_PRESETS,
+    ASRConfig,
+    ASRConfigCreate,
+    ASRConfigResponse,
+    ASRConfigUpdate,
+    ASRProvider,
+)
 from app.models.base import BaseTable
 from app.models.call_record import (
     CallRecord,
@@ -20,6 +35,20 @@ from app.models.call_record import (
     CallRecordUpdate,
     DataSource,
     TranscriptStatus,
+)
+from app.models.conversation import (
+    Conversation,
+    ConversationCreate,
+    ConversationResponse,
+    ConversationType,
+    ConversationUpdate,
+    ConversationWithMessages,
+    Message,
+    MessageCreate,
+    MessageResponse,
+    MessageRole,
+    SendMessageRequest,
+    SendMessageResponse,
 )
 from app.models.feishu_bitable import (
     FeishuBitable,
@@ -45,6 +74,30 @@ from app.models.feishu_table import (
     FeishuTableResponse,
     FeishuTableUpdate,
 )
+from app.models.prompt import (
+    AssignUsersRequest,
+    Prompt,
+    PromptAssignment,
+    PromptAssignmentResponse,
+    PromptCreate,
+    PromptResponse,
+    PromptUpdate,
+    PromptWithAssignments,
+)
+from app.models.staff import (
+    CAMPUS_OPTIONS,
+    ApplyToRecordsRequest,
+    ApplyToRecordsResponse,
+    Staff,
+    StaffCreate,
+    StaffMapping,
+    StaffMappingCreate,
+    StaffMappingResponse,
+    StaffMappingUpdate,
+    StaffResponse,
+    StaffUpdate,
+    StaffWithMappings,
+)
 from app.models.task import (
     ScheduledTask,
     ScheduledTaskCreate,
@@ -66,6 +119,12 @@ from app.models.user import (
     UserRole,
     UserUpdate,
 )
+from app.models.user_preference import (
+    UserPreference,
+    UserPreferenceCreate,
+    UserPreferenceResponse,
+    UserPreferenceUpdate,
+)
 from app.models.yunke_account import (
     YunkeAccount,
     YunkeAccountCreate,
@@ -76,65 +135,6 @@ from app.models.yunke_company import (
     YunkeCompany,
     YunkeCompanyCreate,
     YunkeCompanyResponse,
-)
-from app.models.ai_config import (
-    AIConfig,
-    AIConfigCreate,
-    AIConfigResponse,
-    AIConfigUpdate,
-    PROVIDER_PRESETS,
-)
-from app.models.user_preference import (
-    UserPreference,
-    UserPreferenceCreate,
-    UserPreferenceResponse,
-    UserPreferenceUpdate,
-)
-from app.models.asr_config import (
-    ASRConfig,
-    ASRConfigCreate,
-    ASRConfigResponse,
-    ASRConfigUpdate,
-    ASRProvider,
-    ASR_PROVIDER_PRESETS,
-)
-from app.models.staff import (
-    CAMPUS_OPTIONS,
-    Staff,
-    StaffCreate,
-    StaffMapping,
-    StaffMappingCreate,
-    StaffMappingResponse,
-    StaffMappingUpdate,
-    StaffResponse,
-    StaffUpdate,
-    StaffWithMappings,
-    ApplyToRecordsRequest,
-    ApplyToRecordsResponse,
-)
-from app.models.conversation import (
-    Conversation,
-    ConversationCreate,
-    ConversationResponse,
-    ConversationUpdate,
-    ConversationWithMessages,
-    ConversationType,
-    Message,
-    MessageCreate,
-    MessageResponse,
-    MessageRole,
-    SendMessageRequest,
-    SendMessageResponse,
-)
-from app.models.prompt import (
-    Prompt,
-    PromptAssignment,
-    PromptCreate,
-    PromptUpdate,
-    PromptResponse,
-    PromptWithAssignments,
-    AssignUsersRequest,
-    PromptAssignmentResponse,
 )
 
 __all__ = [

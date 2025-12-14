@@ -3,8 +3,6 @@
 提供通话录音下载地址获取等API。
 """
 
-from typing import Any
-
 from loguru import logger
 
 from app.clients.yunke.client import YunkeApiClient, YunkeApiException

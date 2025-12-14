@@ -1,7 +1,6 @@
 """用户管理接口 - 仅管理员可用"""
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Query, Request
 from loguru import logger
@@ -26,7 +25,7 @@ async def list_users(
     request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    is_active: Optional[bool] = None,
+    is_active: bool | None = None,
 ):
     """获取用户列表 (仅管理员)
 
@@ -327,10 +326,14 @@ async def get_user_api_keys(request: Request, user_id: int):
                 "items": [
                     {
                         "id": k.id,
-                        "key": k.key[:8] + "..." + k.key[-4:] if len(k.key) > 12 else k.key,
+                        "key": k.key[:8] + "..." + k.key[-4:]
+                        if len(k.key) > 12
+                        else k.key,
                         "name": k.name,
                         "is_active": k.is_active,
-                        "created_at": k.created_at.isoformat() if k.created_at else None,
+                        "created_at": k.created_at.isoformat()
+                        if k.created_at
+                        else None,
                     }
                     for k in api_keys
                 ],

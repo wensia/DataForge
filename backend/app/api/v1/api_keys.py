@@ -1,8 +1,5 @@
 """API 密钥管理接口"""
 
-from datetime import datetime
-from typing import Optional
-
 from fastapi import APIRouter, Query
 from loguru import logger
 from sqlmodel import Session, select
@@ -19,7 +16,7 @@ router = APIRouter(prefix="/api-keys", tags=["API密钥管理"])
 async def list_api_keys(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
-    is_active: Optional[bool] = Query(None, description="筛选启用/禁用状态"),
+    is_active: bool | None = Query(None, description="筛选启用/禁用状态"),
 ):
     """获取 API 密钥列表"""
     with Session(engine) as session:
@@ -64,9 +61,7 @@ async def create_api_key(key_data: ApiKeyCreate):
         key_value = key_data.key if key_data.key else generate_api_key()
 
         # 检查密钥是否已存在
-        existing = session.exec(
-            select(ApiKey).where(ApiKey.key == key_value)
-        ).first()
+        existing = session.exec(select(ApiKey).where(ApiKey.key == key_value)).first()
         if existing:
             return ResponseModel.error(code=400, message="API 密钥已存在")
 

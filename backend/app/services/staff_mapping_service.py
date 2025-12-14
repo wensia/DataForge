@@ -109,7 +109,11 @@ def sync_staff_from_records(session: Session) -> dict:
     扫描 call_records 表中的 staff_name，创建不存在的员工。
     """
     # 获取所有不重复的员工名称
-    stmt = select(CallRecord.staff_name).where(CallRecord.staff_name.isnot(None)).distinct()
+    stmt = (
+        select(CallRecord.staff_name)
+        .where(CallRecord.staff_name.isnot(None))
+        .distinct()
+    )
     staff_names = [name for name in session.exec(stmt).all() if name and name.strip()]
 
     # 获取已存在的员工
@@ -126,7 +130,11 @@ def sync_staff_from_records(session: Session) -> dict:
             added += 1
 
     session.commit()
-    return {"total_names": len(staff_names), "added": added, "existing": len(existing_staff) - added}
+    return {
+        "total_names": len(staff_names),
+        "added": added,
+        "existing": len(existing_staff) - added,
+    }
 
 
 # ============ Mapping CRUD ============
@@ -146,10 +154,17 @@ def get_all_mappings(
         query = query.where(
             and_(
                 StaffMapping.effective_from <= today,
-                or_(StaffMapping.effective_to.is_(None), StaffMapping.effective_to >= today),
+                or_(
+                    StaffMapping.effective_to.is_(None),
+                    StaffMapping.effective_to >= today,
+                ),
             )
         )
-    return list(session.exec(query.order_by(StaffMapping.staff_id, StaffMapping.effective_from)).all())
+    return list(
+        session.exec(
+            query.order_by(StaffMapping.staff_id, StaffMapping.effective_from)
+        ).all()
+    )
 
 
 def get_mapping_by_id(session: Session, mapping_id: int) -> StaffMapping | None:
@@ -157,7 +172,9 @@ def get_mapping_by_id(session: Session, mapping_id: int) -> StaffMapping | None:
     return session.get(StaffMapping, mapping_id)
 
 
-def get_current_mapping(session: Session, staff_id: int, target_date: date | None = None) -> StaffMapping | None:
+def get_current_mapping(
+    session: Session, staff_id: int, target_date: date | None = None
+) -> StaffMapping | None:
     """获取员工在指定日期的有效映射"""
     target = target_date or date.today()
     return session.exec(
@@ -165,7 +182,10 @@ def get_current_mapping(session: Session, staff_id: int, target_date: date | Non
             and_(
                 StaffMapping.staff_id == staff_id,
                 StaffMapping.effective_from <= target,
-                or_(StaffMapping.effective_to.is_(None), StaffMapping.effective_to >= target),
+                or_(
+                    StaffMapping.effective_to.is_(None),
+                    StaffMapping.effective_to >= target,
+                ),
             )
         )
     ).first()
@@ -210,7 +230,9 @@ def create_mapping(session: Session, data: StaffMappingCreate) -> StaffMapping:
         raise HTTPException(status_code=404, detail="员工不存在")
 
     # 检查时间段冲突
-    overlap = check_mapping_overlap(session, data.staff_id, data.effective_from, data.effective_to)
+    overlap = check_mapping_overlap(
+        session, data.staff_id, data.effective_from, data.effective_to
+    )
     if overlap:
         raise HTTPException(
             status_code=400,
@@ -224,7 +246,9 @@ def create_mapping(session: Session, data: StaffMappingCreate) -> StaffMapping:
     return mapping
 
 
-def update_mapping(session: Session, mapping_id: int, data: StaffMappingUpdate) -> StaffMapping:
+def update_mapping(
+    session: Session, mapping_id: int, data: StaffMappingUpdate
+) -> StaffMapping:
     """更新映射"""
     mapping = get_mapping_by_id(session, mapping_id)
     if not mapping:
@@ -235,7 +259,9 @@ def update_mapping(session: Session, mapping_id: int, data: StaffMappingUpdate) 
     # 如果更新时间段，检查冲突
     new_from = update_data.get("effective_from", mapping.effective_from)
     new_to = update_data.get("effective_to", mapping.effective_to)
-    overlap = check_mapping_overlap(session, mapping.staff_id, new_from, new_to, exclude_id=mapping_id)
+    overlap = check_mapping_overlap(
+        session, mapping.staff_id, new_from, new_to, exclude_id=mapping_id
+    )
     if overlap:
         raise HTTPException(
             status_code=400,
@@ -317,12 +343,14 @@ def apply_mappings_to_records(
         if not staff:
             result["skipped_count"] += 1
             if dry_run:
-                result["details"].append({
-                    "record_id": record.id,
-                    "staff_name": staff_name,
-                    "status": "skipped",
-                    "reason": "员工不存在",
-                })
+                result["details"].append(
+                    {
+                        "record_id": record.id,
+                        "staff_name": staff_name,
+                        "status": "skipped",
+                        "reason": "员工不存在",
+                    }
+                )
             continue
 
         # 根据通话时间找对应的映射
@@ -342,13 +370,15 @@ def apply_mappings_to_records(
         if not matched_mapping:
             result["skipped_count"] += 1
             if dry_run:
-                result["details"].append({
-                    "record_id": record.id,
-                    "staff_name": staff_name,
-                    "call_date": str(call_date),
-                    "status": "skipped",
-                    "reason": "无有效映射",
-                })
+                result["details"].append(
+                    {
+                        "record_id": record.id,
+                        "staff_name": staff_name,
+                        "call_date": str(call_date),
+                        "status": "skipped",
+                        "reason": "无有效映射",
+                    }
+                )
             continue
 
         # 更新记录
@@ -361,20 +391,24 @@ def apply_mappings_to_records(
 
         result["updated_count"] += 1
         if dry_run:
-            result["details"].append({
-                "record_id": record.id,
-                "staff_name": staff_name,
-                "call_date": str(call_date),
-                "status": "will_update",
-                "mapping": {
-                    "position": matched_mapping.position,
-                    "department": matched_mapping.department,
-                    "campus": matched_mapping.campus,
-                },
-            })
+            result["details"].append(
+                {
+                    "record_id": record.id,
+                    "staff_name": staff_name,
+                    "call_date": str(call_date),
+                    "status": "will_update",
+                    "mapping": {
+                        "position": matched_mapping.position,
+                        "department": matched_mapping.department,
+                        "campus": matched_mapping.campus,
+                    },
+                }
+            )
 
     if not dry_run:
         session.commit()
-        logger.info(f"映射回写完成: 更新 {result['updated_count']}，跳过 {result['skipped_count']}")
+        logger.info(
+            f"映射回写完成: 更新 {result['updated_count']}，跳过 {result['skipped_count']}"
+        )
 
     return result

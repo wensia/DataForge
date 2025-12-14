@@ -4,7 +4,7 @@
 """
 
 from datetime import date
-from typing import Any, Callable, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -13,9 +13,9 @@ from app.clients.yunke.client import YunkeApiClient
 
 class ReportClient(YunkeApiClient):
     """云客报表API客户端
-    
+
     提供通话报表、统计等API接口。
-    
+
     使用示例:
         ```python
         client = ReportClient(
@@ -25,7 +25,7 @@ class ReportClient(YunkeApiClient):
             cookies={"user": "xxx", "userToken": "xxx"},
             auto_login_callback=auto_login_func,
         )
-        
+
         # 获取外呼报表
         result = await client.get_call_index_detail(
             start_date="2025-11-30",
@@ -35,7 +35,7 @@ class ReportClient(YunkeApiClient):
         )
         ```
     """
-    
+
     async def get_call_index_detail(
         self,
         start_date: str | date,
@@ -48,9 +48,9 @@ class ReportClient(YunkeApiClient):
         page_size: int = 10,
     ) -> dict[str, Any]:
         """获取通话报表详情
-        
+
         获取指定时间范围内的通话统计数据，支持按部门和员工筛选。
-        
+
         Args:
             start_date: 开始日期，格式 YYYY-MM-DD
             end_date: 结束日期，格式 YYYY-MM-DD
@@ -63,10 +63,10 @@ class ReportClient(YunkeApiClient):
             option: 选项，默认 "1"
             page: 页码，默认 1
             page_size: 每页数量，默认 10
-            
+
         Returns:
             dict: 报表数据
-            
+
         Raises:
             YunkePasswordException: 密码错误
             YunkeApiException: API调用失败
@@ -76,7 +76,7 @@ class ReportClient(YunkeApiClient):
             start_date = start_date.strftime("%Y-%m-%d")
         if isinstance(end_date, date):
             end_date = end_date.strftime("%Y-%m-%d")
-        
+
         payload = {
             "childModule": child_module,
             "starttime": start_date,
@@ -87,19 +87,19 @@ class ReportClient(YunkeApiClient):
             "page": page,
             "pageSize": page_size,
         }
-        
+
         logger.info(
             f"获取通话报表: module={child_module}, "
             f"date={start_date}~{end_date}, depart={depart_id}"
         )
-        
+
         return await self._request(
             "POST",
             "/yunke-report-phone/module/getIndexDetail",
             json=payload,
             referer="/cms/home/reportform/call",
         )
-    
+
     async def get_outbound_call_report(
         self,
         start_date: str | date,
@@ -110,7 +110,7 @@ class ReportClient(YunkeApiClient):
         page_size: int = 10,
     ) -> dict[str, Any]:
         """获取外呼报表（快捷方法）
-        
+
         Args:
             start_date: 开始日期
             end_date: 结束日期
@@ -118,7 +118,7 @@ class ReportClient(YunkeApiClient):
             search_user_id: 搜索的用户ID（可选）
             page: 页码
             page_size: 每页数量
-            
+
         Returns:
             dict: 外呼报表数据
         """
@@ -131,7 +131,7 @@ class ReportClient(YunkeApiClient):
             page=page,
             page_size=page_size,
         )
-    
+
     async def get_inbound_call_report(
         self,
         start_date: str | date,
@@ -142,7 +142,7 @@ class ReportClient(YunkeApiClient):
         page_size: int = 10,
     ) -> dict[str, Any]:
         """获取呼入报表（快捷方法）
-        
+
         Args:
             start_date: 开始日期
             end_date: 结束日期
@@ -150,7 +150,7 @@ class ReportClient(YunkeApiClient):
             search_user_id: 搜索的用户ID（可选）
             page: 页码
             page_size: 每页数量
-            
+
         Returns:
             dict: 呼入报表数据
         """
@@ -163,8 +163,3 @@ class ReportClient(YunkeApiClient):
             page=page,
             page_size=page_size,
         )
-
-
-
-
-

@@ -18,9 +18,3 @@ async def health_check():
         data={"status": "healthy"},
         message="服务运行正常",
     )
-
-
-
-
-
-

@@ -11,7 +11,6 @@ from sqlmodel import Field, SQLModel
 
 from app.models.base import BaseTable
 
-
 # 校区固定选项
 CAMPUS_OPTIONS = [
     {"value": "西南楼", "label": "西南楼"},
@@ -51,7 +50,9 @@ class StaffMapping(BaseTable, table=True):
     department: str | None = Field(default=None, description="部门")
     campus: str | None = Field(default=None, description="校区")
     effective_from: date = Field(description="生效开始日期")
-    effective_to: date | None = Field(default=None, description="生效结束日期（NULL=至今）")
+    effective_to: date | None = Field(
+        default=None, description="生效结束日期（NULL=至今）"
+    )
 
 
 # ============ Schemas ============

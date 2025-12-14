@@ -1,6 +1,6 @@
 """应用配置管理"""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     celery_timezone: str = "Asia/Shanghai"
     celery_task_track_started: bool = True
     celery_beat_sync_every: int = 60  # Beat 从数据库同步任务的间隔（秒）
+    celery_worker_soft_shutdown_timeout: float = 30.0  # 软关闭超时（秒）
 
     # 任务配置
     timezone: str = "Asia/Shanghai"
@@ -62,10 +63,11 @@ class Settings(BaseSettings):
         """获取 Celery result backend URL"""
         return self.celery_result_backend or self.redis_url
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"  # 忽略额外的环境变量
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",  # 忽略额外的环境变量
+    )
 
 
 settings = Settings()

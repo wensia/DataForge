@@ -10,7 +10,7 @@ from loguru import logger
 from sqlalchemy import distinct
 from sqlmodel import Session, select
 
-from app.models.call_record import CallRecord, CallRecordCreate, DataSource
+from app.models.call_record import CallRecord, DataSource
 from app.models.feishu_bitable import FeishuBitable
 from app.models.feishu_client import FeishuClient
 from app.models.feishu_table import FeishuTable
@@ -299,7 +299,9 @@ async def sync_all_feishu_tables(
                             "error": e.message,
                         }
                     )
-                    logger.error(f"同步表 {bitable.name}/{table.name} 失败: {e.message}")
+                    logger.error(
+                        f"同步表 {bitable.name}/{table.name} 失败: {e.message}"
+                    )
 
     return result
 
@@ -410,7 +412,6 @@ def get_call_record_stats(
     Returns:
         dict: 统计结果
     """
-    from sqlalchemy import func
 
     query = select(CallRecord)
 
@@ -535,7 +536,7 @@ async def sync_yunke_call_logs(
 
             data = response.get("data", {})
             records = data.get("data", [])
-            total_count = data.get("totalCount", 0)
+            data.get("totalCount", 0)
             page_count = data.get("pageCount", 0)
 
             result["total"] += len(records)

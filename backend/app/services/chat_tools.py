@@ -307,7 +307,9 @@ def _query_call_records(
     # 被叫号码筛选（支持多个号码，逗号分隔）
     if callee:
         # 清理和分割号码
-        phone_list = [p.strip() for p in callee.replace("，", ",").split(",") if p.strip()]
+        phone_list = [
+            p.strip() for p in callee.replace("，", ",").split(",") if p.strip()
+        ]
         if phone_list:
             if len(phone_list) == 1:
                 # 单个号码，使用模糊匹配
@@ -681,32 +683,38 @@ def _query_by_callee(
             avg_dur = round(stats["duration"] / cnt, 1) if cnt > 0 else 0
             eff_rate = round(stats["effective_count"] * 100 / cnt, 1) if cnt > 0 else 0
             last_time = stats["last_call_time"]
-            results.append({
-                "callee": phone,
-                "call_count": cnt,
-                "total_duration_seconds": stats["duration"],
-                "total_duration_minutes": round(stats["duration"] / 60, 1),
-                "avg_duration_seconds": avg_dur,
-                "staff_count": len(stats["staff_set"]),
-                "staff_names": list(stats["staff_set"]),
-                "effective_call_count": stats["effective_count"],
-                "effective_rate": eff_rate,
-                "last_call_time": last_time.strftime("%Y-%m-%d %H:%M") if last_time else None,
-            })
+            results.append(
+                {
+                    "callee": phone,
+                    "call_count": cnt,
+                    "total_duration_seconds": stats["duration"],
+                    "total_duration_minutes": round(stats["duration"] / 60, 1),
+                    "avg_duration_seconds": avg_dur,
+                    "staff_count": len(stats["staff_set"]),
+                    "staff_names": list(stats["staff_set"]),
+                    "effective_call_count": stats["effective_count"],
+                    "effective_rate": eff_rate,
+                    "last_call_time": last_time.strftime("%Y-%m-%d %H:%M")
+                    if last_time
+                    else None,
+                }
+            )
         else:
-            results.append({
-                "callee": phone,
-                "call_count": 0,
-                "total_duration_seconds": 0,
-                "total_duration_minutes": 0,
-                "avg_duration_seconds": 0,
-                "staff_count": 0,
-                "staff_names": [],
-                "effective_call_count": 0,
-                "effective_rate": 0,
-                "last_call_time": None,
-                "note": "未找到该号码的通话记录",
-            })
+            results.append(
+                {
+                    "callee": phone,
+                    "call_count": 0,
+                    "total_duration_seconds": 0,
+                    "total_duration_minutes": 0,
+                    "avg_duration_seconds": 0,
+                    "staff_count": 0,
+                    "staff_names": [],
+                    "effective_call_count": 0,
+                    "effective_rate": 0,
+                    "last_call_time": None,
+                    "note": "未找到该号码的通话记录",
+                }
+            )
 
     # 统计汇总
     found_count = sum(1 for r in results if r["call_count"] > 0)
@@ -743,9 +751,7 @@ def _get_call_transcripts(
         dict: 通话转录内容
     """
     # 解析号码列表
-    phones = [
-        p.strip() for p in callee_list.replace("，", ",").split(",") if p.strip()
-    ]
+    phones = [p.strip() for p in callee_list.replace("，", ",").split(",") if p.strip()]
 
     if not phones:
         return {"error": "请提供被叫号码列表", "total": 0, "transcripts": []}
@@ -804,22 +810,26 @@ def _get_call_transcripts(
             if item.get("speaker") == "customer"
         ]
 
-        transcripts.append({
-            "callee": r.callee,
-            "staff_name": r.staff_name,
-            "call_time": r.call_time.strftime("%Y-%m-%d %H:%M") if r.call_time else None,
-            "duration_seconds": r.duration,
-            "duration_minutes": round(r.duration / 60, 1) if r.duration else 0,
-            "dialogue_count": len(transcript_data),
-            "staff_dialogue_count": len(staff_lines),
-            "customer_dialogue_count": len(customer_lines),
-            "full_dialogue": full_dialogue,
-            "summary": {
-                "total_turns": len(transcript_data),
-                "staff_words": sum(len(line) for line in staff_lines),
-                "customer_words": sum(len(line) for line in customer_lines),
-            },
-        })
+        transcripts.append(
+            {
+                "callee": r.callee,
+                "staff_name": r.staff_name,
+                "call_time": r.call_time.strftime("%Y-%m-%d %H:%M")
+                if r.call_time
+                else None,
+                "duration_seconds": r.duration,
+                "duration_minutes": round(r.duration / 60, 1) if r.duration else 0,
+                "dialogue_count": len(transcript_data),
+                "staff_dialogue_count": len(staff_lines),
+                "customer_dialogue_count": len(customer_lines),
+                "full_dialogue": full_dialogue,
+                "summary": {
+                    "total_turns": len(transcript_data),
+                    "staff_words": sum(len(line) for line in staff_lines),
+                    "customer_words": sum(len(line) for line in customer_lines),
+                },
+            }
+        )
 
     return {
         "total": len(transcripts),

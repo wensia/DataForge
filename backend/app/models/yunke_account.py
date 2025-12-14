@@ -37,10 +37,10 @@ class YunkeAccount(BaseTable, table=True):
     phone: str = Field(index=True, description="手机号")
     password: str = Field(description="密码（加密存储）")
     company_id: int = Field(foreign_key="yunke_companies.id", description="关联公司ID")
-    user_id: Optional[str] = Field(default=None, description="云客用户ID")
-    token: Optional[str] = Field(default=None, description="登录token")
-    cookies: Optional[str] = Field(default=None, description="cookies JSON")
-    last_login: Optional[datetime] = Field(default=None, description="最后登录时间")
+    user_id: str | None = Field(default=None, description="云客用户ID")
+    token: str | None = Field(default=None, description="登录token")
+    cookies: str | None = Field(default=None, description="cookies JSON")
+    last_login: datetime | None = Field(default=None, description="最后登录时间")
     status: int = Field(default=0, description="状态：1正常 0失效")
 
     # 关联关系
@@ -60,7 +60,7 @@ class YunkeAccountCreate(SQLModel):
 class YunkeAccountUpdate(SQLModel):
     """更新账号请求模型"""
 
-    password: Optional[str] = Field(default=None, description="密码")
+    password: str | None = Field(default=None, description="密码")
 
 
 class YunkeAccountResponse(SQLModel):
@@ -71,8 +71,8 @@ class YunkeAccountResponse(SQLModel):
     company_id: int
     company_code: str
     company_name: str
-    user_id: Optional[str]
-    last_login: Optional[datetime]
+    user_id: str | None
+    last_login: datetime | None
     status: int
     created_at: datetime
     updated_at: datetime

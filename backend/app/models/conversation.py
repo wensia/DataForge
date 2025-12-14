@@ -121,7 +121,9 @@ class SendMessageRequest(SQLModel):
     content: str = Field(description="用户消息内容")
     ai_provider: str | None = Field(default=None, description="临时切换 AI 提供商")
     use_deep_thinking: bool = Field(default=True, description="是否启用深度思考模式")
-    enable_tools: bool = Field(default=True, description="是否启用工具调用(Function Calling)")
+    enable_tools: bool = Field(
+        default=True, description="是否启用工具调用(Function Calling)"
+    )
 
 
 class SendMessageResponse(SQLModel):

@@ -1,7 +1,6 @@
 """飞书客户端配置模型"""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -17,7 +16,7 @@ class FeishuClient(BaseTable, table=True):
     app_id: str = Field(unique=True, index=True, description="飞书应用 App ID")
     app_secret: str = Field(description="飞书应用 App Secret")
     is_active: bool = Field(default=True, description="是否启用")
-    notes: Optional[str] = Field(default=None, description="备注")
+    notes: str | None = Field(default=None, description="备注")
 
 
 class FeishuClientCreate(SQLModel):
@@ -26,16 +25,16 @@ class FeishuClientCreate(SQLModel):
     name: str
     app_id: str
     app_secret: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class FeishuClientUpdate(SQLModel):
     """更新飞书客户端请求"""
 
-    name: Optional[str] = None
-    app_secret: Optional[str] = None
-    is_active: Optional[bool] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    app_secret: str | None = None
+    is_active: bool | None = None
+    notes: str | None = None
 
 
 class FeishuClientResponse(SQLModel):
@@ -45,6 +44,6 @@ class FeishuClientResponse(SQLModel):
     name: str
     app_id: str
     is_active: bool
-    notes: Optional[str]
+    notes: str | None
     created_at: datetime
     updated_at: datetime

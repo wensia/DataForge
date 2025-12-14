@@ -58,7 +58,9 @@ class AnalysisResult(BaseTable, table=True):
     tokens_used: int | None = Field(default=None, description="消耗的 token 数量")
 
     # 状态
-    status: str = Field(default="completed", description="状态: pending/completed/failed")
+    status: str = Field(
+        default="completed", description="状态: pending/completed/failed"
+    )
     error_message: str | None = Field(default=None, description="错误信息")
 
 

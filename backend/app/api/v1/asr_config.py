@@ -73,7 +73,7 @@ async def create_asr_config(
     if data.is_default:
         existing_defaults = session.exec(
             select(ASRConfig).where(
-                ASRConfig.provider == data.provider, ASRConfig.is_default == True
+                ASRConfig.provider == data.provider, ASRConfig.is_default
             )
         ).all()
         for config in existing_defaults:
@@ -114,7 +114,7 @@ def get_asr_config_options(
 
     返回所有启用的 ASR 配置，用于任务参数中的下拉框选择。
     """
-    query = select(ASRConfig).where(ASRConfig.is_active == True)
+    query = select(ASRConfig).where(ASRConfig.is_active)
     configs = session.exec(query).all()
 
     options = [
@@ -178,7 +178,7 @@ async def update_asr_config(
         existing_defaults = session.exec(
             select(ASRConfig).where(
                 ASRConfig.provider == config.provider,
-                ASRConfig.is_default == True,
+                ASRConfig.is_default,
                 ASRConfig.id != config_id,
             )
         ).all()

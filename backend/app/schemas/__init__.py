@@ -3,9 +3,3 @@
 from app.schemas.response import ResponseModel
 
 __all__ = ["ResponseModel"]
-
-
-
-
-
-

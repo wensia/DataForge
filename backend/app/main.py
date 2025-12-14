@@ -76,6 +76,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # 关闭时执行
+    from app.utils.http_client import close_all_clients
+
+    await close_all_clients()
+    logger.info("HTTP 客户端已关闭")
     logger.info("应用正在关闭...")
 
 

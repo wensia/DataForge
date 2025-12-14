@@ -1,6 +1,6 @@
 """统一响应模型"""
 
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -18,12 +18,10 @@ class ResponseModel(BaseModel, Generic[T]):
 
     code: int = 200
     message: str = "success"
-    data: Optional[T] = None
+    data: T | None = None
 
     @classmethod
-    def success(
-        cls, data: T = None, message: str = "success"
-    ) -> "ResponseModel[T]":
+    def success(cls, data: T = None, message: str = "success") -> "ResponseModel[T]":
         """成功响应
 
         Args:
@@ -50,9 +48,3 @@ class ResponseModel(BaseModel, Generic[T]):
             ResponseModel: 错误响应对象
         """
         return cls(code=code, message=message, data=data)
-
-
-
-
-
-

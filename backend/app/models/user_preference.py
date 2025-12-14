@@ -1,7 +1,6 @@
 """用户偏好设置模型"""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -11,13 +10,17 @@ class UserPreference(SQLModel, table=True):
 
     __tablename__ = "user_preferences"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(index=True, description="用户ID")
     preference_key: str = Field(index=True, description="偏好键名")
     preference_value: str = Field(description="偏好值(JSON格式)")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="创建时间")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="更新时间")
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, description="创建时间"
+    )
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, description="更新时间"
+    )
 
     class Config:
         # 创建复合唯一索引

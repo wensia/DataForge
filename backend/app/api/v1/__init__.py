@@ -16,8 +16,8 @@ from app.api.v1 import (
     record_proxy,
     staff_mapping,
     tasks,
-    users,
     user_preferences,
+    users,
     yunke,
 )
 

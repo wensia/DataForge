@@ -13,7 +13,7 @@ import time
 import urllib.parse
 import uuid
 from base64 import b64encode
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -67,14 +67,12 @@ class AlibabaASRClient(ASRClient):
 
         # HMAC-SHA1 签名
         key = (self.access_key_secret + "&").encode("utf-8")
-        signature = hmac.new(
-            key, string_to_sign.encode("utf-8"), hashlib.sha1
-        ).digest()
+        signature = hmac.new(key, string_to_sign.encode("utf-8"), hashlib.sha1).digest()
         return b64encode(signature).decode("utf-8")
 
     def _build_common_params(self, action: str) -> dict[str, str]:
         """构建公共请求参数"""
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         return {
             "Format": "JSON",
             "Version": self.API_VERSION,

@@ -26,7 +26,12 @@ ASR_PROVIDER_PRESETS = {
         "fields": [
             {"key": "secret_id", "label": "SecretId", "required": True},
             {"key": "secret_key", "label": "SecretKey", "required": True},
-            {"key": "app_id", "label": "AppId", "required": False, "hint": "实时语音识别需要，录音文件识别可不填"},
+            {
+                "key": "app_id",
+                "label": "AppId",
+                "required": False,
+                "hint": "实时语音识别需要，录音文件识别可不填",
+            },
         ],
         "doc_url": "https://cloud.tencent.com/document/product/1093/37823",
     },
@@ -44,7 +49,12 @@ ASR_PROVIDER_PRESETS = {
         "fields": [
             {"key": "app_id", "label": "App ID", "required": True},
             {"key": "access_token", "label": "Access Token", "required": True},
-            {"key": "secret_key", "label": "Secret Key", "required": False, "hint": "部分接口可能需要"},
+            {
+                "key": "secret_key",
+                "label": "Secret Key",
+                "required": False,
+                "hint": "部分接口可能需要",
+            },
             {
                 "key": "cluster",
                 "label": "Cluster",

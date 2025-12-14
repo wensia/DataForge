@@ -1,7 +1,6 @@
 """飞书多维表格配置模型"""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
@@ -16,10 +15,10 @@ class FeishuConfig(BaseTable, table=True):
     name: str = Field(description="配置名称")
     app_id: str = Field(unique=True, index=True, description="飞书应用 App ID")
     app_secret: str = Field(description="飞书应用 App Secret")
-    app_token: Optional[str] = Field(default=None, description="多维表格 App Token")
-    table_id: Optional[str] = Field(default=None, description="数据表 ID")
+    app_token: str | None = Field(default=None, description="多维表格 App Token")
+    table_id: str | None = Field(default=None, description="数据表 ID")
     is_active: bool = Field(default=True, description="是否启用")
-    notes: Optional[str] = Field(default=None, description="备注")
+    notes: str | None = Field(default=None, description="备注")
 
 
 class FeishuConfigCreate(SQLModel):
@@ -28,20 +27,20 @@ class FeishuConfigCreate(SQLModel):
     name: str
     app_id: str
     app_secret: str
-    app_token: Optional[str] = None
-    table_id: Optional[str] = None
-    notes: Optional[str] = None
+    app_token: str | None = None
+    table_id: str | None = None
+    notes: str | None = None
 
 
 class FeishuConfigUpdate(SQLModel):
     """更新飞书配置请求"""
 
-    name: Optional[str] = None
-    app_secret: Optional[str] = None
-    app_token: Optional[str] = None
-    table_id: Optional[str] = None
-    is_active: Optional[bool] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    app_secret: str | None = None
+    app_token: str | None = None
+    table_id: str | None = None
+    is_active: bool | None = None
+    notes: str | None = None
 
 
 class FeishuConfigResponse(SQLModel):
@@ -50,9 +49,9 @@ class FeishuConfigResponse(SQLModel):
     id: int
     name: str
     app_id: str
-    app_token: Optional[str]
-    table_id: Optional[str]
+    app_token: str | None
+    table_id: str | None
     is_active: bool
-    notes: Optional[str]
+    notes: str | None
     created_at: datetime
     updated_at: datetime

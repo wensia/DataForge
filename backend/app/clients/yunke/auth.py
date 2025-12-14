@@ -113,10 +113,12 @@ async def check_and_get_users(
 
     # 初始化cookies
     init_cookies = cookies or {}
-    init_cookies.update({
-        "pc_register": "1",
-        "i18next": "zh-CN",
-    })
+    init_cookies.update(
+        {
+            "pc_register": "1",
+            "i18next": "zh-CN",
+        }
+    )
 
     # 使用同一个 client 保持 session（此API可从任意云客域名调用）
     async with create_client(init_cookies, base_url) as client:
@@ -172,7 +174,9 @@ async def check_and_get_users(
             response.raise_for_status()
 
             result = response.json()
-            logger.info(f"获取用户公司列表完成: account={account}, code={result.get('code')}")
+            logger.info(
+                f"获取用户公司列表完成: account={account}, code={result.get('code')}"
+            )
             logger.debug(f"checkAndGetUsers完整响应: {result}")
 
             return {
@@ -211,8 +215,10 @@ async def password_login(
     Raises:
         httpx.HTTPStatusError: 请求失败时抛出
     """
-    logger.info(f"开始登录: phone={phone}, company_code={company_code}, domain={domain}")
-    
+    logger.info(
+        f"开始登录: phone={phone}, company_code={company_code}, domain={domain}"
+    )
+
     # 1. 获取RSA公钥（使用对应公司的域名）
     key_data = await get_secure_key(phone, base_url=domain)
 
@@ -247,7 +253,9 @@ async def password_login(
             response.raise_for_status()
 
             result = response.json()
-            logger.info(f"登录请求完成: phone={phone}, company_code={company_code}, domain={domain}, code={result.get('code')}")
+            logger.info(
+                f"登录请求完成: phone={phone}, company_code={company_code}, domain={domain}, code={result.get('code')}"
+            )
 
             return {
                 "json": result,
@@ -259,4 +267,3 @@ async def password_login(
         except Exception as e:
             logger.error(f"登录异常: {e}, domain={domain}")
             raise
-

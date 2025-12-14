@@ -106,7 +106,9 @@ async def get_staff_detail(
     return ResponseModel(data=result)
 
 
-@router.post("/staff", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.post(
+    "/staff", response_model=ResponseModel, dependencies=[Depends(require_admin)]
+)
 async def create_staff(
     data: StaffCreate,
     session: Session = Depends(get_session),
@@ -126,7 +128,11 @@ async def create_staff(
     )
 
 
-@router.put("/staff/{staff_id}", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.put(
+    "/staff/{staff_id}",
+    response_model=ResponseModel,
+    dependencies=[Depends(require_admin)],
+)
 async def update_staff(
     staff_id: int,
     data: StaffUpdate,
@@ -147,7 +153,11 @@ async def update_staff(
     )
 
 
-@router.delete("/staff/{staff_id}", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.delete(
+    "/staff/{staff_id}",
+    response_model=ResponseModel,
+    dependencies=[Depends(require_admin)],
+)
 async def delete_staff(
     staff_id: int,
     session: Session = Depends(get_session),
@@ -157,7 +167,9 @@ async def delete_staff(
     return ResponseModel(message="员工删除成功")
 
 
-@router.post("/staff/sync", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.post(
+    "/staff/sync", response_model=ResponseModel, dependencies=[Depends(require_admin)]
+)
 async def sync_staff_from_records(
     session: Session = Depends(get_session),
 ) -> ResponseModel:
@@ -179,7 +191,9 @@ async def get_mappings(
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取映射列表"""
-    mappings = svc.get_all_mappings(session, staff_id=staff_id, include_expired=include_expired)
+    mappings = svc.get_all_mappings(
+        session, staff_id=staff_id, include_expired=include_expired
+    )
     result = [
         StaffMappingResponse(
             id=m.id,
@@ -209,26 +223,30 @@ async def get_mappings_at_time(
     for staff in staff_list:
         mapping = svc.get_current_mapping(session, staff.id, target_date=target_date)
         if mapping:
-            result.append({
-                "staff_id": staff.id,
-                "staff_name": staff.name,
-                "mapping": StaffMappingResponse(
-                    id=mapping.id,
-                    staff_id=mapping.staff_id,
-                    position=mapping.position,
-                    department=mapping.department,
-                    campus=mapping.campus,
-                    effective_from=mapping.effective_from,
-                    effective_to=mapping.effective_to,
-                    created_at=mapping.created_at,
-                    updated_at=mapping.updated_at,
-                ),
-            })
+            result.append(
+                {
+                    "staff_id": staff.id,
+                    "staff_name": staff.name,
+                    "mapping": StaffMappingResponse(
+                        id=mapping.id,
+                        staff_id=mapping.staff_id,
+                        position=mapping.position,
+                        department=mapping.department,
+                        campus=mapping.campus,
+                        effective_from=mapping.effective_from,
+                        effective_to=mapping.effective_to,
+                        created_at=mapping.created_at,
+                        updated_at=mapping.updated_at,
+                    ),
+                }
+            )
 
     return ResponseModel(data=result)
 
 
-@router.post("/mappings", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.post(
+    "/mappings", response_model=ResponseModel, dependencies=[Depends(require_admin)]
+)
 async def create_mapping(
     data: StaffMappingCreate,
     session: Session = Depends(get_session),
@@ -251,7 +269,11 @@ async def create_mapping(
     )
 
 
-@router.put("/mappings/{mapping_id}", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.put(
+    "/mappings/{mapping_id}",
+    response_model=ResponseModel,
+    dependencies=[Depends(require_admin)],
+)
 async def update_mapping(
     mapping_id: int,
     data: StaffMappingUpdate,
@@ -275,7 +297,11 @@ async def update_mapping(
     )
 
 
-@router.delete("/mappings/{mapping_id}", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.delete(
+    "/mappings/{mapping_id}",
+    response_model=ResponseModel,
+    dependencies=[Depends(require_admin)],
+)
 async def delete_mapping(
     mapping_id: int,
     session: Session = Depends(get_session),
@@ -297,7 +323,11 @@ async def get_campus_options() -> ResponseModel:
 # ============ 回写接口 ============
 
 
-@router.post("/apply/to-records", response_model=ResponseModel, dependencies=[Depends(require_admin)])
+@router.post(
+    "/apply/to-records",
+    response_model=ResponseModel,
+    dependencies=[Depends(require_admin)],
+)
 async def apply_to_records(
     data: ApplyToRecordsRequest,
     session: Session = Depends(get_session),

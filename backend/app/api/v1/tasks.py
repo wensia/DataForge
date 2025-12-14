@@ -16,12 +16,10 @@ from app.models.task_execution import (
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
 )
-from app.scheduler import is_execution_running
 from app.scheduler.registry import get_registered_handlers
 from app.schemas.response import ResponseModel
 from app.services import task_service
 from app.utils.redis_client import (
-    get_execution_status_async,
     get_logs_async,
     subscribe_logs,
 )
@@ -309,13 +307,17 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                 )
                 if message is None:
                     # 没有消息，检查 DB 状态是否已结束
-                    execution = await task_service.get_execution_by_id_async(execution_id)
+                    execution = await task_service.get_execution_by_id_async(
+                        execution_id
+                    )
                     if not execution:
                         yield 'data: {"error": "执行记录不存在"}\n\n'
                         break
                     db_status = execution.status.value
                     if db_status not in ("pending", "running"):
-                        remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                        remaining_logs = await get_logs_async(
+                            execution_id, start=sent_count
+                        )
                         for log_line in remaining_logs:
                             if log_line.strip():
                                 escaped = _escape_log_for_json(log_line)
@@ -328,14 +330,18 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                 if message["type"] == "message":
                     data = message["data"]
                     if data == "__END__":
-                        remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                        remaining_logs = await get_logs_async(
+                            execution_id, start=sent_count
+                        )
                         for log_line in remaining_logs:
                             if log_line.strip():
                                 escaped = _escape_log_for_json(log_line)
                                 yield f'data: {{"log": "{escaped}"}}\n\n'
                                 sent_count += 1
 
-                        execution = await task_service.get_execution_by_id_async(execution_id)
+                        execution = await task_service.get_execution_by_id_async(
+                            execution_id
+                        )
                         db_status = execution.status.value if execution else "unknown"
                         yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
                         break
@@ -355,7 +361,9 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                     break
                 db_status = execution.status.value
                 if db_status not in ("pending", "running"):
-                    remaining_logs = await get_logs_async(execution_id, start=sent_count)
+                    remaining_logs = await get_logs_async(
+                        execution_id, start=sent_count
+                    )
                     for log_line in remaining_logs:
                         if log_line.strip():
                             escaped = _escape_log_for_json(log_line)

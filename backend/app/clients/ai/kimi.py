@@ -241,7 +241,9 @@ class KimiClient(AIClient):
                                 "code", "unknown"
                             )
                         except json.JSONDecodeError:
-                            error_msg = error_text.decode() if error_text else "未知错误"
+                            error_msg = (
+                                error_text.decode() if error_text else "未知错误"
+                            )
                             error_code = "unknown"
                         logger.error(
                             f"Kimi 流式 API 错误: {error_msg} (code={error_code})"

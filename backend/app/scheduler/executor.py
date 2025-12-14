@@ -66,6 +66,7 @@ async def execute_task(
     Returns:
         TaskExecution: 执行记录
     """
+
     # 创建执行记录（同步 DB 操作放入线程，避免阻塞事件循环）
     def _create_execution() -> int:
         with Session(engine) as session:
