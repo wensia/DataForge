@@ -351,8 +351,13 @@ export function AIChat() {
                   {isStreaming && streamingReasoning && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
                       <div className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
-                        <Brain className="h-4 w-4" />
+                        <Brain className="h-4 w-4 animate-pulse" />
                         AI 正在思考...
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500 [animation-delay:-0.3s]" />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500 [animation-delay:-0.15s]" />
+                          <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" />
+                        </span>
                       </div>
                       <div className="max-h-40 overflow-y-auto text-sm text-amber-900/80 dark:text-amber-200/80">
                         <MarkdownContent content={streamingReasoning} />
@@ -363,6 +368,12 @@ export function AIChat() {
                   {isStreaming && streamingContent && (
                     <ChatBubble variant="assistant" showCopy={false}>
                       <MarkdownContent content={streamingContent} />
+                      {/* 打字光标动画 - 表示 AI 正在工作 */}
+                      <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+                        <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+                        <span className="inline-block h-2 w-2 animate-bounce rounded-full bg-primary" />
+                      </span>
                     </ChatBubble>
                   )}
                   {/* 正在等待响应 */}
