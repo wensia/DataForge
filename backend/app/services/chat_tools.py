@@ -33,7 +33,7 @@ CHAT_TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "query_call_records",
-            "description": "查询通话记录数据。可按日期范围、员工、部门、校区等条件筛选。",
+            "description": "查询通话记录数据。可按日期范围、被叫号码、员工、部门、校区等条件筛选。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -44,6 +44,10 @@ CHAT_TOOLS: list[dict[str, Any]] = [
                     "end_date": {
                         "type": "string",
                         "description": "结束日期，格式 YYYY-MM-DD",
+                    },
+                    "callee": {
+                        "type": "string",
+                        "description": "被叫号码/客户手机号，多个号码用逗号分隔。注意：被叫号码存储在 callee 字段，不是 customer_name",
                     },
                     "staff_name": {
                         "type": "string",
@@ -155,6 +159,31 @@ CHAT_TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_by_callee",
+            "description": "按被叫号码（客户手机号）查询通话统计。用于分析特定客户的通话情况。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "callee_list": {
+                        "type": "string",
+                        "description": "被叫号码列表，多个号码用逗号分隔，如 '13800138000,13900139000'",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "开始日期，格式 YYYY-MM-DD",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "结束日期，格式 YYYY-MM-DD",
+                    },
+                },
+                "required": ["callee_list"],
+            },
+        },
+    },
 ]
 
 
@@ -194,6 +223,8 @@ async def execute_tool(session: Session, tool_name: str, arguments: str | dict) 
             result = _get_staff_list(session, **args)
         elif tool_name == "get_call_ranking":
             result = _get_call_ranking(session, **args)
+        elif tool_name == "query_by_callee":
+            result = _query_by_callee(session, **args)
         else:
             result = {"error": f"未知工具: {tool_name}"}
 
@@ -222,12 +253,15 @@ def _query_call_records(
     session: Session,
     start_date: str | None = None,
     end_date: str | None = None,
+    callee: str | None = None,
     staff_name: str | None = None,
     department: str | None = None,
     campus: str | None = None,
     limit: int = 20,
 ) -> dict:
     """查询通话记录"""
+    from sqlalchemy import or_
+
     query = select(CallRecord)
 
     # 日期筛选
@@ -238,6 +272,19 @@ def _query_call_records(
     if end_date:
         end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
         query = query.where(CallRecord.call_time < end_dt)
+
+    # 被叫号码筛选（支持多个号码，逗号分隔）
+    if callee:
+        # 清理和分割号码
+        phone_list = [p.strip() for p in callee.replace("，", ",").split(",") if p.strip()]
+        if phone_list:
+            if len(phone_list) == 1:
+                # 单个号码，使用模糊匹配
+                query = query.where(CallRecord.callee.ilike(f"%{phone_list[0]}%"))
+            else:
+                # 多个号码，使用 OR 条件
+                conditions = [CallRecord.callee.ilike(f"%{p}%") for p in phone_list]
+                query = query.where(or_(*conditions))
 
     # 员工筛选
     if staff_name:
@@ -260,7 +307,7 @@ def _query_call_records(
 
     records = session.exec(query).all()
 
-    # 格式化返回
+    # 格式化返回（包含 callee 字段）
     return {
         "total": len(records),
         "records": [
@@ -269,6 +316,7 @@ def _query_call_records(
                 "call_time": r.call_time.strftime("%Y-%m-%d %H:%M")
                 if r.call_time
                 else None,
+                "callee": r.callee,  # 被叫号码
                 "staff_name": r.staff_name,
                 "customer_name": r.customer_name,
                 "duration": r.duration,
@@ -524,4 +572,121 @@ def _get_call_ranking(
             }
             for i, (name, stats) in enumerate(top_n)
         ],
+    }
+
+
+def _query_by_callee(
+    session: Session,
+    callee_list: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> dict:
+    """按被叫号码查询通话统计
+
+    Args:
+        session: 数据库会话
+        callee_list: 被叫号码列表，逗号分隔
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        dict: 每个号码的通话统计
+    """
+    # 解析号码列表
+    phones = [p.strip() for p in callee_list.replace("，", ",").split(",") if p.strip()]
+
+    if not phones:
+        return {"error": "请提供被叫号码列表", "total": 0, "results": []}
+
+    # 构建查询
+    query = select(CallRecord)
+
+    # 日期筛选
+    if start_date:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        query = query.where(CallRecord.call_time >= start_dt)
+
+    if end_date:
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        query = query.where(CallRecord.call_time < end_dt)
+
+    # 被叫号码筛选（精确匹配）
+    if len(phones) == 1:
+        query = query.where(CallRecord.callee == phones[0])
+    else:
+        query = query.where(CallRecord.callee.in_(phones))
+
+    records = session.exec(query).all()
+
+    # 按被叫号码聚合统计
+    callee_stats: dict[str, dict] = {}
+    for r in records:
+        phone = r.callee
+        if phone not in callee_stats:
+            callee_stats[phone] = {
+                "count": 0,
+                "duration": 0,
+                "staff_set": set(),
+                "last_call_time": None,
+                "effective_count": 0,  # 有效通话数（>=60秒）
+            }
+        stats = callee_stats[phone]
+        stats["count"] += 1
+        stats["duration"] += r.duration or 0
+        if r.staff_name:
+            stats["staff_set"].add(r.staff_name)
+        if r.duration and r.duration >= 60:
+            stats["effective_count"] += 1
+        if r.call_time:
+            if stats["last_call_time"] is None or r.call_time > stats["last_call_time"]:
+                stats["last_call_time"] = r.call_time
+
+    # 格式化结果
+    results = []
+    for phone in phones:
+        if phone in callee_stats:
+            stats = callee_stats[phone]
+            cnt = stats["count"]
+            avg_dur = round(stats["duration"] / cnt, 1) if cnt > 0 else 0
+            eff_rate = round(stats["effective_count"] * 100 / cnt, 1) if cnt > 0 else 0
+            last_time = stats["last_call_time"]
+            results.append({
+                "callee": phone,
+                "call_count": cnt,
+                "total_duration_seconds": stats["duration"],
+                "total_duration_minutes": round(stats["duration"] / 60, 1),
+                "avg_duration_seconds": avg_dur,
+                "staff_count": len(stats["staff_set"]),
+                "staff_names": list(stats["staff_set"]),
+                "effective_call_count": stats["effective_count"],
+                "effective_rate": eff_rate,
+                "last_call_time": last_time.strftime("%Y-%m-%d %H:%M") if last_time else None,
+            })
+        else:
+            results.append({
+                "callee": phone,
+                "call_count": 0,
+                "total_duration_seconds": 0,
+                "total_duration_minutes": 0,
+                "avg_duration_seconds": 0,
+                "staff_count": 0,
+                "staff_names": [],
+                "effective_call_count": 0,
+                "effective_rate": 0,
+                "last_call_time": None,
+                "note": "未找到该号码的通话记录",
+            })
+
+    # 统计汇总
+    found_count = sum(1 for r in results if r["call_count"] > 0)
+    total_calls = sum(r["call_count"] for r in results)
+    total_duration = sum(r["total_duration_seconds"] for r in results)
+
+    return {
+        "query_phones": len(phones),
+        "found_phones": found_count,
+        "not_found_phones": len(phones) - found_count,
+        "total_calls": total_calls,
+        "total_duration_minutes": round(total_duration / 60, 1),
+        "results": results,
     }
