@@ -1,4 +1,8 @@
-"""任务管理服务"""
+"""任务管理服务
+
+使用 Celery 作为任务调度后端。
+定时任务由 Celery Beat 自动从数据库加载，无需手动同步。
+"""
 
 import asyncio
 import json
@@ -6,13 +10,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from functools import partial
 
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.date import DateTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 from sqlmodel import Session, select
 
-from app.config import settings
 from app.database import engine
 
 # 数据库操作线程池（避免同步操作阻塞事件循环）
@@ -22,15 +22,12 @@ from app.models.task import (
     ScheduledTaskCreate,
     ScheduledTaskUpdate,
     TaskStatus,
-    TaskType,
 )
 from app.models.task_execution import (
     ExecutionStatus,
     TaskExecution,
     TaskExecutionDetailResponse,
 )
-from app.scheduler.core import get_scheduler, is_scheduler_initialized
-from app.scheduler.executor import execute_task
 from app.scheduler.registry import get_handler
 
 
@@ -78,22 +75,25 @@ def get_task_by_name(name: str) -> ScheduledTask | None:
 
 
 def create_task(data: ScheduledTaskCreate) -> ScheduledTask:
-    """创建任务"""
+    """创建任务
+
+    注意：任务会自动被 Celery Beat 的 DatabaseScheduler 加载，无需手动添加到调度器。
+    """
     with Session(engine) as session:
         task = ScheduledTask.model_validate(data)
         session.add(task)
         session.commit()
         session.refresh(task)
 
-        # 添加到调度器
-        _add_task_to_scheduler(task)
-
         logger.info(f"创建任务: {task.name} (#{task.id})")
         return task
 
 
 def update_task(task_id: int, data: ScheduledTaskUpdate) -> ScheduledTask | None:
-    """更新任务"""
+    """更新任务
+
+    注意：Celery Beat 的 DatabaseScheduler 会定期从数据库同步任务配置。
+    """
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -109,15 +109,15 @@ def update_task(task_id: int, data: ScheduledTaskUpdate) -> ScheduledTask | None
         session.commit()
         session.refresh(task)
 
-        # 更新调度器中的任务
-        _update_task_in_scheduler(task)
-
         logger.info(f"更新任务: {task.name} (#{task.id})")
         return task
 
 
 def delete_task(task_id: int) -> bool:
-    """删除任务"""
+    """删除任务
+
+    注意：Celery Beat 会在下次同步时自动移除已删除的任务。
+    """
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -127,9 +127,6 @@ def delete_task(task_id: int) -> bool:
         if task.is_system:
             logger.warning(f"尝试删除系统任务: {task.name}")
             return False
-
-        # 从调度器移除
-        _remove_task_from_scheduler(task_id)
 
         # 先删除关联的执行记录（避免外键约束错误）
         statement = select(TaskExecution).where(TaskExecution.task_id == task_id)
@@ -154,7 +151,10 @@ async def delete_task_async(task_id: int) -> bool:
 
 
 def pause_task(task_id: int) -> bool:
-    """暂停任务"""
+    """暂停任务
+
+    注意：Celery Beat 会在下次同步时跳过已暂停的任务。
+    """
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -165,15 +165,15 @@ def pause_task(task_id: int) -> bool:
         session.add(task)
         session.commit()
 
-        # 从调度器移除
-        _remove_task_from_scheduler(task_id)
-
         logger.info(f"暂停任务: {task.name} (#{task_id})")
         return True
 
 
 def resume_task(task_id: int) -> bool:
-    """恢复任务"""
+    """恢复任务
+
+    注意：Celery Beat 会在下次同步时重新加载已激活的任务。
+    """
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
@@ -184,9 +184,6 @@ def resume_task(task_id: int) -> bool:
         session.add(task)
         session.commit()
         session.refresh(task)
-
-        # 重新添加到调度器
-        _add_task_to_scheduler(task)
 
         logger.info(f"恢复任务: {task.name} (#{task_id})")
         return True
@@ -220,132 +217,22 @@ def run_task_in_background(
     task_id: int,
     handler_path: str,
     handler_kwargs: dict,
-) -> None:
-    """在后台执行任务（由 FastAPI BackgroundTasks 调用）
+) -> str:
+    """使用 Celery 在后台执行任务
 
-    注意：这是同步函数，在独立线程中执行，不会阻塞事件循环
+    Returns:
+        Celery task ID
     """
-    # 创建新的事件循环执行异步任务
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    from app.celery_tasks import execute_scheduled_task
 
-    try:
-        loop.run_until_complete(
-            _execute_task_async(task_id, handler_path, handler_kwargs)
-        )
-    except Exception as e:
-        # 捕获所有异常并记录，防止静默失败
-        logger.error(f"后台任务 #{task_id} 执行异常: {e}")
-        import traceback
-
-        logger.error(f"调用栈: {traceback.format_exc()}")
-    finally:
-        loop.close()
-
-
-async def _execute_task_async(
-    task_id: int,
-    handler_path: str,
-    handler_kwargs: dict,
-) -> None:
-    """实际执行任务的异步函数（在后台线程的事件循环中运行）"""
-    from app.scheduler.executor import execute_task_with_execution
-
-    # 在后台线程中创建执行记录
-    with Session(engine) as session:
-        execution = TaskExecution(
-            task_id=task_id,
-            status=ExecutionStatus.PENDING,
-            trigger_type="manual",
-        )
-        session.add(execution)
-        session.commit()
-        session.refresh(execution)
-        execution_id = execution.id
-
-    # 获取处理函数并执行
-    handler = get_handler(handler_path)
-
-    try:
-        await execute_task_with_execution(
-            task_id=task_id,
-            handler=handler,
-            execution_id=execution_id,
-            trigger_type="manual",
-            **handler_kwargs,
-        )
-    except Exception as e:
-        logger.error(f"后台执行任务 #{task_id} 失败: {e}")
-
-
-# ============================================================================
-# 旧版函数（保留以兼容定时调度器调用）
-# ============================================================================
-
-
-async def run_task_now(task_id: int) -> dict:
-    """立即执行任务（旧版，用于定时调度器）
-
-    注意：此函数包含同步数据库操作，不适合在 API 端点中使用。
-    API 端点应使用 validate_task_for_run + run_task_in_background 组合。
-    """
-    with Session(engine) as session:
-        task = session.get(ScheduledTask, task_id)
-        if not task:
-            return {"success": False, "message": "任务不存在"}
-
-        try:
-            handler = get_handler(task.handler_path)
-            kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
-
-            # 先创建执行记录（状态为 pending）
-            execution = TaskExecution(
-                task_id=task_id,
-                status=ExecutionStatus.PENDING,
-                trigger_type="manual",
-            )
-            session.add(execution)
-            session.commit()
-            session.refresh(execution)
-            execution_id = execution.id
-
-            # 在后台异步执行任务，不等待完成
-            asyncio.create_task(
-                _run_task_background(task_id, handler, execution_id, kwargs)
-            )
-
-            # 让出控制权，确保 API 立即返回
-            await asyncio.sleep(0)
-
-            return {
-                "success": True,
-                "message": "任务已触发",
-                "execution_id": execution_id,
-            }
-        except Exception as e:
-            logger.error(f"执行任务失败: {e}")
-            return {"success": False, "message": str(e)}
-
-
-async def _run_task_background(
-    task_id: int,
-    handler,
-    execution_id: int,
-    kwargs: dict,
-) -> None:
-    """后台执行任务的辅助函数（旧版）"""
-    from app.scheduler.executor import execute_task_with_execution
-
-    try:
-        await execute_task_with_execution(
-            task_id=task_id,
-            handler=handler,
-            execution_id=execution_id,
-            trigger_type="manual",
-            **kwargs,
-        )
-    except Exception as e:
-        logger.error(f"后台执行任务 #{task_id} 失败: {e}")
+    result = execute_scheduled_task.delay(
+        task_id=task_id,
+        handler_path=handler_path,
+        handler_kwargs=handler_kwargs,
+        trigger_type="manual",
+    )
+    logger.info(f"任务 #{task_id} 已提交到 Celery，task_id: {result.id}")
+    return result.id
 
 
 def get_task_executions(
@@ -449,27 +336,6 @@ def get_all_executions(
         return executions, total
 
 
-def sync_tasks_to_scheduler() -> None:
-    """同步数据库中的任务到调度器"""
-    if not settings.scheduler_enabled:
-        logger.info("调度器已禁用，跳过任务同步")
-        return
-
-    with Session(engine) as session:
-        statement = select(ScheduledTask).where(
-            ScheduledTask.status == TaskStatus.ACTIVE
-        )
-        tasks = session.exec(statement).all()
-
-        for task in tasks:
-            try:
-                _add_task_to_scheduler(task)
-            except Exception as e:
-                logger.error(f"同步任务 {task.name} 失败: {e}")
-
-        logger.info(f"已同步 {len(tasks)} 个任务到调度器")
-
-
 def init_default_tasks() -> None:
     """初始化默认系统任务"""
     from app.tasks import DEFAULT_TASKS
@@ -479,99 +345,6 @@ def init_default_tasks() -> None:
         if not existing:
             create_task(ScheduledTaskCreate(**task_data))
             logger.info(f"创建默认任务: {task_data['name']}")
-
-
-# 内部函数
-
-
-def _add_task_to_scheduler(task: ScheduledTask) -> None:
-    """将任务添加到调度器"""
-    if not is_scheduler_initialized():
-        return  # 非 leader 实例，跳过调度器同步
-
-    if task.status != TaskStatus.ACTIVE:
-        return
-
-    scheduler = get_scheduler()
-    job_id = f"task_{task.id}"
-
-    # 如果任务已存在，先移除
-    if scheduler.get_job(job_id):
-        scheduler.remove_job(job_id)
-
-    # 获取处理函数
-    try:
-        handler = get_handler(task.handler_path)
-    except ValueError as e:
-        logger.error(f"无法加载任务处理函数: {e}")
-        return
-
-    # 解析参数
-    kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
-
-    # 创建触发器
-    trigger = _create_trigger(task)
-    if not trigger:
-        logger.error(f"无法创建任务触发器: {task.name}")
-        return
-
-    # 包装执行函数
-    async def job_func():
-        await execute_task(task_id=task.id, handler=handler, **kwargs)
-
-    # 添加任务
-    job = scheduler.add_job(
-        job_func,
-        trigger=trigger,
-        id=job_id,
-        name=task.name,
-        replace_existing=True,
-    )
-
-    # 更新下次执行时间
-    next_run_time = getattr(job, "next_run_time", None)
-    if next_run_time:
-        with Session(engine) as session:
-            db_task = session.get(ScheduledTask, task.id)
-            if db_task:
-                db_task.next_run_at = next_run_time
-                session.add(db_task)
-                session.commit()
-
-    logger.debug(f"任务 {task.name} 已添加到调度器")
-
-
-def _update_task_in_scheduler(task: ScheduledTask) -> None:
-    """更新调度器中的任务"""
-    if not is_scheduler_initialized():
-        return  # 非 leader 实例，跳过调度器同步
-
-    _remove_task_from_scheduler(task.id)
-    if task.status == TaskStatus.ACTIVE:
-        _add_task_to_scheduler(task)
-
-
-def _remove_task_from_scheduler(task_id: int) -> None:
-    """从调度器移除任务"""
-    if not is_scheduler_initialized():
-        return  # 非 leader 实例，跳过调度器同步
-
-    scheduler = get_scheduler()
-    job_id = f"task_{task_id}"
-    if scheduler.get_job(job_id):
-        scheduler.remove_job(job_id)
-        logger.debug(f"任务 #{task_id} 已从调度器移除")
-
-
-def _create_trigger(task: ScheduledTask):
-    """根据任务类型创建触发器"""
-    if task.task_type == TaskType.CRON and task.cron_expression:
-        return CronTrigger.from_crontab(task.cron_expression)
-    elif task.task_type == TaskType.INTERVAL and task.interval_seconds:
-        return IntervalTrigger(seconds=task.interval_seconds)
-    elif task.task_type == TaskType.DATE and task.run_date:
-        return DateTrigger(run_date=task.run_date)
-    return None
 
 
 def cancel_execution(execution_id: int) -> dict:

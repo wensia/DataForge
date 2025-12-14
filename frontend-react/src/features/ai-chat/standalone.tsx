@@ -62,7 +62,7 @@ import {
   ChatInput,
   ChatTypingIndicator,
   ChatEmpty,
-} from '@/components/ui/chat'
+} from '@/components/ui/chat-old'
 import {
   useConversations,
   useConversation,

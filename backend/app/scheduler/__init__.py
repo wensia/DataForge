@@ -1,13 +1,12 @@
-"""调度器模块"""
+"""调度器模块（Celery 版本）
 
-from app.scheduler.core import (
-    get_scheduler,
-    init_scheduler,
-    is_scheduler_initialized,
-    shutdown_scheduler,
-    start_scheduler,
-)
-from app.scheduler.executor import execute_task
+任务调度由 Celery Worker 和 Beat 处理，本模块提供：
+- 处理函数注册和发现
+- 任务执行器
+- 任务日志功能
+"""
+
+from app.scheduler.executor import execute_task, execute_task_with_execution
 from app.scheduler.registry import (
     discover_handlers,
     get_handler,
@@ -22,14 +21,10 @@ from app.scheduler.task_logger import (
 __all__ = [
     "discover_handlers",
     "execute_task",
+    "execute_task_with_execution",
     "get_handler",
     "get_registered_handlers",
-    "get_scheduler",
-    "init_scheduler",
     "is_execution_running",
-    "is_scheduler_initialized",
     "register_handler",
-    "shutdown_scheduler",
-    "start_scheduler",
     "task_log",
 ]

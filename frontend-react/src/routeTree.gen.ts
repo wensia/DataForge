@@ -34,6 +34,7 @@ import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAnalysisIndexRouteImport } from './routes/_authenticated/analysis/index'
 import { Route as AuthenticatedAiChatIndexRouteImport } from './routes/_authenticated/ai-chat/index'
+import { Route as AuthenticatedAiChatTestIndexRouteImport } from './routes/_authenticated/ai-chat-test/index'
 import { Route as AuthenticatedSettingsUsersRouteImport } from './routes/_authenticated/settings/users'
 import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_authenticated/settings/prompts'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
@@ -180,6 +181,12 @@ const AuthenticatedAiChatIndexRoute =
     path: '/ai-chat/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAiChatTestIndexRoute =
+  AuthenticatedAiChatTestIndexRouteImport.update({
+    id: '/ai-chat-test/',
+    path: '/ai-chat-test/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsUsersRoute =
   AuthenticatedSettingsUsersRouteImport.update({
     id: '/users',
@@ -300,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/ai-chat-test': typeof AuthenticatedAiChatTestIndexRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -340,6 +348,7 @@ export interface FileRoutesByTo {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/ai-chat-test': typeof AuthenticatedAiChatTestIndexRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -383,6 +392,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/_authenticated/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/_authenticated/ai-chat-test/': typeof AuthenticatedAiChatTestIndexRoute
   '/_authenticated/ai-chat/': typeof AuthenticatedAiChatIndexRoute
   '/_authenticated/analysis/': typeof AuthenticatedAnalysisIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
@@ -426,6 +436,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/prompts'
     | '/settings/users'
+    | '/ai-chat-test'
     | '/ai-chat'
     | '/analysis'
     | '/apps'
@@ -466,6 +477,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/prompts'
     | '/settings/users'
+    | '/ai-chat-test'
     | '/ai-chat'
     | '/analysis'
     | '/apps'
@@ -508,6 +520,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/notifications'
     | '/_authenticated/settings/prompts'
     | '/_authenticated/settings/users'
+    | '/_authenticated/ai-chat-test/'
     | '/_authenticated/ai-chat/'
     | '/_authenticated/analysis/'
     | '/_authenticated/apps/'
@@ -711,6 +724,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAiChatIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-chat-test/': {
+      id: '/_authenticated/ai-chat-test/'
+      path: '/ai-chat-test'
+      fullPath: '/ai-chat-test'
+      preLoaderRoute: typeof AuthenticatedAiChatTestIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings/users': {
       id: '/_authenticated/settings/users'
       path: '/users'
@@ -864,6 +884,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedAiChatTestIndexRoute: typeof AuthenticatedAiChatTestIndexRoute
   AuthenticatedAiChatIndexRoute: typeof AuthenticatedAiChatIndexRoute
   AuthenticatedAnalysisIndexRoute: typeof AuthenticatedAnalysisIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
@@ -884,6 +905,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalysisStaffMappingRoute:
     AuthenticatedAnalysisStaffMappingRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedAiChatTestIndexRoute: AuthenticatedAiChatTestIndexRoute,
   AuthenticatedAiChatIndexRoute: AuthenticatedAiChatIndexRoute,
   AuthenticatedAnalysisIndexRoute: AuthenticatedAnalysisIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,

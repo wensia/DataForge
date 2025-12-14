@@ -16,11 +16,15 @@ FRONTEND_DIR="$PROJECT_DIR/frontend-react"
 # PID 文件
 BACKEND_PID_FILE="$PROJECT_DIR/.backend.pid"
 FRONTEND_PID_FILE="$PROJECT_DIR/.frontend.pid"
+CELERY_WORKER_PID_FILE="$PROJECT_DIR/.celery_worker.pid"
+CELERY_BEAT_PID_FILE="$PROJECT_DIR/.celery_beat.pid"
 
 # 日志文件
 LOG_DIR="$PROJECT_DIR/logs"
 BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
+CELERY_WORKER_LOG="$LOG_DIR/celery_worker.log"
+CELERY_BEAT_LOG="$LOG_DIR/celery_beat.log"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -200,6 +204,114 @@ stop_frontend() {
     
     # 清理可能残留的进程
     pkill -f "vite.*$FRONTEND_PORT" 2>/dev/null
+}
+
+# 启动 Celery Worker
+start_celery_worker() {
+    info "正在启动 Celery Worker..."
+
+    if [ -f "$CELERY_WORKER_PID_FILE" ]; then
+        local pid=$(cat "$CELERY_WORKER_PID_FILE")
+        if ps -p $pid > /dev/null 2>&1; then
+            warning "Celery Worker 已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    cd "$BACKEND_DIR"
+    source .venv/bin/activate
+
+    ensure_log_dir
+    nohup celery -A app.celery_app worker --loglevel=info --pool=gevent --concurrency=4 > "$CELERY_WORKER_LOG" 2>&1 &
+    local pid=$!
+    echo $pid > "$CELERY_WORKER_PID_FILE"
+
+    sleep 3
+    if ps -p $pid > /dev/null 2>&1; then
+        success "Celery Worker 启动成功 (PID: $pid)"
+    else
+        error "Celery Worker 启动失败，请查看日志: $CELERY_WORKER_LOG"
+        return 1
+    fi
+}
+
+# 启动 Celery Beat
+start_celery_beat() {
+    info "正在启动 Celery Beat..."
+
+    if [ -f "$CELERY_BEAT_PID_FILE" ]; then
+        local pid=$(cat "$CELERY_BEAT_PID_FILE")
+        if ps -p $pid > /dev/null 2>&1; then
+            warning "Celery Beat 已在运行 (PID: $pid)"
+            return 0
+        fi
+    fi
+
+    cd "$BACKEND_DIR"
+    source .venv/bin/activate
+
+    ensure_log_dir
+    nohup celery -A app.celery_app beat --loglevel=info --scheduler app.celery_scheduler:DatabaseScheduler > "$CELERY_BEAT_LOG" 2>&1 &
+    local pid=$!
+    echo $pid > "$CELERY_BEAT_PID_FILE"
+
+    sleep 2
+    if ps -p $pid > /dev/null 2>&1; then
+        success "Celery Beat 启动成功 (PID: $pid)"
+    else
+        error "Celery Beat 启动失败，请查看日志: $CELERY_BEAT_LOG"
+        return 1
+    fi
+}
+
+# 停止 Celery Worker
+stop_celery_worker() {
+    info "正在停止 Celery Worker..."
+
+    if [ -f "$CELERY_WORKER_PID_FILE" ]; then
+        local pid=$(cat "$CELERY_WORKER_PID_FILE")
+        if ps -p $pid > /dev/null 2>&1; then
+            kill $pid 2>/dev/null
+            sleep 2
+            if ps -p $pid > /dev/null 2>&1; then
+                kill -9 $pid 2>/dev/null
+            fi
+            success "Celery Worker 已停止 (PID: $pid)"
+        else
+            warning "Celery Worker 未运行"
+        fi
+        rm -f "$CELERY_WORKER_PID_FILE"
+    else
+        warning "Celery Worker 未运行"
+    fi
+
+    # 清理可能残留的进程
+    pkill -f "celery.*app.celery_app.*worker" 2>/dev/null
+}
+
+# 停止 Celery Beat
+stop_celery_beat() {
+    info "正在停止 Celery Beat..."
+
+    if [ -f "$CELERY_BEAT_PID_FILE" ]; then
+        local pid=$(cat "$CELERY_BEAT_PID_FILE")
+        if ps -p $pid > /dev/null 2>&1; then
+            kill $pid 2>/dev/null
+            sleep 1
+            if ps -p $pid > /dev/null 2>&1; then
+                kill -9 $pid 2>/dev/null
+            fi
+            success "Celery Beat 已停止 (PID: $pid)"
+        else
+            warning "Celery Beat 未运行"
+        fi
+        rm -f "$CELERY_BEAT_PID_FILE"
+    else
+        warning "Celery Beat 未运行"
+    fi
+
+    # 清理可能残留的进程
+    pkill -f "celery.*app.celery_app.*beat" 2>/dev/null
 }
 
 # 启动所有服务
