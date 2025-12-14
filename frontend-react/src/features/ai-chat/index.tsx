@@ -386,7 +386,7 @@ export function AIChat() {
                 <QuickPrompts onSelect={(content) => setInputMessage(content)} className="max-w-md" />
               </div>
             ) : (
-              <div className="space-y-6 w-full overflow-hidden">
+              <div className="space-y-6 w-full">
                 {messages.map((message) => (
                   <MessageItem key={message.id} message={message} onCopy={() => handleCopyMessage(message.content)} />
                 ))}
@@ -598,10 +598,10 @@ function MessageItem({
   }
 
   return (
-    <div className={cn('flex gap-3 w-full', isUser && 'flex-row-reverse')}>
+    <div className={cn('flex gap-2 sm:gap-3', isUser && 'flex-row-reverse')}>
       <div
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+          'flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full',
           isUser ? 'bg-primary' : 'bg-muted'
         )}
       >
@@ -611,17 +611,19 @@ function MessageItem({
           <Bot className="h-4 w-4" />
         )}
       </div>
-      <div className={cn('group min-w-0 flex-1', isUser && 'flex justify-end')}>
+      <div className={cn('min-w-0 max-w-[calc(100%-3rem)]', isUser && 'ml-auto')}>
         <div
           className={cn(
-            'inline-block max-w-full rounded-2xl px-3 sm:px-4 py-2.5 text-sm',
-            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted overflow-x-auto'
+            'rounded-2xl px-3 sm:px-4 py-2.5 text-sm',
+            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
           )}
         >
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
-            <MarkdownContent content={message.content} />
+            <div className="overflow-x-auto">
+              <MarkdownContent content={message.content} />
+            </div>
           )}
           {isStreaming && (
             <span className="ml-1 inline-flex items-center gap-0.5">
@@ -631,19 +633,18 @@ function MessageItem({
             </span>
           )}
         </div>
-        {/* 操作按钮 */}
-        {!isUser && !isStreaming && (
-          <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy}>
-              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-            </Button>
-          </div>
-        )}
-        {/* 时间和 tokens */}
+        {/* 时间、tokens 和操作按钮 */}
         {'created_at' in message && (
-          <div className={cn('mt-1 text-[10px] text-muted-foreground', isUser && 'text-right')}>
-            {format(new Date(message.created_at), 'HH:mm')}
-            {'tokens_used' in message && message.tokens_used && ` · ${message.tokens_used} tokens`}
+          <div className={cn('mt-1 flex items-center gap-2 text-[10px] text-muted-foreground', isUser && 'justify-end')}>
+            <span>
+              {format(new Date(message.created_at), 'HH:mm')}
+              {'tokens_used' in message && message.tokens_used && ` · ${message.tokens_used} tokens`}
+            </span>
+            {!isUser && !isStreaming && (
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopy}>
+                {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </Button>
+            )}
           </div>
         )}
       </div>
