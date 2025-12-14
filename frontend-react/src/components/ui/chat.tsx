@@ -22,7 +22,7 @@ const ChatContainer = React.forwardRef<HTMLDivElement, ChatContainerProps>(
     return (
       <div
         ref={ref}
-        className={cn('flex h-full flex-col', className)}
+        className={cn('flex h-full min-w-0 flex-col', className)}
         {...props}
       >
         {children}
@@ -64,7 +64,7 @@ const ChatMessages = React.forwardRef<HTMLDivElement, ChatMessagesProps>(
     }, [])
 
     return (
-      <div className={cn('min-h-0 flex-1 overflow-hidden', className)}>
+      <div className={cn('min-h-0 min-w-0 flex-1 overflow-hidden', className)}>
         <ScrollArea
           ref={scrollRef}
           className="h-full px-4"
@@ -81,7 +81,7 @@ ChatMessages.displayName = 'ChatMessages'
 // ============ ChatBubble ============
 
 const chatBubbleVariants = cva(
-  'relative max-w-[85%] rounded-2xl px-4 py-3 text-sm overflow-hidden',
+  'relative min-w-0 max-w-[85%] break-words rounded-2xl px-4 py-3 text-sm overflow-hidden',
   {
     variants: {
       variant: {
@@ -132,7 +132,7 @@ const ChatBubble = React.forwardRef<HTMLDivElement, ChatBubbleProps>(
     return (
       <div
         className={cn(
-          'flex gap-3',
+          'flex min-w-0 gap-3',
           isUser ? 'flex-row-reverse' : 'flex-row'
         )}
       >

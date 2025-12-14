@@ -21,17 +21,19 @@ class Settings(BaseSettings):
     enable_security_audit: bool = True
     security_log_file: str = "logs/security.log"
 
-    # 调度器配置
-    scheduler_enabled: bool = True
+    # Celery 配置
+    celery_broker_url: str = ""  # 默认使用 redis_url
+    celery_result_backend: str = ""  # 默认使用 redis_url
+    celery_task_serializer: str = "json"
+    celery_result_serializer: str = "json"
+    celery_timezone: str = "Asia/Shanghai"
+    celery_task_track_started: bool = True
+    celery_beat_sync_every: int = 60  # Beat 从数据库同步任务的间隔（秒）
+
+    # 任务配置
     timezone: str = "Asia/Shanghai"
     max_execution_history_days: int = 30  # 执行历史保留天数
-    # 调度器分布式 leader 锁（防止多进程/多实例重复调度）
-    scheduler_leader_lock_enabled: bool = True
-    scheduler_leader_lock_key: str = "scheduler:leader"
-    scheduler_leader_lock_ttl: int = 30  # 秒
-    scheduler_leader_lock_refresh_interval: int = 10  # 秒
-    scheduler_log_publish_interval: float = 0.3  # NEW_LOG 通知节流间隔（秒）
-    scheduler_log_buffer_max_lines: int = 20000  # 单次执行内存日志上限（超出自动丢弃最早）
+    scheduler_log_buffer_max_lines: int = 20000  # 单次执行内存日志上限
 
     # 脚本文件夹配置
     scripts_path: str = "scripts"  # 任务脚本文件夹路径（相对于 backend 目录）
@@ -49,6 +51,16 @@ class Settings(BaseSettings):
     redis_url: str = ""  # Redis 连接 URL
     api_key_cache_ttl: int = 300  # API 密钥缓存过期时间(秒)
     record_cache_ttl: int = 180  # 录音缓存过期时间(秒)
+
+    @property
+    def celery_broker(self) -> str:
+        """获取 Celery broker URL"""
+        return self.celery_broker_url or self.redis_url
+
+    @property
+    def celery_backend(self) -> str:
+        """获取 Celery result backend URL"""
+        return self.celery_result_backend or self.redis_url
 
     class Config:
         env_file = ".env"
