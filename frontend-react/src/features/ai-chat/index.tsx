@@ -18,6 +18,8 @@ import {
   PanelLeft,
   MoreHorizontal,
   Send,
+  AlertCircle,
+  XCircle,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -100,11 +102,18 @@ export function AIChat() {
   const deleteMutation = useDeleteConversation()
 
   // 流式聊天 Hook
-  const { isStreaming, streamingContent, streamingReasoning, pendingUserMessage, sendMessage, stopStreaming } =
-    useChatStream({
-      conversationId: selectedId,
-      onError: (err) => toast.error(err),
-    })
+  const {
+    isStreaming,
+    streamingContent,
+    streamingReasoning,
+    pendingUserMessage,
+    streamingMessageId,
+    sendMessage,
+    stopStreaming,
+  } = useChatStream({
+    conversationId: selectedId,
+    onError: (err) => toast.error(err),
+  })
 
   const conversations = conversationsData?.items || []
   const messages = conversationData?.messages || []
@@ -386,9 +395,24 @@ export function AIChat() {
               </div>
             ) : (
               <div className="space-y-6 w-full">
-                {messages.map((message) => (
-                  <MessageItem key={message.id} message={message} onCopy={() => handleCopyMessage(message.content)} />
-                ))}
+                {messages.map((message) => {
+                  // 如果是正在流式传输的消息，使用流式内容
+                  const isCurrentlyStreaming =
+                    streamingMessageId === message.id && message.role === 'assistant' && isStreaming
+                  if (isCurrentlyStreaming) {
+                    return (
+                      <MessageItem
+                        key={message.id}
+                        message={{ ...message, content: streamingContent || message.content }}
+                        isStreaming
+                        onCopy={() => handleCopyMessage(streamingContent || message.content)}
+                      />
+                    )
+                  }
+                  return (
+                    <MessageItem key={message.id} message={message} onCopy={() => handleCopyMessage(message.content)} />
+                  )
+                })}
                 {/* 待发送的用户消息 */}
                 {pendingUserMessage && !messages.some((m) => m.role === 'user' && m.content === pendingUserMessage) && (
                   <MessageItem message={{ role: 'user', content: pendingUserMessage } as Message} />
@@ -405,8 +429,8 @@ export function AIChat() {
                     </div>
                   </div>
                 )}
-                {/* 流式响应 */}
-                {isStreaming && streamingContent && (
+                {/* 流式响应（如果消息还没创建到数据库） */}
+                {isStreaming && streamingContent && !streamingMessageId && (
                   <MessageItem message={{ role: 'assistant', content: streamingContent } as Message} isStreaming />
                 )}
                 {/* 加载指示器 */}
@@ -582,12 +606,16 @@ function MessageItem({
   onCopy,
   isStreaming,
 }: {
-  message: Message | { role: string; content: string }
+  message: Message | { role: string; content: string; status?: string }
   onCopy?: () => void
   isStreaming?: boolean
 }) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
+
+  // 检查消息状态
+  const isIncomplete = 'status' in message && message.status === 'streaming'
+  const isFailed = 'status' in message && message.status === 'failed'
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -615,13 +643,33 @@ function MessageItem({
           className={cn(
             'rounded-lg md:rounded-2xl px-3 py-2 md:py-2.5 text-sm',
             'border md:border-0 shadow-sm md:shadow-none',
-            isUser ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border overflow-x-auto'
+            isUser ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border overflow-x-auto',
+            // 未完成消息的样式
+            isIncomplete && !isStreaming && 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30',
+            // 失败消息的样式
+            isFailed && 'border-red-300 bg-red-50 dark:border-red-700 dark:bg-red-950/30'
           )}
         >
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
-            <MarkdownContent content={message.content} />
+            <>
+              <MarkdownContent content={message.content || (isIncomplete && !isStreaming ? '(生成中断)' : '')} />
+              {/* 未完成状态指示 */}
+              {isIncomplete && !isStreaming && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-3 w-3" />
+                  生成中断，内容可能不完整
+                </div>
+              )}
+              {/* 失败状态指示 */}
+              {isFailed && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                  <XCircle className="h-3 w-3" />
+                  生成失败
+                </div>
+              )}
+            </>
           )}
           {isStreaming && (
             <span className="ml-1 inline-flex items-center gap-0.5">

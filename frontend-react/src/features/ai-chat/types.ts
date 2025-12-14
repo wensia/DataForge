@@ -2,6 +2,8 @@
  * AI 对话类型定义
  */
 
+export type MessageStatus = 'streaming' | 'completed' | 'failed'
+
 export interface Conversation {
   id: number
   user_id: number
@@ -20,6 +22,8 @@ export interface Message {
   content: string
   tokens_used: number | null
   created_at: string
+  status: MessageStatus
+  reasoning_content: string | null
 }
 
 export interface ConversationWithMessages extends Conversation {

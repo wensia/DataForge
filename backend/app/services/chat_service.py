@@ -22,6 +22,7 @@ from app.models.conversation import (
     ConversationUpdate,
     Message,
     MessageRole,
+    MessageStatus,
 )
 from app.services.ai_analysis_service import AIAnalysisError, _resolve_ai_client
 from app.services.chat_tools import CHAT_TOOLS, execute_tool
@@ -33,6 +34,41 @@ class ChatServiceError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
+
+
+# 增量保存配置
+SAVE_INTERVAL_SECONDS = 2.0  # 每 2 秒保存一次
+SAVE_CHUNK_SIZE = 500  # 或每 500 字符保存一次
+
+
+def _update_streaming_message(
+    session: Session,
+    message: Message,
+    content: str,
+    reasoning_content: str | None = None,
+    tokens_used: int | None = None,
+    status: str | None = None,
+) -> None:
+    """更新流式消息内容
+
+    Args:
+        session: 数据库会话
+        message: 消息对象
+        content: 当前累积的完整内容
+        reasoning_content: 思考过程内容
+        tokens_used: token 消耗
+        status: 消息状态
+    """
+    message.content = content
+    message.updated_at = datetime.now()
+    if reasoning_content is not None:
+        message.reasoning_content = reasoning_content
+    if tokens_used is not None:
+        message.tokens_used = tokens_used
+    if status is not None:
+        message.status = status
+    session.add(message)
+    session.commit()
 
 
 def create_conversation(
@@ -532,14 +568,33 @@ async def send_message_stream(
         conversation_id=conversation_id,
         role=MessageRole.USER,
         content=content,
+        status=MessageStatus.COMPLETED,
         created_at=now,
         updated_at=now,
     )
     session.add(user_message)
     session.flush()  # 获取 ID
 
-    # 发送开始事件
-    yield {"type": "start", "user_message_id": user_message.id}
+    # 立即创建 AI 消息（空内容，streaming 状态）
+    assistant_message = Message(
+        conversation_id=conversation_id,
+        role=MessageRole.ASSISTANT,
+        content="",
+        status=MessageStatus.STREAMING,
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    session.add(assistant_message)
+    session.commit()
+    session.refresh(user_message)
+    session.refresh(assistant_message)
+
+    # 发送开始事件（包含 AI 消息 ID）
+    yield {
+        "type": "start",
+        "user_message_id": user_message.id,
+        "assistant_message_id": assistant_message.id,
+    }
 
     try:
         # 获取历史消息作为上下文
@@ -601,7 +656,40 @@ async def send_message_stream(
 
         # 收集完整内容
         full_content = ""
+        full_reasoning = ""  # 收集完整思考过程
         total_tokens = 0
+
+        # 增量保存状态追踪
+        import time
+
+        last_save_time = time.time()
+        last_save_length = 0
+
+        def maybe_save_progress() -> None:
+            """检查是否需要保存进度"""
+            nonlocal last_save_time, last_save_length
+            current_time = time.time()
+            content_delta = len(full_content) - last_save_length
+
+            # 满足任一条件时保存：时间间隔或内容增量
+            should_save = (
+                current_time - last_save_time >= SAVE_INTERVAL_SECONDS
+                or content_delta >= SAVE_CHUNK_SIZE
+            )
+
+            if should_save and full_content:
+                _update_streaming_message(
+                    session=session,
+                    message=assistant_message,
+                    content=full_content,
+                    reasoning_content=full_reasoning if full_reasoning else None,
+                )
+                last_save_time = current_time
+                last_save_length = len(full_content)
+                logger.debug(
+                    f"增量保存消息: message_id={assistant_message.id}, "
+                    f"length={len(full_content)}"
+                )
 
         # 如果启用工具，先处理工具调用（非流式）
         if use_tools:
@@ -685,6 +773,8 @@ async def send_message_stream(
                 for i in range(0, len(full_content), chunk_size):
                     chunk = full_content[i : i + chunk_size]
                     yield {"type": "content", "content": chunk}
+                    # 增量保存
+                    maybe_save_progress()
         else:
             # 普通流式对话（不使用工具）
             # 检查是否启用深度思考模式 (仅 DeepSeek 支持)
@@ -696,8 +786,6 @@ async def send_message_stream(
                 f"provider={provider_id}, deep_thinking={is_deep_thinking}"
             )
 
-            full_reasoning = ""  # 收集完整思考过程
-
             async for chunk in client.chat_stream(chat_history, model=stream_model):
                 # 处理思考内容 (reasoning_content)
                 if chunk.reasoning_content:
@@ -708,6 +796,8 @@ async def send_message_stream(
                 if chunk.content:
                     full_content += chunk.content
                     yield {"type": "content", "content": chunk.content}
+                    # 增量保存
+                    maybe_save_progress()
 
                 if chunk.tokens_used:
                     total_tokens = chunk.tokens_used
@@ -715,15 +805,12 @@ async def send_message_stream(
                 if chunk.finish_reason:
                     logger.debug(f"流式响应完成: finish_reason={chunk.finish_reason}")
 
-        # 保存 AI 回复
-        assistant_message = Message(
-            conversation_id=conversation_id,
-            role=MessageRole.ASSISTANT,
-            content=full_content,
-            tokens_used=total_tokens,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-        )
+        # 更新 AI 回复（完成状态）
+        assistant_message.content = full_content
+        assistant_message.reasoning_content = full_reasoning if full_reasoning else None
+        assistant_message.tokens_used = total_tokens
+        assistant_message.status = MessageStatus.COMPLETED
+        assistant_message.updated_at = datetime.now()
         session.add(assistant_message)
 
         # 更新对话时间和 provider
@@ -754,6 +841,28 @@ async def send_message_stream(
         }
 
     except AIClientError as e:
-        session.rollback()
+        # 标记消息为失败状态（保留已生成的内容）
+        if full_content:
+            assistant_message.content = full_content
+            assistant_message.reasoning_content = (
+                full_reasoning if full_reasoning else None
+            )
+        assistant_message.status = MessageStatus.FAILED
+        assistant_message.updated_at = datetime.now()
+        session.add(assistant_message)
+        session.commit()
         logger.error(f"流式对话 AI 错误: {e.message}")
         yield {"type": "error", "error": f"AI 服务错误: {e.message}"}
+    except Exception as e:
+        # 捕获其他异常，保存当前进度
+        if full_content:
+            assistant_message.content = full_content
+            assistant_message.reasoning_content = (
+                full_reasoning if full_reasoning else None
+            )
+        assistant_message.status = MessageStatus.FAILED
+        assistant_message.updated_at = datetime.now()
+        session.add(assistant_message)
+        session.commit()
+        logger.error(f"流式对话异常: {str(e)}")
+        yield {"type": "error", "error": f"服务异常: {str(e)}"}

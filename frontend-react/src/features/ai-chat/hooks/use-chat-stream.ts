@@ -34,6 +34,7 @@ interface UseChatStreamReturn {
   streamingReasoning: string
   pendingUserMessage: string | null
   error: string | null
+  streamingMessageId: number | null // 当前流式消息的 ID
 
   // 方法
   sendMessage: (content: string, aiProvider?: string, useDeepThinking?: boolean) => Promise<void>
@@ -51,6 +52,7 @@ export function useChatStream({
   const [streamingReasoning, setStreamingReasoning] = useState('')
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [streamingMessageId, setStreamingMessageId] = useState<number | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const queryClient = useQueryClient()
 
@@ -139,9 +141,10 @@ export function useChatStream({
 
               switch (event.type) {
                 case 'start':
-                  // 用户消息已保存到数据库，刷新消息列表
-                  // 注意：不在这里清除 pendingUserMessage，由组件根据消息列表判断是否显示
-                  // 这样可以避免消息闪烁（pending消息消失但query还没刷新的间隙）
+                  // 用户消息和 AI 消息已保存到数据库，保存流式消息 ID 并刷新消息列表
+                  if (event.assistant_message_id) {
+                    setStreamingMessageId(event.assistant_message_id)
+                  }
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversation', conversationId],
                   })
@@ -186,7 +189,8 @@ export function useChatStream({
                   break
 
                 case 'done':
-                  // 刷新消息列表
+                  // 清除流式消息 ID 并刷新消息列表
+                  setStreamingMessageId(null)
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversation', conversationId],
                   })
@@ -205,6 +209,7 @@ export function useChatStream({
                   break
 
                 case 'error':
+                  setStreamingMessageId(null)
                   setError(event.error || '未知错误')
                   if (onError && event.error) {
                     onError(event.error)
@@ -233,6 +238,7 @@ export function useChatStream({
         setStreamingContent('')
         setStreamingReasoning('')
         setPendingUserMessage(null)
+        setStreamingMessageId(null)
         abortControllerRef.current = null
       }
     },
@@ -255,6 +261,7 @@ export function useChatStream({
     streamingReasoning,
     pendingUserMessage,
     error,
+    streamingMessageId,
     sendMessage,
     stopStreaming,
     clearError,

@@ -25,6 +25,14 @@ class MessageRole(str, Enum):
     SYSTEM = "system"
 
 
+class MessageStatus(str, Enum):
+    """消息状态"""
+
+    STREAMING = "streaming"  # 流式传输中
+    COMPLETED = "completed"  # 已完成
+    FAILED = "failed"  # 失败
+
+
 class Conversation(BaseTable, table=True):
     """对话表
 
@@ -56,6 +64,12 @@ class Message(BaseTable, table=True):
     role: str = Field(description="消息角色: user/assistant/system")
     content: str = Field(sa_column=Column(Text), description="消息内容")
     tokens_used: int | None = Field(default=None, description="消耗的 token 数量")
+    status: str = Field(
+        default=MessageStatus.COMPLETED, index=True, description="消息状态"
+    )
+    reasoning_content: str | None = Field(
+        sa_column=Column(Text), default=None, description="深度思考内容"
+    )
 
 
 # ============ Schema ============
@@ -113,6 +127,8 @@ class MessageResponse(SQLModel):
     content: str
     tokens_used: int | None
     created_at: datetime
+    status: str = "completed"
+    reasoning_content: str | None = None
 
 
 class SendMessageRequest(SQLModel):
