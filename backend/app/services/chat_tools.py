@@ -184,6 +184,35 @@ CHAT_TOOLS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_call_transcripts",
+            "description": "获取通话转录文稿内容。用于分析通话的具体对话内容、关键话题等。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "callee_list": {
+                        "type": "string",
+                        "description": "被叫号码列表，多个号码用逗号分隔",
+                    },
+                    "staff_name": {
+                        "type": "string",
+                        "description": "筛选特定员工的通话",
+                    },
+                    "min_duration": {
+                        "type": "integer",
+                        "description": "最小通话时长(秒)，默认60秒",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "返回记录数量限制，默认5条",
+                    },
+                },
+                "required": ["callee_list"],
+            },
+        },
+    },
 ]
 
 
@@ -225,6 +254,8 @@ async def execute_tool(session: Session, tool_name: str, arguments: str | dict) 
             result = _get_call_ranking(session, **args)
         elif tool_name == "query_by_callee":
             result = _query_by_callee(session, **args)
+        elif tool_name == "get_call_transcripts":
+            result = _get_call_transcripts(session, **args)
         else:
             result = {"error": f"未知工具: {tool_name}"}
 
@@ -689,4 +720,108 @@ def _query_by_callee(
         "total_calls": total_calls,
         "total_duration_minutes": round(total_duration / 60, 1),
         "results": results,
+    }
+
+
+def _get_call_transcripts(
+    session: Session,
+    callee_list: str,
+    staff_name: str | None = None,
+    min_duration: int = 60,
+    limit: int = 5,
+) -> dict:
+    """获取通话转录文稿内容
+
+    Args:
+        session: 数据库会话
+        callee_list: 被叫号码列表，逗号分隔
+        staff_name: 筛选特定员工
+        min_duration: 最小通话时长(秒)
+        limit: 返回记录数量限制
+
+    Returns:
+        dict: 通话转录内容
+    """
+    # 解析号码列表
+    phones = [
+        p.strip() for p in callee_list.replace("，", ",").split(",") if p.strip()
+    ]
+
+    if not phones:
+        return {"error": "请提供被叫号码列表", "total": 0, "transcripts": []}
+
+    # 构建查询
+    query = select(CallRecord).where(
+        CallRecord.callee.in_(phones),
+        CallRecord.transcript.isnot(None),
+        CallRecord.duration >= min_duration,
+    )
+
+    if staff_name:
+        query = query.where(CallRecord.staff_name.ilike(f"%{staff_name}%"))
+
+    # 按时长降序排列，优先返回较长的通话
+    query = query.order_by(CallRecord.duration.desc()).limit(min(limit, 10))
+
+    records = session.exec(query).all()
+
+    if not records:
+        return {
+            "total": 0,
+            "message": "未找到符合条件的通话转录记录",
+            "hint": "可能原因：1. 号码无通话记录 2. 通话时长过短 3. 未完成转录",
+            "transcripts": [],
+        }
+
+    # 格式化转录内容
+    transcripts = []
+    for r in records:
+        # 解析转录内容
+        transcript_data = r.transcript
+        if not transcript_data:
+            continue
+
+        # 将转录列表转换为对话格式
+        dialogue = []
+        for item in transcript_data:
+            speaker = "客户" if item.get("speaker") == "customer" else "员工"
+            text = item.get("text", "")
+            if text:
+                dialogue.append(f"【{speaker}】{text}")
+
+        # 合并为完整对话文本
+        full_dialogue = "\n".join(dialogue)
+
+        # 提取关键信息
+        staff_lines = [
+            item.get("text", "")
+            for item in transcript_data
+            if item.get("speaker") == "staff"
+        ]
+        customer_lines = [
+            item.get("text", "")
+            for item in transcript_data
+            if item.get("speaker") == "customer"
+        ]
+
+        transcripts.append({
+            "callee": r.callee,
+            "staff_name": r.staff_name,
+            "call_time": r.call_time.strftime("%Y-%m-%d %H:%M") if r.call_time else None,
+            "duration_seconds": r.duration,
+            "duration_minutes": round(r.duration / 60, 1) if r.duration else 0,
+            "dialogue_count": len(transcript_data),
+            "staff_dialogue_count": len(staff_lines),
+            "customer_dialogue_count": len(customer_lines),
+            "full_dialogue": full_dialogue,
+            "summary": {
+                "total_turns": len(transcript_data),
+                "staff_words": sum(len(line) for line in staff_lines),
+                "customer_words": sum(len(line) for line in customer_lines),
+            },
+        })
+
+    return {
+        "total": len(transcripts),
+        "transcripts": transcripts,
     }

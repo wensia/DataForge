@@ -308,6 +308,7 @@ async def send_message(
 
 ## 可用工具
 - query_by_callee: 按被叫号码（客户手机号）查询通话统计。当用户提供手机号列表时优先使用此工具。
+- get_call_transcripts: 获取通话转录文稿内容。用于分析对话内容、关键话题。需要分析通话内容时使用。
 - query_call_records: 查询通话记录详情，支持按被叫号码(callee)、员工、部门等筛选。
 - get_call_statistics: 获取通话统计，可按天/员工/部门/校区分组。
 - get_call_ranking: 获取员工通话排行榜。
@@ -317,6 +318,7 @@ async def send_message(
 ## 重要说明
 - 被叫手机号存储在 callee 字段（不是 customer_name）
 - 当用户提供手机号列表时，使用 query_by_callee 工具
+- 当用户需要分析通话内容/对话/话术时，使用 get_call_transcripts 工具
 - 有效通话定义：通话时长 >= 60 秒
 
 请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
@@ -560,6 +562,7 @@ async def send_message_stream(
 
 ## 可用工具
 - query_by_callee: 按被叫号码（客户手机号）查询通话统计。当用户提供手机号列表时优先使用此工具。
+- get_call_transcripts: 获取通话转录文稿内容。用于分析对话内容、关键话题。需要分析通话内容时使用。
 - query_call_records: 查询通话记录详情，支持按被叫号码(callee)、员工、部门等筛选。
 - get_call_statistics: 获取通话统计，可按天/员工/部门/校区分组。
 - get_call_ranking: 获取员工通话排行榜。
@@ -569,6 +572,7 @@ async def send_message_stream(
 ## 重要说明
 - 被叫手机号存储在 callee 字段（不是 customer_name）
 - 当用户提供手机号列表时，使用 query_by_callee 工具
+- 当用户需要分析通话内容/对话/话术时，使用 get_call_transcripts 工具
 - 有效通话定义：通话时长 >= 60 秒
 
 请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
