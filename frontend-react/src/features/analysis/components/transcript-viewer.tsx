@@ -51,6 +51,7 @@ const emotionConfig: Record<string, { label: string; className: string }> = {
 interface TranscriptViewerProps {
   transcript: TranscriptSegment[]
   currentTime?: number // 当前音频播放时间（秒）
+  onSeek?: (time: number) => void // 点击片段跳转到指定时间
 }
 
 /**
@@ -59,6 +60,7 @@ interface TranscriptViewerProps {
 export function TranscriptViewer({
   transcript,
   currentTime = 0,
+  onSeek,
 }: TranscriptViewerProps) {
   // 存储每个片段的 DOM 引用
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -110,13 +112,16 @@ export function TranscriptViewer({
             )}
           >
             <div
+              onClick={() => onSeek?.(seg.start_time)}
+              title="点击跳转到此处播放"
               className={cn(
                 'flex max-w-[80%] flex-col gap-1 rounded-lg px-3 py-2 transition-all duration-300',
                 isCustomer
                   ? 'bg-blue-50 dark:bg-blue-950'
                   : 'bg-gray-100 dark:bg-gray-800',
                 isActive &&
-                  'scale-[1.02] shadow-lg shadow-primary/20 ring-1 ring-primary/50'
+                  'scale-[1.02] shadow-lg shadow-primary/20 ring-1 ring-primary/50',
+                onSeek && 'cursor-pointer hover:opacity-80'
               )}
             >
               {/* 说话人和时间信息 */}

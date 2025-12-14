@@ -4,7 +4,7 @@
  * 展示录音播放器和转写文本
  * 支持音频播放进度同步高亮转写文本
  */
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Loader2, Volume2, FileText, Clock, User, Phone } from 'lucide-react'
 import {
   Dialog,
@@ -14,8 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { TranscriptViewer } from './transcript-viewer'
-import type { CallRecord } from '../types'
-import { formatDate } from '../types'
+import { formatDate, type CallRecord } from '../types'
 
 interface RecordDetailModalProps {
   open: boolean
@@ -45,6 +44,14 @@ export function RecordDetailModal({
       setCurrentTime(audioRef.current.currentTime)
     }
   }
+
+  // 点击转写片段跳转到对应时间
+  const handleSeek = useCallback((time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time
+      audioRef.current.play()
+    }
+  }, [])
 
   if (!record) return null
 
@@ -124,6 +131,7 @@ export function RecordDetailModal({
               <TranscriptViewer
                 transcript={record.transcript!}
                 currentTime={currentTime}
+                onSeek={handleSeek}
               />
             ) : (
               <div className='text-muted-foreground flex h-32 items-center justify-center text-sm'>
