@@ -131,6 +131,12 @@ def delete_task(task_id: int) -> bool:
         # 从调度器移除
         _remove_task_from_scheduler(task_id)
 
+        # 先删除关联的执行记录（避免外键约束错误）
+        statement = select(TaskExecution).where(TaskExecution.task_id == task_id)
+        executions = session.exec(statement).all()
+        for execution in executions:
+            session.delete(execution)
+
         session.delete(task)
         session.commit()
 
