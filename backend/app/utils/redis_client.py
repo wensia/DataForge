@@ -370,3 +370,24 @@ def cleanup_execution_redis(execution_id: int) -> bool:
     except Exception as e:
         logger.warning(f"清理 Redis 数据失败: {e}")
         return False
+
+
+async def publish_log_end_async(execution_id: int) -> bool:
+    """异步发布任务结束信号
+
+    Args:
+        execution_id: 任务执行 ID
+
+    Returns:
+        是否发布成功
+    """
+    client = await get_async_redis()
+    if client is None:
+        return False
+    try:
+        channel = f"{LOG_CHANNEL_PREFIX}{execution_id}"
+        await client.publish(channel, "__END__")
+        return True
+    except Exception as e:
+        logger.warning(f"发布结束信号失败: {e}")
+        return False

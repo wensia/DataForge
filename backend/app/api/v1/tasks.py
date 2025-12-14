@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
+from datetime import datetime
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
@@ -245,14 +246,25 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
 
     使用 Redis List 存储日志，Pub/Sub 只用于通知有新日志。
     这样可以解决订阅前消息丢失的问题。
+
+    增强功能：
+    - 初始连接确认
+    - 任务超时检测（最大运行 1 小时）
+    - 更短的状态检查间隔（10 秒）
     """
-    # 1. 检查执行记录是否存在
+    # 任务最大运行时间（秒）
+    MAX_RUNNING_TIME = 3600  # 1 小时
+
+    # 1. 发送连接确认
+    yield f'data: {{"connected": true, "execution_id": {execution_id}}}\n\n'
+
+    # 2. 检查执行记录是否存在
     execution = await task_service.get_execution_by_id_async(execution_id)
     if not execution:
         yield 'data: {"error": "执行记录不存在"}\n\n'
         return
 
-    # 2. 如果任务已结束，直接返回完整日志并关闭连接
+    # 3. 如果任务已结束，直接返回完整日志并关闭连接
     db_status = execution.status.value
     if db_status not in ("pending", "running"):
         if execution.log_output:
@@ -263,7 +275,15 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
         yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
         return
 
-    # 3. pending/running：先发送已存在的 Redis 日志（若还没开始可能为空）
+    # 4. 检查任务是否运行超时
+    if execution.started_at:
+        running_time = (datetime.now() - execution.started_at).total_seconds()
+        if running_time > MAX_RUNNING_TIME:
+            yield f'data: {{"warning": "任务运行超时（已运行 {int(running_time)} 秒）", "timeout": true}}\n\n'
+            yield f'data: {{"status": "timeout", "finished": true}}\n\n'
+            return
+
+    # 5. pending/running：先发送已存在的 Redis 日志（若还没开始可能为空）
     sent_count = 0
     existing_logs = await get_logs_async(execution_id)
     for log_line in existing_logs:
@@ -274,7 +294,7 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
 
     yield f'data: {{"status": "{db_status}", "execution_id": {execution_id}}}\n\n'
 
-    # 4. 订阅 Pub/Sub 获取新日志通知；若不可用则回退轮询
+    # 6. 订阅 Pub/Sub 获取新日志通知；若不可用则回退轮询
     pubsub = await subscribe_logs(execution_id)
     if pubsub is None:
         yield 'data: {"warning": "Redis Pub/Sub不可用，使用轮询模式"}\n\n'
@@ -307,9 +327,10 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
     try:
         while True:
             try:
+                # 使用 10 秒超时，更频繁检查 DB 状态
                 message = await asyncio.wait_for(
                     pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
-                    timeout=30.0,
+                    timeout=10.0,
                 )
                 if message is None:
                     # 没有消息，检查 DB 状态是否已结束
@@ -377,6 +398,16 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                             sent_count += 1
                     yield f'data: {{"status": "{db_status}", "finished": true}}\n\n'
                     break
+
+                # 检查任务是否运行超时
+                if execution.started_at:
+                    running_time = (
+                        datetime.now() - execution.started_at
+                    ).total_seconds()
+                    if running_time > MAX_RUNNING_TIME:
+                        yield f'data: {{"warning": "任务运行超时（已运行 {int(running_time)} 秒）", "timeout": true}}\n\n'
+                        yield f'data: {{"status": "timeout", "finished": true}}\n\n'
+                        break
     finally:
         await pubsub.unsubscribe()
         await pubsub.close()

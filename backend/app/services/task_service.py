@@ -7,7 +7,7 @@
 import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 
 from loguru import logger
@@ -478,4 +478,94 @@ async def cancel_execution_async(execution_id: int) -> dict:
     return await loop.run_in_executor(
         _db_executor,
         partial(cancel_execution, execution_id),
+    )
+
+
+# ============================================================================
+# 卡住任务检测与处理
+# ============================================================================
+
+
+def check_stuck_tasks(max_running_hours: int = 2) -> list[int]:
+    """检测运行超过指定时间的任务
+
+    Args:
+        max_running_hours: 最大运行时间（小时），默认 2 小时
+
+    Returns:
+        卡住任务的执行记录 ID 列表
+    """
+    cutoff = datetime.now() - timedelta(hours=max_running_hours)
+
+    with Session(engine) as session:
+        statement = (
+            select(TaskExecution.id)
+            .where(TaskExecution.status == ExecutionStatus.RUNNING)
+            .where(TaskExecution.started_at < cutoff)
+        )
+        stuck_ids = session.exec(statement).all()
+        return list(stuck_ids)
+
+
+def mark_task_as_stuck(execution_id: int) -> bool:
+    """将卡住的任务标记为失败
+
+    Args:
+        execution_id: 执行记录 ID
+
+    Returns:
+        是否成功标记
+    """
+    from app.utils.redis_client import get_logs, publish_log_end
+
+    with Session(engine) as session:
+        execution = session.get(TaskExecution, execution_id)
+        if not execution:
+            return False
+
+        if execution.status != ExecutionStatus.RUNNING:
+            return False
+
+        # 从 Redis 获取日志并保存
+        redis_logs = get_logs(execution_id)
+        if redis_logs:
+            execution.log_output = "\n".join(redis_logs)
+            logger.info(f"卡住任务 #{execution_id} 保存了 {len(redis_logs)} 行日志")
+
+        # 更新状态
+        execution.status = ExecutionStatus.FAILED
+        execution.finished_at = datetime.now()
+        execution.error_message = "任务运行超时，已自动标记为失败"
+
+        # 计算执行时长
+        if execution.started_at:
+            execution.duration_ms = int(
+                (execution.finished_at - execution.started_at).total_seconds() * 1000
+            )
+
+        session.add(execution)
+        session.commit()
+
+        # 发送结束信号（通知可能还在监听的 SSE 客户端）
+        publish_log_end(execution_id)
+
+        logger.warning(f"任务执行 #{execution_id} 已被标记为超时失败")
+        return True
+
+
+async def check_stuck_tasks_async(max_running_hours: int = 2) -> list[int]:
+    """异步检测卡住任务"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(check_stuck_tasks, max_running_hours),
+    )
+
+
+async def mark_task_as_stuck_async(execution_id: int) -> bool:
+    """异步标记卡住任务"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _db_executor,
+        partial(mark_task_as_stuck, execution_id),
     )
