@@ -54,7 +54,10 @@ async def list_users(
                     UserResponse(
                         id=u.id,
                         email=u.email,
+                        username=u.username,
+                        crm_id=u.crm_id,
                         name=u.name,
+                        phone=u.phone,
                         role=u.role,
                         is_active=u.is_active,
                         created_at=u.created_at,
@@ -104,7 +107,10 @@ async def create_user(request: Request, data: UserCreate):
             data=UserResponse(
                 id=user.id,
                 email=user.email,
+                username=user.username,
+                crm_id=user.crm_id,
                 name=user.name,
+                phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
                 created_at=user.created_at,
@@ -136,7 +142,10 @@ async def get_user(request: Request, user_id: int):
             data=UserResponse(
                 id=user.id,
                 email=user.email,
+                username=user.username,
+                crm_id=user.crm_id,
                 name=user.name,
+                phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
                 created_at=user.created_at,
@@ -195,7 +204,10 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
             data=UserResponse(
                 id=user.id,
                 email=user.email,
+                username=user.username,
+                crm_id=user.crm_id,
                 name=user.name,
+                phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
                 created_at=user.created_at,

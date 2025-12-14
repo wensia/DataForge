@@ -269,7 +269,10 @@ async def get_current_user(request: Request):
             data=UserResponse(
                 id=user.id,
                 email=user.email,
+                username=user.username,
+                crm_id=user.crm_id,
                 name=user.name,
+                phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
                 created_at=user.created_at,
@@ -325,7 +328,10 @@ async def update_current_user(request: Request, data: ProfileUpdateRequest):
             data=UserResponse(
                 id=user.id,
                 email=user.email,
+                username=user.username,
+                crm_id=user.crm_id,
                 name=user.name,
+                phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
                 created_at=user.created_at,
