@@ -610,20 +610,18 @@ function MessageItem({
           <Bot className="h-4 w-4" />
         )}
       </div>
-      <div className={cn('min-w-0 max-w-[calc(100%-2.5rem)] overflow-hidden', isUser && 'ml-auto')}>
+      <div className={cn('min-w-0 w-0 flex-1', isUser && 'ml-auto !w-auto max-w-[85%]')}>
         <div
           className={cn(
             'rounded-lg md:rounded-2xl px-3 py-2 md:py-2.5 text-sm',
             'border md:border-0 shadow-sm md:shadow-none',
-            isUser ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border'
+            isUser ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border overflow-x-auto'
           )}
         >
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
-            <div className="max-w-full overflow-x-auto">
-              <MarkdownContent content={message.content} />
-            </div>
+            <MarkdownContent content={message.content} />
           )}
           {isStreaming && (
             <span className="ml-1 inline-flex items-center gap-0.5">
