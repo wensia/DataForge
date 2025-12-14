@@ -222,7 +222,7 @@ export function AIChat() {
       <div className="p-2">
         <Button
           variant="outline"
-          className="w-full justify-start gap-2"
+          className="w-full justify-start gap-2 rounded-md md:rounded-lg border-2 md:border"
           onClick={handleCreateConversation}
           disabled={createMutation.isPending}
         >
@@ -304,7 +304,7 @@ export function AIChat() {
 
       {/* 移动端侧边栏 (Sheet) */}
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="w-64 p-0 border-r-2">
           <SheetHeader className="sr-only">
             <SheetTitle>对话列表</SheetTitle>
           </SheetHeader>
@@ -315,7 +315,7 @@ export function AIChat() {
       {/* 主内容区 */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* 顶部栏 */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b px-2 sm:px-4">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b-2 md:border-b shadow-sm md:shadow-none px-2 sm:px-4">
           <div className="flex items-center gap-2">
             {/* 移动端菜单按钮 */}
             <Button
@@ -441,12 +441,12 @@ export function AIChat() {
                 onKeyDown={handleKeyDown}
                 placeholder="输入消息..."
                 disabled={isStreaming}
-                className="min-h-[52px] max-h-[200px] resize-none rounded-2xl pr-12 py-3.5 text-sm"
+                className="min-h-[52px] max-h-[200px] resize-none rounded-lg md:rounded-2xl pr-12 py-2.5 md:py-3.5 text-sm border-2 md:border"
                 rows={1}
               />
               <Button
                 size="icon"
-                className="absolute bottom-2 right-2 h-8 w-8 rounded-full"
+                className="absolute bottom-2 right-2 h-8 w-8 rounded-lg md:rounded-full"
                 disabled={isStreaming || !inputMessage.trim()}
                 onClick={handleSendMessage}
               >
@@ -532,9 +532,9 @@ function ConversationItem({
   return (
     <div
       className={cn(
-        'group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
-        'hover:bg-accent',
-        isSelected && 'bg-accent'
+        'group flex cursor-pointer items-center gap-2 rounded-md md:rounded-lg px-2 py-2 text-sm transition-colors',
+        'border-l-2 border-l-transparent hover:border-l-primary hover:bg-accent',
+        isSelected && 'bg-accent border-l-primary'
       )}
       onClick={onSelect}
     >
@@ -613,8 +613,9 @@ function MessageItem({
       <div className={cn('min-w-0 max-w-[calc(100%-2.5rem)] overflow-hidden', isUser && 'ml-auto')}>
         <div
           className={cn(
-            'rounded-2xl px-3 sm:px-4 py-2.5 text-sm',
-            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+            'rounded-lg md:rounded-2xl px-3 py-2 md:py-2.5 text-sm',
+            'border md:border-0 shadow-sm md:shadow-none',
+            isUser ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border'
           )}
         >
           {isUser ? (
