@@ -16,6 +16,8 @@ import {
   StopCircle,
   Moon,
   Sun,
+  Menu,
+  X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -47,6 +49,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import {
   ChatContainer,
   ChatMessages,
   ChatBubble,
@@ -74,6 +82,7 @@ export function StandaloneAIChat() {
   const [conversationToDelete, setConversationToDelete] = useState<
     number | null
   >(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const { theme, setTheme } = useTheme()
 
   // API Hooks

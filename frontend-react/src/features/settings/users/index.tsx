@@ -167,8 +167,8 @@ function formatDateTime(dateStr: string | null): string {
 }
 
 const roleOptions = [
-  { value: 'ADMIN', label: '管理员', icon: Shield },
-  { value: 'USER', label: '普通用户', icon: UserIcon },
+  { value: 'admin', label: '管理员', icon: Shield },
+  { value: 'user', label: '普通用户', icon: UserIcon },
 ]
 
 const formSchema = z.object({
@@ -248,7 +248,7 @@ export function UsersSettings() {
         const roleOption = roleOptions.find((r) => r.value === role)
         return (
           <Badge
-            variant={role === 'ADMIN' ? 'default' : 'secondary'}
+            variant={role === 'admin' ? 'default' : 'secondary'}
             className='gap-1'
           >
             {roleOption?.icon && <roleOption.icon className='h-3 w-3' />}
@@ -358,7 +358,7 @@ export function UsersSettings() {
       email: '',
       password: '',
       name: '',
-      role: 'USER',
+      role: 'user',
     },
   })
 
