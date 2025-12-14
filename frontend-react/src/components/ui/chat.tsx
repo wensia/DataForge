@@ -240,7 +240,7 @@ const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
             )}
           </Button>
         </div>
-        <p className="mt-2 text-center text-xs text-muted-foreground">
+        <p className="mt-2 hidden text-center text-xs text-muted-foreground md:block">
           Enter 发送，Shift+Enter 换行
         </p>
       </div>

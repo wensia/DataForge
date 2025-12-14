@@ -14,6 +14,7 @@ import {
   MoreVertical,
   Bot,
   StopCircle,
+  Brain,
   Moon,
   Sun,
   Menu,
@@ -24,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -77,6 +79,7 @@ export function StandaloneAIChat() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [inputMessage, setInputMessage] = useState('')
   const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [useDeepThinking, setUseDeepThinking] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [conversationToDelete, setConversationToDelete] = useState<
     number | null
@@ -147,12 +150,19 @@ export function StandaloneAIChat() {
     setInputMessage('')
 
     try {
-      await sendMessage(content, selectedProvider || undefined)
+      await sendMessage(content, selectedProvider || undefined, useDeepThinking)
     } catch {
       toast.error('发送失败，请重试')
       setInputMessage(content)
     }
-  }, [inputMessage, selectedId, isStreaming, sendMessage, selectedProvider])
+  }, [
+    inputMessage,
+    selectedId,
+    isStreaming,
+    sendMessage,
+    selectedProvider,
+    useDeepThinking,
+  ])
 
   // 复制消息内容
   const handleCopyMessage = useCallback((content: string) => {
@@ -195,6 +205,23 @@ export function StandaloneAIChat() {
                 </SelectContent>
               </Select>
             )}
+            {/* 深度思考开关 */}
+            <div className="flex items-center gap-1.5">
+              <Switch
+                id="deep-thinking-desktop"
+                checked={useDeepThinking}
+                onCheckedChange={setUseDeepThinking}
+                disabled={isStreaming}
+                className="scale-90"
+              />
+              <label
+                htmlFor="deep-thinking-desktop"
+                className="cursor-pointer items-center gap-1 text-xs text-muted-foreground sm:flex"
+              >
+                <Brain className="h-3.5 w-3.5" />
+                深度思考
+              </label>
+            </div>
             {/* 主题切换 */}
             <Button
               variant="ghost"
@@ -272,19 +299,18 @@ export function StandaloneAIChat() {
               <span className="max-w-[200px] truncate font-medium">
                 {conversationData?.title || '新对话'}
               </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={handleCreateConversation}
-                disabled={createMutation.isPending}
-                className="h-9 w-9"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Plus size={18} />
-                )}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Switch
+                  id="deep-thinking-mobile"
+                  checked={useDeepThinking}
+                  onCheckedChange={setUseDeepThinking}
+                  disabled={isStreaming}
+                  className="scale-90"
+                />
+                <label htmlFor="deep-thinking-mobile" className="sr-only">
+                  深度思考
+                </label>
+              </div>
             </div>
 
             {/* 对话头部 - 桌面端 */}
@@ -366,19 +392,18 @@ export function StandaloneAIChat() {
                 <Menu className="h-5 w-5" />
               </Button>
               <span className="font-medium">AI 对话助手</span>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={handleCreateConversation}
-                disabled={createMutation.isPending}
-                className="h-9 w-9"
-              >
-                {createMutation.isPending ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Plus size={18} />
-                )}
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Switch
+                  id="deep-thinking-mobile-empty"
+                  checked={useDeepThinking}
+                  onCheckedChange={setUseDeepThinking}
+                  disabled={isStreaming}
+                  className="scale-90"
+                />
+                <label htmlFor="deep-thinking-mobile-empty" className="sr-only">
+                  深度思考
+                </label>
+              </div>
             </div>
 
             {/* 空状态内容 */}
@@ -396,7 +421,6 @@ export function StandaloneAIChat() {
                 <Button
                   onClick={handleCreateConversation}
                   disabled={createMutation.isPending}
-                  className="hidden md:inline-flex"
                 >
                   {createMutation.isPending ? (
                     <Loader2 className="mr-2 animate-spin" />
@@ -452,7 +476,7 @@ export function StandaloneAIChat() {
               <div className="text-muted-foreground py-8 text-center">
                 <MessageSquare className="mx-auto mb-2 h-8 w-8" />
                 <p className="text-sm">暂无对话</p>
-                <p className="text-xs">点击右上角 + 创建</p>
+                <p className="text-xs">点击下方“新建对话”创建</p>
               </div>
             ) : (
               conversations.map((conv) => (

@@ -382,10 +382,13 @@ export function TasksMutateDrawer({
                       <FormLabel>间隔时间（秒）</FormLabel>
                       <FormControl>
                         <Input
-                          {...field}
                           type='number'
                           min={1}
                           placeholder='3600'
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                          }
                         />
                       </FormControl>
                       <FormDescription>
