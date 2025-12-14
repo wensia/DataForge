@@ -137,6 +137,21 @@ def discover_scripts() -> None:
         logger.warning(f"脚本目录不存在: {scripts_dir.absolute()}")
         return
 
+    # 确保 scripts 包在 Python 路径中（支持脚本内部的 from scripts.xxx import）
+    import sys
+
+    # 将 backend 目录添加到 Python 路径
+    backend_dir = scripts_dir.parent.absolute()
+    if str(backend_dir) not in sys.path:
+        sys.path.insert(0, str(backend_dir))
+
+    # 导入 scripts 包到 sys.modules
+    if "scripts" not in sys.modules:
+        try:
+            import scripts  # noqa: F401
+        except ImportError as e:
+            logger.warning(f"无法导入 scripts 包: {e}")
+
     script_count = 0
     for script_file in scripts_dir.glob("*.py"):
         # 跳过 __init__.py 和以 _ 开头的文件
