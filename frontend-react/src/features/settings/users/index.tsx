@@ -232,7 +232,12 @@ export function UsersSettings() {
     name: string
     password: string
   } | null>(null)
+  const [editedCredentials, setEditedCredentials] = useState<{
+    name: string
+    password: string
+  } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [editedCopied, setEditedCopied] = useState(false)
 
   const columns: ColumnDef<User>[] = [
     {
@@ -443,6 +448,7 @@ export function UsersSettings() {
       if (data.email && data.email !== editingUser.email) {
         updateData.email = data.email
       }
+      const hasNewPassword = !!data.password
       if (data.password) {
         updateData.password = data.password
       }
@@ -459,6 +465,15 @@ export function UsersSettings() {
       })
       toast.success('用户更新成功')
       setEditDialogOpen(false)
+
+      // 如果设置了新密码，显示凭证复制弹窗
+      if (hasNewPassword) {
+        setEditedCredentials({
+          name: editingUser.name,
+          password: data.password,
+        })
+      }
+
       setEditingUser(null)
       editForm.reset()
     } catch (error: unknown) {
@@ -489,6 +504,31 @@ export function UsersSettings() {
       }
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+      toast.success('凭证已复制到剪贴板')
+    } catch {
+      toast.error('复制失败，请手动复制')
+    }
+  }
+
+  const handleCopyEditedCredentials = async () => {
+    if (!editedCredentials) return
+    const text = `用户名: ${editedCredentials.name}\n密码: ${editedCredentials.password}`
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setEditedCopied(true)
+      setTimeout(() => setEditedCopied(false), 2000)
       toast.success('凭证已复制到剪贴板')
     } catch {
       toast.error('复制失败，请手动复制')
@@ -954,6 +994,60 @@ export function UsersSettings() {
                 <Copy className='h-4 w-4' />
               )}
               {copied ? '已复制' : '复制凭证'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑用户凭证复制对话框 */}
+      <Dialog
+        open={!!editedCredentials}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditedCredentials(null)
+            setEditedCopied(false)
+          }
+        }}
+      >
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>密码已更新</DialogTitle>
+            <DialogDescription>
+              请保存以下登录凭证，密码不会再次显示。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='space-y-3 rounded-md border bg-muted/50 p-4'>
+            <div className='flex items-center justify-between'>
+              <span className='text-muted-foreground text-sm'>用户名</span>
+              <span className='font-mono font-medium'>
+                {editedCredentials?.name}
+              </span>
+            </div>
+            <Separator />
+            <div className='flex items-center justify-between'>
+              <span className='text-muted-foreground text-sm'>新密码</span>
+              <span className='font-mono font-medium'>
+                {editedCredentials?.password}
+              </span>
+            </div>
+          </div>
+          <DialogFooter className='sm:justify-between'>
+            <Button
+              variant='outline'
+              onClick={() => {
+                setEditedCredentials(null)
+                setEditedCopied(false)
+              }}
+            >
+              关闭
+            </Button>
+            <Button onClick={handleCopyEditedCredentials} className='gap-2'>
+              {editedCopied ? (
+                <Check className='h-4 w-4' />
+              ) : (
+                <Copy className='h-4 w-4' />
+              )}
+              {editedCopied ? '已复制' : '复制凭证'}
             </Button>
           </DialogFooter>
         </DialogContent>
