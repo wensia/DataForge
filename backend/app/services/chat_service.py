@@ -321,6 +321,14 @@ async def send_message(
 - 当用户需要分析通话内容/对话/话术时，使用 get_call_transcripts 工具
 - 有效通话定义：通话时长 >= 60 秒
 
+## 输出格式要求
+- 使用 Markdown 格式输出
+- 使用标题（##、###）组织内容层级
+- 使用列表（-、1.）展示要点
+- 使用表格展示数据对比
+- 使用代码块展示数字或ID
+- 重要信息使用**加粗**标记
+
 请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
             chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
         total_tokens = 0
@@ -574,6 +582,14 @@ async def send_message_stream(
 - 当用户提供手机号列表时，使用 query_by_callee 工具
 - 当用户需要分析通话内容/对话/话术时，使用 get_call_transcripts 工具
 - 有效通话定义：通话时长 >= 60 秒
+
+## 输出格式要求
+- 使用 Markdown 格式输出
+- 使用标题（##、###）组织内容层级
+- 使用列表（-、1.）展示要点
+- 使用表格展示数据对比
+- 使用代码块展示数字或ID
+- 重要信息使用**加粗**标记
 
 请用中文回答问题，并以清晰、结构化的方式呈现数据分析结果。"""
             chat_history.insert(0, AIChatMessage(role="system", content=system_prompt))
