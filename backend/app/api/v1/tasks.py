@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from loguru import logger
 
@@ -175,23 +175,29 @@ async def delete_task(task_id: int):
 
 
 @router.post("/{task_id}/run", response_model=ResponseModel)
-async def run_task(task_id: int, background_tasks: BackgroundTasks):
-    """手动触发任务执行（立即返回，后台执行）"""
-    # 仅验证任务存在和处理函数有效，不做数据库写入
+async def run_task(task_id: int):
+    """手动触发任务执行（通过 Celery 异步执行）"""
+    from app.celery_tasks import execute_scheduled_task
+
+    # 验证任务存在和处理函数有效
     result = task_service.validate_task_for_run(task_id)
     if not result["success"]:
         return ResponseModel.error(code=400, message=result["message"])
 
-    # 添加到 FastAPI 后台任务队列（在独立线程执行，不阻塞事件循环）
-    background_tasks.add_task(
-        task_service.run_task_in_background,
+    # 通过 Celery 异步执行任务
+    celery_result = execute_scheduled_task.delay(
         task_id=task_id,
         handler_path=result["handler_path"],
         handler_kwargs=result["handler_kwargs"],
+        trigger_type="manual",
     )
 
     return ResponseModel.success(
-        data={"task_id": task_id, "message": "任务已加入执行队列"},
+        data={
+            "task_id": task_id,
+            "celery_task_id": celery_result.id,
+            "message": "任务已发送到 Celery 队列",
+        },
         message="任务已触发",
     )
 
