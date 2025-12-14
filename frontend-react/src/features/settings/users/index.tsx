@@ -401,6 +401,18 @@ export function UsersSettings() {
     },
   })
 
+  // 当编辑用户变化时，填充表单
+  useEffect(() => {
+    if (editingUser) {
+      editForm.reset({
+        email: editingUser.email || '',
+        password: '',
+        role: editingUser.role,
+        is_active: editingUser.is_active,
+      })
+    }
+  }, [editingUser, editForm])
+
   const onSubmit = async (data: UserForm) => {
     try {
       const password = data.password
