@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     api_key_cache_ttl: int = 300  # API 密钥缓存过期时间(秒)
     record_cache_ttl: int = 180  # 录音缓存过期时间(秒)
 
+    # CRM Open API 配置
+    crm_base_url: str = ""  # CRM 系统 Open API 基础地址
+    crm_service_key: str = ""  # CRM 服务端 API Key
+
     @property
     def celery_broker(self) -> str:
         """获取 Celery broker URL"""

@@ -3,6 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
+from pydantic import BaseModel
 from sqlmodel import Field, SQLModel
 
 
@@ -14,13 +15,33 @@ class UserRole(str, Enum):
 
 
 class User(SQLModel, table=True):
-    """用户模型"""
+    """用户模型
+
+    支持两种认证模式:
+    1. 本地认证: 使用 email + password_hash
+    2. CRM 认证: 使用 crm_id 关联 CRM 系统用户
+    """
 
     __tablename__ = "users"
 
     id: int | None = Field(default=None, primary_key=True)
-    email: str = Field(index=True, unique=True, description="邮箱(登录账号)")
-    password_hash: str = Field(description="密码哈希")
+
+    # 本地认证字段
+    email: str | None = Field(
+        default=None, index=True, unique=True, description="邮箱(本地登录账号)"
+    )
+    password_hash: str | None = Field(default=None, description="密码哈希(本地认证)")
+
+    # CRM 认证字段
+    crm_id: str | None = Field(
+        default=None, index=True, unique=True, description="CRM 用户 ID"
+    )
+    username: str | None = Field(
+        default=None, index=True, unique=True, description="用户名(CRM 登录账号)"
+    )
+    phone: str | None = Field(default=None, description="手机号")
+
+    # 通用字段
     name: str = Field(description="显示名称")
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
     is_active: bool = Field(default=True, description="是否启用")
@@ -33,18 +54,26 @@ class User(SQLModel, table=True):
     )
     last_login_at: datetime | None = Field(default=None, description="最后登录时间")
 
+    # CRM 同步信息
+    crm_synced_at: datetime | None = Field(
+        default=None, description="CRM 信息最后同步时间"
+    )
+
 
 class UserCreate(SQLModel):
     """创建用户请求模型"""
 
-    email: str = Field(description="邮箱")
-    password: str = Field(min_length=6, description="密码(至少6位)")
+    email: str | None = Field(default=None, description="邮箱")
+    password: str | None = Field(
+        default=None, min_length=6, description="密码(至少6位)"
+    )
+    username: str | None = Field(default=None, description="用户名")
     name: str = Field(description="显示名称")
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
 
 
 class UserUpdate(SQLModel):
-    """更新用户请求模型（name 不可修改）"""
+    """更新用户请求模型"""
 
     email: str | None = None
     password: str | None = None
@@ -56,9 +85,32 @@ class UserResponse(SQLModel):
     """用户响应模型(不包含密码)"""
 
     id: int
-    email: str
+    email: str | None = None
+    username: str | None = None
+    crm_id: str | None = None
     name: str
+    phone: str | None = None
     role: UserRole
     is_active: bool
     created_at: datetime
-    last_login_at: datetime | None
+    last_login_at: datetime | None = None
+
+
+class UserIdentity(BaseModel):
+    """用户身份信息（来自 CRM）"""
+
+    identity_id: str
+    campus_id: str
+    campus_name: str
+    department_id: str
+    department_name: str
+    position_id: str
+    position_name: str
+    position_level: int
+    is_active: bool = True
+
+
+class UserWithIdentities(UserResponse):
+    """包含身份信息的用户响应"""
+
+    identities: list[UserIdentity] = []

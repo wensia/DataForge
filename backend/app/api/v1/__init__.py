@@ -12,6 +12,7 @@ from app.api.v1 import (
     data_analysis,
     feishu_config,
     health,
+    organization,
     prompts,
     record_proxy,
     staff_mapping,
@@ -32,6 +33,7 @@ router.include_router(yunke.router)
 router.include_router(accounts.router)
 router.include_router(tasks.router)
 router.include_router(users.router)
+router.include_router(organization.router)
 router.include_router(data_analysis.router)
 router.include_router(ai_config.router)
 router.include_router(asr_config.router)
