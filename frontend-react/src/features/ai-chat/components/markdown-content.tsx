@@ -31,6 +31,9 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
         'prose-code:before:content-none prose-code:after:content-none',
         'prose-headings:my-3 prose-headings:font-semibold',
         'prose-table:my-2',
+        // 移动端溢出处理（官方推荐）
+        'prose-pre:max-w-full prose-pre:overflow-x-auto',
+        'prose-img:max-w-full',
         // 宽度约束
         'w-full',
         className
@@ -70,21 +73,21 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
           // 表格样式 - 移动端优化
           table({ children }) {
             return (
-              <div className="my-2 overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-max">{children}</table>
+              <div className="my-2 max-w-full overflow-x-auto rounded-lg border">
+                <table className="w-full table-auto">{children}</table>
               </div>
             )
           },
           th({ children }) {
             return (
-              <th className="border-b bg-muted/50 px-2 py-1.5 text-left text-xs font-medium whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">
+              <th className="border-b bg-muted/50 px-2 py-1.5 text-left text-xs font-medium sm:whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">
                 {children}
               </th>
             )
           },
           td({ children }) {
             return (
-              <td className="border-b px-2 py-1.5 text-xs whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">{children}</td>
+              <td className="border-b px-2 py-1.5 text-xs sm:whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">{children}</td>
             )
           },
           // 链接
@@ -132,9 +135,9 @@ function CodeBlock({ language, code }: CodeBlockProps) {
   }, [code])
 
   return (
-    <div className="group relative my-2 overflow-hidden rounded-lg">
+    <div className="group relative my-2 max-w-full overflow-hidden rounded-lg">
       {/* 语言标签和复制按钮 */}
-      <div className="flex items-center justify-between bg-zinc-800 px-4 py-2 text-xs text-zinc-400">
+      <div className="flex items-center justify-between bg-zinc-800 px-2 sm:px-4 py-2 text-xs text-zinc-400">
         <span>{language || 'code'}</span>
         <Button
           variant="ghost"
@@ -156,18 +159,20 @@ function CodeBlock({ language, code }: CodeBlockProps) {
         </Button>
       </div>
       {/* 代码内容 */}
-      <SyntaxHighlighter
-        style={oneDark}
-        language={language || 'text'}
-        PreTag="div"
-        customStyle={{
-          margin: 0,
-          borderRadius: 0,
-          fontSize: '0.875rem',
-        }}
-      >
-        {code}
-      </SyntaxHighlighter>
+      <div className="overflow-x-auto">
+        <SyntaxHighlighter
+          style={oneDark}
+          language={language || 'text'}
+          PreTag="div"
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            fontSize: '0.875rem',
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
     </div>
   )
 }

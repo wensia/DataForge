@@ -610,7 +610,7 @@ function MessageItem({
           <Bot className="h-4 w-4" />
         )}
       </div>
-      <div className={cn('min-w-0 max-w-[calc(100%-3rem)]', isUser && 'ml-auto')}>
+      <div className={cn('min-w-0 max-w-[calc(100%-2.5rem)] overflow-hidden', isUser && 'ml-auto')}>
         <div
           className={cn(
             'rounded-2xl px-3 sm:px-4 py-2.5 text-sm',
@@ -620,7 +620,7 @@ function MessageItem({
           {isUser ? (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-w-full overflow-x-auto">
               <MarkdownContent content={message.content} />
             </div>
           )}
