@@ -4,7 +4,6 @@
 """
 
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from loguru import logger
@@ -389,6 +388,103 @@ async def get_analysis_history(
     )
 
 
+# ============ 通话记录智能分析接口 (DeepSeek + Function Calling) ============
+
+
+@router.post("/call-analysis", response_model=ResponseModel)
+async def analyze_call_records(
+    question: str = Body(..., embed=True, description="用户问题"),
+    history: list[dict[str, str]] | None = Body(None, description="对话历史"),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """通话记录智能分析（DeepSeek + Function Calling）
+
+    使用 DeepSeek 自动执行 SQL 查询并分析通话数据。
+
+    特性:
+    - 自动执行 SQL 查询
+    - 支持被叫号码列表分析
+    - 支持员工通话统计
+    - 支持多轮对话
+
+    Args:
+        question: 用户问题
+        history: 对话历史 [{"role": "user/assistant", "content": "..."}]
+
+    Returns:
+        ResponseModel: 分析结果
+
+    Example:
+        POST /api/v1/analysis/call-analysis
+        {
+            "question": "分析这些被叫号码：13821294844, 13302199992"
+        }
+    """
+    from app.services.call_record_analysis_service import (
+        CallRecordAnalysisError,
+        CallRecordAnalysisService,
+    )
+
+    try:
+        service = CallRecordAnalysisService(session)
+        result = await service.analyze(
+            question=question,
+            history=history,
+        )
+
+        return ResponseModel(
+            data={
+                "content": result.content,
+                "queries_executed": result.queries_executed,
+                "tokens_used": result.tokens_used,
+            }
+        )
+    except CallRecordAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/call-analysis/quick", response_model=ResponseModel)
+async def quick_query_phones(
+    phones: list[str] = Body(..., description="被叫号码列表"),
+    start_date: str | None = Body(None, description="开始日期 (YYYY-MM-DD)"),
+    end_date: str | None = Body(None, description="结束日期 (YYYY-MM-DD)"),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """快速查询被叫号码
+
+    不使用 AI，直接执行 SQL 查询被叫号码的通话统计。
+
+    Args:
+        phones: 被叫号码列表
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        ResponseModel: 查询结果
+    """
+    from app.services.call_record_analysis_service import (
+        CallRecordAnalysisError,
+        CallRecordAnalysisService,
+    )
+
+    try:
+        service = CallRecordAnalysisService(session)
+        result = await service.quick_query(
+            phones=phones,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return ResponseModel(
+            data={
+                "content": result.content,
+                "queries_executed": result.queries_executed,
+            }
+        )
+    except CallRecordAnalysisError as e:
+        raise HTTPException(status_code=500, detail=e.message) from e
+
+
 @router.get("/providers", response_model=ResponseModel)
 async def get_ai_providers(
     session: Session = Depends(get_session),
@@ -398,9 +494,10 @@ async def get_ai_providers(
     Returns:
         ResponseModel: AI 服务列表
     """
+    from sqlmodel import select
+
     from app.config import settings
     from app.models.ai_config import AIConfig
-    from sqlmodel import select
 
     active_providers = set(
         session.exec(
