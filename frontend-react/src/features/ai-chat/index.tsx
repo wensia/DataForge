@@ -454,7 +454,7 @@ export function AIChat() {
                 {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">
+            <p className="mt-2 hidden text-center text-[10px] text-muted-foreground sm:block">
               Enter 发送 · Shift+Enter 换行
             </p>
           </div>
