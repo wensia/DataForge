@@ -22,7 +22,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
   return (
     <div
       className={cn(
-        'prose prose-sm dark:prose-invert max-w-none',
+        'prose prose-sm dark:prose-invert max-w-full',
         // 重置一些 prose 样式
         'prose-p:my-2 prose-p:leading-relaxed',
         'prose-ul:my-2 prose-ol:my-2',
@@ -31,6 +31,8 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
         'prose-code:before:content-none prose-code:after:content-none',
         'prose-headings:my-3 prose-headings:font-semibold',
         'prose-table:my-2',
+        // 移动端优化：限制宽度，允许内容滚动
+        'w-full overflow-x-auto',
         className
       )}
     >
@@ -65,24 +67,24 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               </code>
             )
           },
-          // 表格样式
+          // 表格样式 - 移动端优化
           table({ children }) {
             return (
-              <div className="my-2 overflow-x-auto rounded-lg border">
-                <table className="w-full">{children}</table>
+              <div className="my-2 -mx-2 overflow-x-auto rounded-lg border sm:mx-0">
+                <table className="w-full min-w-[400px]">{children}</table>
               </div>
             )
           },
           th({ children }) {
             return (
-              <th className="border-b bg-muted/50 px-3 py-2 text-left text-sm font-medium">
+              <th className="border-b bg-muted/50 px-2 py-1.5 text-left text-xs font-medium whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">
                 {children}
               </th>
             )
           },
           td({ children }) {
             return (
-              <td className="border-b px-3 py-2 text-sm">{children}</td>
+              <td className="border-b px-2 py-1.5 text-xs whitespace-nowrap sm:px-3 sm:py-2 sm:text-sm">{children}</td>
             )
           },
           // 链接

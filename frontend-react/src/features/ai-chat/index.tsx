@@ -200,9 +200,9 @@ export function AIChat() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <section className="flex h-full gap-6 px-4 py-6">
-          {/* 左侧：对话列表 */}
-          <div className="flex w-full flex-col gap-2 sm:w-56 lg:w-72 2xl:w-80">
+      <section className="flex h-full gap-4 px-2 py-4 sm:gap-6 sm:px-4 sm:py-6">
+          {/* 左侧：对话列表 - 移动端隐藏 */}
+          <div className="hidden flex-col gap-2 sm:flex sm:w-56 lg:w-72 2xl:w-80">
             <div className="bg-background sticky top-0 z-10 -mx-4 px-4 pb-3 shadow-md sm:static sm:z-auto sm:mx-0 sm:p-0 sm:shadow-none">
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-2">
@@ -276,33 +276,49 @@ export function AIChat() {
 
           {/* 右侧：对话内容 */}
           {selectedId ? (
-            <ChatContainer className="bg-background flex-1 rounded-md border shadow-xs">
+            <ChatContainer className="bg-background min-w-0 flex-1 rounded-md border shadow-xs">
               {/* 对话头部 */}
-              <div className="bg-card flex items-center justify-between rounded-t-md p-4 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Bot className="text-primary" />
-                  <span className="font-medium">
+              <div className="bg-card flex items-center justify-between gap-2 rounded-t-md p-2 shadow-sm sm:p-4">
+                <div className="flex min-w-0 items-center gap-2">
+                  {/* 移动端：新建对话按钮 */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleCreateConversation}
+                    disabled={createMutation.isPending}
+                    className="h-8 w-8 shrink-0 sm:hidden"
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                  </Button>
+                  <Bot className="hidden text-primary sm:block" />
+                  <span className="truncate text-sm font-medium sm:text-base">
                     {conversationData?.title || '新对话'}
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  {/* 深度思考开关 */}
-                  <div className="flex items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+                  {/* 深度思考开关 - 移动端简化 */}
+                  <div className="flex items-center gap-1">
                     <Switch
                       id="deep-thinking"
                       checked={useDeepThinking}
                       onCheckedChange={setUseDeepThinking}
                       disabled={isStreaming}
+                      className="scale-90 sm:scale-100"
                     />
                     <label
                       htmlFor="deep-thinking"
-                      className="flex cursor-pointer items-center gap-1 text-sm text-muted-foreground"
+                      className="hidden cursor-pointer items-center gap-1 text-sm text-muted-foreground sm:flex"
                     >
                       <Brain className="h-3.5 w-3.5" />
                       深度思考
                     </label>
+                    <Brain className="h-3.5 w-3.5 text-muted-foreground sm:hidden" />
                   </div>
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="hidden sm:inline-flex">
                     {conversationData?.ai_provider?.toUpperCase()}
                   </Badge>
                   {isStreaming && (
@@ -313,7 +329,7 @@ export function AIChat() {
                       className="h-7 gap-1"
                     >
                       <StopCircle className="h-3 w-3" />
-                      停止
+                      <span className="hidden sm:inline">停止</span>
                     </Button>
                   )}
                 </div>
@@ -398,7 +414,7 @@ export function AIChat() {
               />
             </ChatContainer>
           ) : (
-            <div className="bg-card flex flex-1 flex-col items-center justify-center rounded-md border shadow-xs">
+            <div className="bg-card flex min-w-0 flex-1 flex-col items-center justify-center rounded-md border px-4 shadow-xs">
               <div className="flex flex-col items-center space-y-6">
                 <div className="border-border flex size-16 items-center justify-center rounded-full border-2">
                   <Bot className="size-8" />
@@ -406,7 +422,7 @@ export function AIChat() {
                 <div className="space-y-2 text-center">
                   <h1 className="text-xl font-semibold">AI 对话助手</h1>
                   <p className="text-sm text-muted-foreground">
-                    选择或创建一个对话开始聊天
+                    点击下方按钮开始对话
                   </p>
                 </div>
                 <Button

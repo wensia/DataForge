@@ -178,9 +178,6 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
         if data.password is not None:
             user.password_hash = get_password_hash(data.password)
 
-        if data.name is not None:
-            user.name = data.name
-
         if data.role is not None:
             user.role = data.role
 

@@ -81,7 +81,7 @@ ChatMessages.displayName = 'ChatMessages'
 // ============ ChatBubble ============
 
 const chatBubbleVariants = cva(
-  'relative max-w-[85%] rounded-2xl px-4 py-3 text-sm',
+  'relative max-w-[85%] rounded-2xl px-4 py-3 text-sm overflow-hidden',
   {
     variants: {
       variant: {

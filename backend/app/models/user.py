@@ -41,11 +41,10 @@ class UserCreate(SQLModel):
 
 
 class UserUpdate(SQLModel):
-    """更新用户请求模型"""
+    """更新用户请求模型（name 不可修改）"""
 
     email: Optional[str] = None
     password: Optional[str] = None
-    name: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   flexRender,
@@ -25,6 +25,7 @@ import {
   Dices,
   Copy,
   Check,
+  Pencil,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -67,6 +68,7 @@ import {
 } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTablePagination, DataTableColumnHeader } from '@/components/data-table'
+import { Switch } from '@/components/ui/switch'
 
 /** 用户类型 */
 interface User {
@@ -126,7 +128,12 @@ function useUpdateUser() {
       data,
     }: {
       id: number
-      data: { is_active?: boolean; role?: string }
+      data: {
+        email?: string
+        password?: string
+        role?: string
+        is_active?: boolean
+      }
     }) => {
       const response = await apiClient.put<ApiResponse<User>>(
         `/users/${id}`,
@@ -178,6 +185,13 @@ const formSchema = z.object({
   role: z.string().min(1, '请选择角色'),
 })
 
+const editFormSchema = z.object({
+  email: z.string().email('请输入有效的邮箱').optional().or(z.literal('')),
+  password: z.string().min(6, '密码至少 6 个字符').optional().or(z.literal('')),
+  role: z.string().min(1, '请选择角色'),
+  is_active: z.boolean(),
+})
+
 /** 生成随机密码：2位大写 + 2位小写 + 4位数字 */
 function generateRandomPassword(): string {
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -198,6 +212,7 @@ function generateRandomPassword(): string {
 }
 
 type UserForm = z.infer<typeof formSchema>
+type EditUserForm = z.infer<typeof editFormSchema>
 
 export function UsersSettings() {
   const { data: users = [], isLoading, refetch, isRefetching } = useUsers()
@@ -207,8 +222,10 @@ export function UsersSettings() {
   const deleteUser = useDeleteUser()
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -310,6 +327,18 @@ export function UsersSettings() {
           <div className='flex gap-1'>
             <Button
               variant='ghost'
+              size='icon'
+              className='h-8 w-8'
+              onClick={() => {
+                setEditingUser(user)
+                setEditDialogOpen(true)
+              }}
+              title='编辑用户'
+            >
+              <Pencil className='h-4 w-4' />
+            </Button>
+            <Button
+              variant='ghost'
               size='sm'
               onClick={() => {
                 updateUser.mutate({
@@ -362,6 +391,16 @@ export function UsersSettings() {
     },
   })
 
+  const editForm = useForm<EditUserForm>({
+    resolver: zodResolver(editFormSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      role: 'user',
+      is_active: true,
+    },
+  })
+
   const onSubmit = async (data: UserForm) => {
     try {
       const password = data.password
@@ -374,6 +413,45 @@ export function UsersSettings() {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : '创建失败，请重试'
+      toast.error(message)
+    }
+  }
+
+  const onEditSubmit = async (data: EditUserForm) => {
+    if (!editingUser) return
+    try {
+      // 只发送有变化的字段
+      const updateData: {
+        email?: string
+        password?: string
+        role?: string
+        is_active?: boolean
+      } = {}
+
+      if (data.email && data.email !== editingUser.email) {
+        updateData.email = data.email
+      }
+      if (data.password) {
+        updateData.password = data.password
+      }
+      if (data.role !== editingUser.role) {
+        updateData.role = data.role
+      }
+      if (data.is_active !== editingUser.is_active) {
+        updateData.is_active = data.is_active
+      }
+
+      await updateUser.mutateAsync({
+        id: editingUser.id,
+        data: updateData,
+      })
+      toast.success('用户更新成功')
+      setEditDialogOpen(false)
+      setEditingUser(null)
+      editForm.reset()
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '更新失败，请重试'
       toast.error(message)
     }
   }
@@ -631,6 +709,164 @@ export function UsersSettings() {
                 </Button>
                 <Button type='submit' disabled={createUser.isPending}>
                   {createUser.isPending ? '创建中...' : '创建'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑用户对话框 */}
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) {
+            setEditingUser(null)
+            editForm.reset()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑用户</DialogTitle>
+            <DialogDescription>
+              修改用户信息。用户名不可修改。
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form
+              onSubmit={editForm.handleSubmit(onEditSubmit)}
+              className='space-y-4'
+            >
+              {/* 用户名 - 只读 */}
+              <div className='space-y-2'>
+                <label className='text-sm font-medium'>名称</label>
+                <Input
+                  value={editingUser?.name || ''}
+                  disabled
+                  className='bg-muted'
+                />
+                <p className='text-muted-foreground text-xs'>用户名不可修改</p>
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name='email'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>邮箱</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type='email'
+                        placeholder='user@example.com'
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='password'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      新密码{' '}
+                      <span className='text-muted-foreground'>(留空不修改)</span>
+                    </FormLabel>
+                    <div className='flex gap-2'>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='text'
+                          placeholder='输入新密码'
+                          autoComplete='new-password'
+                        />
+                      </FormControl>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='icon'
+                        onClick={() => {
+                          const pwd = generateRandomPassword()
+                          editForm.setValue('password', pwd)
+                        }}
+                        title='生成随机密码'
+                      >
+                        <Dices className='h-4 w-4' />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='role'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>角色</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='选择角色' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {roleOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className='flex items-center gap-2'>
+                              <option.icon className='h-4 w-4' />
+                              {option.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='is_active'
+                render={({ field }) => (
+                  <FormItem className='flex items-center justify-between rounded-lg border p-3'>
+                    <div className='space-y-0.5'>
+                      <FormLabel>启用状态</FormLabel>
+                      <p className='text-muted-foreground text-sm'>
+                        禁用后用户将无法登录
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  variant='outline'
+                  type='button'
+                  onClick={() => {
+                    setEditDialogOpen(false)
+                    setEditingUser(null)
+                    editForm.reset()
+                  }}
+                >
+                  取消
+                </Button>
+                <Button type='submit' disabled={updateUser.isPending}>
+                  {updateUser.isPending ? '保存中...' : '保存'}
                 </Button>
               </DialogFooter>
             </form>
