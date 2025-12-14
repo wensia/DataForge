@@ -322,6 +322,8 @@ start_all() {
     echo "=========================================="
     echo ""
     start_backend
+    start_celery_worker
+    start_celery_beat
     start_frontend
     echo ""
     echo "=========================================="
@@ -339,8 +341,10 @@ stop_all() {
     echo "       云客中转 - 停止服务"
     echo "=========================================="
     echo ""
-    stop_backend
     stop_frontend
+    stop_celery_beat
+    stop_celery_worker
+    stop_backend
     echo ""
 }
 
@@ -358,7 +362,7 @@ status() {
     echo "       云客中转 - 服务状态"
     echo "=========================================="
     echo ""
-    
+
     # 后端状态
     if [ -f "$BACKEND_PID_FILE" ]; then
         local backend_pid=$(cat "$BACKEND_PID_FILE")
@@ -370,7 +374,31 @@ status() {
     else
         warning "后端服务: 未运行"
     fi
-    
+
+    # Celery Worker 状态
+    if [ -f "$CELERY_WORKER_PID_FILE" ]; then
+        local worker_pid=$(cat "$CELERY_WORKER_PID_FILE")
+        if ps -p $worker_pid > /dev/null 2>&1; then
+            success "Celery Worker: 运行中 (PID: $worker_pid)"
+        else
+            warning "Celery Worker: 已停止 (PID文件存在但进程不存在)"
+        fi
+    else
+        warning "Celery Worker: 未运行"
+    fi
+
+    # Celery Beat 状态
+    if [ -f "$CELERY_BEAT_PID_FILE" ]; then
+        local beat_pid=$(cat "$CELERY_BEAT_PID_FILE")
+        if ps -p $beat_pid > /dev/null 2>&1; then
+            success "Celery Beat: 运行中 (PID: $beat_pid)"
+        else
+            warning "Celery Beat: 已停止 (PID文件存在但进程不存在)"
+        fi
+    else
+        warning "Celery Beat: 未运行"
+    fi
+
     # 前端状态
     if [ -f "$FRONTEND_PID_FILE" ]; then
         local frontend_pid=$(cat "$FRONTEND_PID_FILE")
@@ -382,7 +410,7 @@ status() {
     else
         warning "前端服务: 未运行"
     fi
-    
+
     echo ""
     echo "=========================================="
     echo "  后端地址: http://localhost:$BACKEND_PORT"
@@ -410,9 +438,23 @@ logs() {
                 error "前端日志文件不存在"
             fi
             ;;
+        celery-worker|worker)
+            if [ -f "$CELERY_WORKER_LOG" ]; then
+                tail -f "$CELERY_WORKER_LOG"
+            else
+                error "Celery Worker 日志文件不存在"
+            fi
+            ;;
+        celery-beat|beat)
+            if [ -f "$CELERY_BEAT_LOG" ]; then
+                tail -f "$CELERY_BEAT_LOG"
+            else
+                error "Celery Beat 日志文件不存在"
+            fi
+            ;;
         *)
-            error "请指定服务: backend 或 frontend"
-            echo "用法: $0 logs <backend|frontend>"
+            error "请指定服务: backend|frontend|celery-worker|celery-beat"
+            echo "用法: $0 logs <backend|frontend|celery-worker|celery-beat>"
             ;;
     esac
 }
@@ -425,16 +467,26 @@ show_help() {
     echo "用法: $0 <命令> [参数]"
     echo ""
     echo "命令:"
-    echo "  start           启动所有服务"
-    echo "  stop            停止所有服务"
-    echo "  restart         重启所有服务"
-    echo "  status          查看服务状态"
-    echo "  start-backend   仅启动后端"
-    echo "  stop-backend    仅停止后端"
-    echo "  start-frontend  仅启动前端"
-    echo "  stop-frontend   仅停止前端"
-    echo "  logs <service>  查看日志 (backend|frontend)"
-    echo "  help            显示帮助信息"
+    echo "  start              启动所有服务 (后端+Celery+前端)"
+    echo "  stop               停止所有服务"
+    echo "  restart            重启所有服务"
+    echo "  status             查看服务状态"
+    echo ""
+    echo "  start-backend      仅启动后端 API"
+    echo "  stop-backend       仅停止后端 API"
+    echo "  start-frontend     仅启动前端"
+    echo "  stop-frontend      仅停止前端"
+    echo ""
+    echo "  start-celery       启动 Celery (Worker + Beat)"
+    echo "  stop-celery        停止 Celery (Worker + Beat)"
+    echo "  start-worker       仅启动 Celery Worker"
+    echo "  stop-worker        仅停止 Celery Worker"
+    echo "  start-beat         仅启动 Celery Beat"
+    echo "  stop-beat          仅停止 Celery Beat"
+    echo ""
+    echo "  logs <service>     查看日志"
+    echo "                     服务: backend|frontend|celery-worker|celery-beat"
+    echo "  help               显示帮助信息"
     echo ""
     echo "端口配置:"
     echo "  后端端口: $BACKEND_PORT"
@@ -467,6 +519,26 @@ case "$1" in
         ;;
     stop-frontend)
         stop_frontend
+        ;;
+    start-celery)
+        start_celery_worker
+        start_celery_beat
+        ;;
+    stop-celery)
+        stop_celery_beat
+        stop_celery_worker
+        ;;
+    start-worker)
+        start_celery_worker
+        ;;
+    stop-worker)
+        stop_celery_worker
+        ;;
+    start-beat)
+        start_celery_beat
+        ;;
+    stop-beat)
+        stop_celery_beat
         ;;
     logs)
         logs $2

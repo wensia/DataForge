@@ -162,7 +162,7 @@ class DatabaseScheduler(Scheduler):
 
 
 # 注册信号处理器，在任务执行后更新下次运行时间
-from celery.signals import task_postrun
+from celery.signals import task_postrun  # noqa: E402
 
 
 @task_postrun.connect

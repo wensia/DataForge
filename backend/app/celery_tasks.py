@@ -5,7 +5,6 @@
 """
 
 import asyncio
-import json
 from typing import Any
 
 from celery import Task
@@ -122,16 +121,15 @@ def cleanup_old_executions() -> dict[str, Any]:
     """
     from datetime import datetime, timedelta
 
+    from sqlmodel import delete
+
     from app.config import settings
     from app.models.task_execution import TaskExecution
-    from sqlmodel import delete
 
     cutoff_date = datetime.now() - timedelta(days=settings.max_execution_history_days)
 
     with Session(engine) as session:
-        statement = delete(TaskExecution).where(
-            TaskExecution.created_at < cutoff_date
-        )
+        statement = delete(TaskExecution).where(TaskExecution.created_at < cutoff_date)
         result = session.exec(statement)  # type: ignore
         deleted_count = result.rowcount
         session.commit()
