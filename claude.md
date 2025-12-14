@@ -86,6 +86,7 @@ cd frontend-react && pnpm dev --port 3692
 - `docs/rules/feishu.md` - 飞书多维表格集成规范
 - `docs/rules/data-sync.md` - 数据同步规范（飞书→本地数据库）
 - `docs/rules/ai-integration.md` - AI 集成规范（Kimi/DeepSeek）
+- `docs/rules/ai-tools.md` - AI 工具调用规范（Function Calling）
 - `docs/rules/auth.md` - 用户认证规范
 - `docs/rules/deploy.md` - 服务器部署和运维
 
