@@ -13,10 +13,23 @@ import type {
   WechatArticle,
 } from './types'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const articleKeys = {
   all: ['wechat-articles'] as const,
-  list: (params?: ArticleParams) => [...articleKeys.all, 'list', params] as const,
+  list: (params?: ArticleParams) =>
+    [
+      ...articleKeys.all,
+      'list',
+      params?.page,
+      params?.page_size,
+      params?.biz,
+      params?.account_name,
+      params?.title,
+      params?.start_time,
+      params?.end_time,
+      params?.is_original,
+      params?.config_id,
+    ] as const,
   filterOptions: () => [...articleKeys.all, 'filter-options'] as const,
   detail: (id: number) => [...articleKeys.all, 'detail', id] as const,
 }

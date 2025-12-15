@@ -15,15 +15,31 @@ import type {
   RecordsParams,
 } from '../types'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const analysisKeys = {
   all: ['analysis'] as const,
-  records: (params?: RecordsParams) => [...analysisKeys.all, 'records', params] as const,
+  records: (params?: RecordsParams) =>
+    [
+      ...analysisKeys.all,
+      'records',
+      params?.page,
+      params?.page_size,
+      params?.staff_name,
+      params?.call_type,
+      params?.start_time,
+      params?.end_time,
+    ] as const,
   stats: (params?: { start_time?: string; end_time?: string }) =>
-    [...analysisKeys.all, 'stats', params] as const,
+    [...analysisKeys.all, 'stats', params?.start_time, params?.end_time] as const,
   providers: () => [...analysisKeys.all, 'providers'] as const,
   history: (params?: { analysis_type?: string; page?: number; page_size?: number }) =>
-    [...analysisKeys.all, 'history', params] as const,
+    [
+      ...analysisKeys.all,
+      'history',
+      params?.analysis_type,
+      params?.page,
+      params?.page_size,
+    ] as const,
 }
 
 // 获取筛选选项（员工列表等）

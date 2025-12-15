@@ -12,7 +12,7 @@ import type {
   TaskHandler,
 } from '../data/schema'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const taskKeys = {
   all: ['tasks'] as const,
   list: (params?: {
@@ -20,18 +20,34 @@ export const taskKeys = {
     category?: string
     page?: number
     size?: number
-  }) => [...taskKeys.all, 'list', params] as const,
+  }) =>
+    [
+      ...taskKeys.all,
+      'list',
+      params?.status,
+      params?.category,
+      params?.page,
+      params?.size,
+    ] as const,
   detail: (id: number) => [...taskKeys.all, 'detail', id] as const,
   handlers: () => [...taskKeys.all, 'handlers'] as const,
   categories: () => [...taskKeys.all, 'categories'] as const,
   executions: (taskId: number, params?: { page?: number; size?: number }) =>
-    [...taskKeys.all, 'executions', taskId, params] as const,
+    [...taskKeys.all, 'executions', taskId, params?.page, params?.size] as const,
   allExecutions: (params?: {
     task_id?: number
     status?: string
     page?: number
     size?: number
-  }) => [...taskKeys.all, 'allExecutions', params] as const,
+  }) =>
+    [
+      ...taskKeys.all,
+      'allExecutions',
+      params?.task_id,
+      params?.status,
+      params?.page,
+      params?.size,
+    ] as const,
   executionDetail: (executionId: number) =>
     [...taskKeys.all, 'executionDetail', executionId] as const,
 }

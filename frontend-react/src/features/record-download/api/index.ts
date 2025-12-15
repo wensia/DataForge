@@ -6,10 +6,21 @@ import apiClient from '@/lib/api-client'
 import type { ApiResponse } from '@/lib/types'
 import type { CallLogQuery, CallLogResponse, RecordUrlResponse } from '../types'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const recordKeys = {
   all: ['records'] as const,
-  callLogs: (params: CallLogQuery) => [...recordKeys.all, 'call-logs', params] as const,
+  callLogs: (params: CallLogQuery) =>
+    [
+      ...recordKeys.all,
+      'call-logs',
+      params.accountId,
+      params.startTime,
+      params.endTime,
+      params.page,
+      params.pageSize,
+      params.callType,
+      params.searchPhone,
+    ] as const,
   recordUrl: (accountId: number, voiceId: string) =>
     [...recordKeys.all, 'url', accountId, voiceId] as const,
 }

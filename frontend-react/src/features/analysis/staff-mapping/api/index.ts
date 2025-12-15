@@ -19,16 +19,16 @@ import type {
   SyncStaffResponse,
 } from '../types'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const staffMappingKeys = {
   all: ['staff-mapping'] as const,
   staff: () => [...staffMappingKeys.all, 'staff'] as const,
   staffList: (includeInactive?: boolean) =>
-    [...staffMappingKeys.staff(), { includeInactive }] as const,
+    [...staffMappingKeys.staff(), 'list', includeInactive] as const,
   staffDetail: (id: number) => [...staffMappingKeys.staff(), id] as const,
   mappings: () => [...staffMappingKeys.all, 'mappings'] as const,
   mappingsList: (params?: { staffId?: number; includeExpired?: boolean }) =>
-    [...staffMappingKeys.mappings(), params] as const,
+    [...staffMappingKeys.mappings(), 'list', params?.staffId, params?.includeExpired] as const,
   mappingsAtTime: (date: string) =>
     [...staffMappingKeys.mappings(), 'at-time', date] as const,
   campuses: () => [...staffMappingKeys.all, 'campuses'] as const,

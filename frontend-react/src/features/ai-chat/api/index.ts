@@ -16,15 +16,20 @@ import type {
   SendMessageResponse,
 } from '../types'
 
-// Query Keys
+// Query Keys - 使用扁平化参数避免循环渲染
 export const chatKeys = {
   all: ['chat'] as const,
   conversations: (params?: { conversation_type?: string; include_archived?: boolean }) =>
-    [...chatKeys.all, 'conversations', params] as const,
+    [
+      ...chatKeys.all,
+      'conversations',
+      params?.conversation_type,
+      params?.include_archived,
+    ] as const,
   conversationsRoot: () => [...chatKeys.all, 'conversations'] as const,
   conversation: (id: number) => [...chatKeys.all, 'conversation', id] as const,
   messages: (conversationId: number, params?: { page?: number; page_size?: number }) =>
-    [...chatKeys.all, 'messages', conversationId, params] as const,
+    [...chatKeys.all, 'messages', conversationId, params?.page, params?.page_size] as const,
   messagesRoot: (conversationId: number) => [...chatKeys.all, 'messages', conversationId] as const,
   providers: () => [...chatKeys.all, 'providers'] as const,
 }
