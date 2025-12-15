@@ -27,15 +27,15 @@ class DatabaseScheduleEntry(ScheduleEntry):
 
     def __init__(
         self,
-        task: ScheduledTask | None = None,
+        task: ScheduledTask | str | None = None,
         app: Any = None,
         **entry_kwargs: Any,
     ) -> None:
         # 支持两种初始化方式：
-        # 1. 从数据库任务创建（task 参数）
-        # 2. 从 _next_instance 复制（entry_kwargs 参数）
+        # 1. 从数据库任务创建（task 是 ScheduledTask 对象）
+        # 2. 从 _next_instance 复制（task 是字符串或 entry_kwargs 包含参数）
 
-        if task is not None:
+        if isinstance(task, ScheduledTask):
             # 从数据库任务创建
             self.task_model = task
 
@@ -75,7 +75,8 @@ class DatabaseScheduleEntry(ScheduleEntry):
             # 从 _next_instance 复制（Celery 内部调用）
             # 提取并保存 task_model，然后传递其余参数给父类
             self.task_model = entry_kwargs.pop("task_model", None)
-            super().__init__(app=app, **entry_kwargs)
+            # task 参数在这里是 Celery 任务名称字符串，直接传递给父类
+            super().__init__(task=task, app=app, **entry_kwargs)
 
     def _make_schedule(self, task: ScheduledTask) -> schedule:
         """根据任务类型创建 Celery schedule"""
