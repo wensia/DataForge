@@ -427,7 +427,16 @@ async def send_message(
                 )
                 total_tokens += response.tokens_used or 0
 
-            final_content = response.content
+            final_content = response.content or ""
+
+            # 如果 content 为空，使用普通对话获取最终答案
+            # DeepSeek API 在工具调用后可能返回空 content
+            if not final_content:
+                logger.info("工具调用后 content 为空，使用普通对话获取最终答案")
+                response = await client.chat(chat_history, model=model)
+                total_tokens += response.tokens_used or 0
+                final_content = response.content or ""
+
         elif use_deep_thinking and isinstance(client, DeepSeekClient):
             # 深度思考模式 (DeepSeek Reasoner)
             logger.info("使用深度思考模式")
@@ -774,15 +783,28 @@ async def send_message_stream(
             # 工具调用完成，最终结果流式输出
             # 如果最后的 response 没有工具调用，使用流式输出最终内容
             if not response.tool_calls:
-                # 使用非流式结果（已经有了）
-                full_content = response.content
-                # 流式发送内容（分块发送以模拟流式效果）
-                chunk_size = 20
-                for i in range(0, len(full_content), chunk_size):
-                    chunk = full_content[i : i + chunk_size]
-                    yield {"type": "content", "content": chunk}
-                    # 增量保存
-                    maybe_save_progress()
+                full_content = response.content or ""
+
+                # 如果 content 为空，使用流式输出获取最终答案
+                # DeepSeek API 在工具调用后可能返回空 content
+                if not full_content:
+                    logger.info("工具调用后 content 为空，使用流式输出获取最终答案")
+                    async for chunk in client.chat_stream(chat_history, model=model):
+                        if chunk.content:
+                            full_content += chunk.content
+                            yield {"type": "content", "content": chunk.content}
+                            maybe_save_progress()
+                        if chunk.tokens_used:
+                            total_tokens = chunk.tokens_used
+                        if chunk.finish_reason:
+                            break
+                else:
+                    # 原有逻辑：分块发送以模拟流式效果
+                    chunk_size = 20
+                    for i in range(0, len(full_content), chunk_size):
+                        chunk = full_content[i : i + chunk_size]
+                        yield {"type": "content", "content": chunk}
+                        maybe_save_progress()
         else:
             # 普通流式对话（不使用工具）
             # 检查是否启用深度思考模式 (仅 DeepSeek 支持)

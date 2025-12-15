@@ -22,6 +22,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     PROTECTED_PREFIXES = [
         "/api/v1/users",  # 用户管理
         "/api/v1/organization",  # 组织架构
+        "/api/v1/dingtalk",  # 钉钉配置
     ]
 
     # 豁免 JWT 认证的路由(即使匹配 PROTECTED_PREFIXES)
