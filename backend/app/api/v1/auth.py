@@ -235,6 +235,7 @@ async def login(data: LoginRequest):
                     phone=user.phone,
                     role=user.role,
                     is_active=user.is_active,
+                    ai_enabled=user.ai_enabled,
                     created_at=user.created_at,
                     last_login_at=user.last_login_at,
                     identities=identities,
@@ -275,6 +276,7 @@ async def get_current_user(request: Request):
                 phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
+                ai_enabled=user.ai_enabled,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             )
@@ -334,6 +336,7 @@ async def update_current_user(request: Request, data: ProfileUpdateRequest):
                 phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
+                ai_enabled=user.ai_enabled,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),

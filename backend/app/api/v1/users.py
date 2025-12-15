@@ -167,6 +167,7 @@ async def create_user(request: Request, data: UserCreate):
                 phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
+                ai_enabled=user.ai_enabled,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),
@@ -202,6 +203,7 @@ async def get_user(request: Request, user_id: int):
                 phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
+                ai_enabled=user.ai_enabled,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             )
@@ -264,6 +266,7 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
                 phone=user.phone,
                 role=user.role,
                 is_active=user.is_active,
+                ai_enabled=user.ai_enabled,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),
