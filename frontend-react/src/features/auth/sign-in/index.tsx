@@ -18,7 +18,7 @@ export function SignIn() {
         <CardHeader>
           <CardTitle className='text-lg tracking-tight'>登录</CardTitle>
           <CardDescription>
-            输入您的邮箱和密码登录系统
+            输入您的账号和密码登录系统
           </CardDescription>
         </CardHeader>
         <CardContent>

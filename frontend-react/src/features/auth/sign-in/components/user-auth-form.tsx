@@ -19,10 +19,7 @@ import { PasswordInput } from '@/components/password-input'
 import { useLogin } from '@/features/auth/api'
 
 const formSchema = z.object({
-  email: z.email({
-    error: (iss) =>
-      iss.input === '' ? '请输入邮箱地址' : '请输入有效的邮箱地址',
-  }),
+  email: z.string().min(1, '请输入账号'),
   password: z
     .string()
     .min(1, '请输入密码')
@@ -95,9 +92,9 @@ export function UserAuthForm({
           name='email'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>邮箱</FormLabel>
+              <FormLabel>账号</FormLabel>
               <FormControl>
-                <Input placeholder='name@example.com' {...field} />
+                <Input placeholder='用户名或邮箱' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
