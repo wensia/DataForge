@@ -138,8 +138,8 @@ export const sidebarData: SidebarData = {
           icon: Mic,
         },
         {
-          title: '钉钉配置',
-          url: '/settings/dingtalk',
+          title: '机器人配置',
+          url: '/settings/robot',
           icon: Send,
         },
         {

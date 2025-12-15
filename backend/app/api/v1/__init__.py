@@ -10,12 +10,12 @@ from app.api.v1 import (
     auth,
     chat,
     data_analysis,
-    dingtalk,
     feishu_config,
     health,
     organization,
     prompts,
     record_proxy,
+    robot,
     staff_mapping,
     tasks,
     user_preferences,
@@ -43,4 +43,4 @@ router.include_router(user_preferences.router)
 router.include_router(staff_mapping.router)
 router.include_router(chat.router)
 router.include_router(prompts.router)
-router.include_router(dingtalk.router)
+router.include_router(robot.router)

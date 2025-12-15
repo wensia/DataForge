@@ -1,21 +1,31 @@
-"""钉钉机器人配置数据模型
+"""机器人配置数据模型
 
-用于存储钉钉机器人的 Webhook 和密钥配置。
+支持钉钉和飞书机器人的 Webhook 和密钥配置。
 """
+
+from enum import Enum
 
 from sqlmodel import Field, SQLModel
 
 from app.models.base import BaseTable
 
 
-class DingTalkConfig(BaseTable, table=True):
-    """钉钉机器人配置表
+class RobotPlatform(str, Enum):
+    """机器人平台类型"""
 
-    存储钉钉机器人的 Webhook URL 和签名密钥。
+    DINGTALK = "dingtalk"
+    FEISHU = "feishu"
+
+
+class RobotConfig(BaseTable, table=True):
+    """机器人配置表
+
+    存储钉钉/飞书机器人的 Webhook URL 和签名密钥。
     """
 
-    __tablename__ = "dingtalk_configs"
+    __tablename__ = "robot_configs"
 
+    platform: str = Field(default=RobotPlatform.DINGTALK.value, description="平台类型")
     name: str = Field(description="配置名称")
     webhook_url: str = Field(description="Webhook URL")
     secret: str = Field(description="签名密钥")
@@ -24,9 +34,10 @@ class DingTalkConfig(BaseTable, table=True):
     notes: str | None = Field(default=None, description="备注")
 
 
-class DingTalkConfigCreate(SQLModel):
-    """创建钉钉配置"""
+class RobotConfigCreate(SQLModel):
+    """创建机器人配置"""
 
+    platform: str = RobotPlatform.DINGTALK.value
     name: str
     webhook_url: str
     secret: str
@@ -34,9 +45,10 @@ class DingTalkConfigCreate(SQLModel):
     notes: str | None = None
 
 
-class DingTalkConfigUpdate(SQLModel):
-    """更新钉钉配置"""
+class RobotConfigUpdate(SQLModel):
+    """更新机器人配置"""
 
+    platform: str | None = None
     name: str | None = None
     webhook_url: str | None = None
     secret: str | None = None
@@ -44,10 +56,11 @@ class DingTalkConfigUpdate(SQLModel):
     notes: str | None = None
 
 
-class DingTalkConfigResponse(SQLModel):
-    """钉钉配置响应"""
+class RobotConfigResponse(SQLModel):
+    """机器人配置响应"""
 
     id: int
+    platform: str
     name: str
     webhook_url_masked: str  # 脱敏后的 Webhook URL
     secret_masked: str  # 脱敏后的密钥
@@ -72,9 +85,10 @@ class DingTalkConfigResponse(SQLModel):
         return secret[:6] + "****" + secret[-4:]
 
     @classmethod
-    def from_model(cls, config: "DingTalkConfig") -> "DingTalkConfigResponse":
+    def from_model(cls, config: "RobotConfig") -> "RobotConfigResponse":
         return cls(
             id=config.id,
+            platform=config.platform,
             name=config.name,
             webhook_url_masked=cls.mask_url(config.webhook_url),
             secret_masked=cls.mask_secret(config.secret),
@@ -86,9 +100,10 @@ class DingTalkConfigResponse(SQLModel):
         )
 
 
-class DingTalkTestRequest(SQLModel):
-    """钉钉机器人测试请求"""
+class RobotTestRequest(SQLModel):
+    """机器人测试请求"""
 
+    platform: str = RobotPlatform.DINGTALK.value
     webhook_url: str
     secret: str
-    message: str = "DataForge 钉钉机器人配置测试消息"
+    message: str = "DataForge 机器人配置测试消息"

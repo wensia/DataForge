@@ -51,12 +51,41 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
-/** 钉钉配置类型 */
-interface DingTalkConfig {
+/** 平台类型 */
+type RobotPlatform = 'dingtalk' | 'feishu'
+
+/** 平台配置 */
+const PLATFORM_CONFIG = {
+  dingtalk: {
+    label: '钉钉',
+    description: '钉钉群机器人',
+    webhookPlaceholder: 'https://oapi.dingtalk.com/robot/send?access_token=xxx',
+    webhookHint: '从钉钉群设置中获取机器人 Webhook 地址',
+    urlPattern: 'dingtalk',
+  },
+  feishu: {
+    label: '飞书',
+    description: '飞书群机器人',
+    webhookPlaceholder: 'https://open.feishu.cn/open-apis/bot/v2/hook/xxx',
+    webhookHint: '从飞书群设置中获取机器人 Webhook 地址',
+    urlPattern: 'feishu',
+  },
+}
+
+/** 机器人配置类型 */
+interface RobotConfig {
   id: number
+  platform: RobotPlatform
   name: string
   webhook_url_masked: string
   secret_masked: string
@@ -68,64 +97,65 @@ interface DingTalkConfig {
 }
 
 // Query Keys
-const dingtalkKeys = {
-  all: ['dingtalk-configs'] as const,
-  list: () => [...dingtalkKeys.all, 'list'] as const,
+const robotKeys = {
+  all: ['robot-configs'] as const,
+  list: () => [...robotKeys.all, 'list'] as const,
 }
 
-// 获取钉钉配置列表
-function useDingTalkConfigs() {
+// 获取机器人配置列表
+function useRobotConfigs() {
   return useQuery({
-    queryKey: dingtalkKeys.list(),
+    queryKey: robotKeys.list(),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<DingTalkConfig[]>>(
-        '/dingtalk'
-      )
+      const response =
+        await apiClient.get<ApiResponse<RobotConfig[]>>('/robot')
       return response.data.data
     },
   })
 }
 
-// 测试钉钉 Webhook（创建前测试）
-function useTestDingTalkWebhook() {
+// 测试机器人 Webhook（创建前测试）
+function useTestRobotWebhook() {
   return useMutation({
     mutationFn: async (data: {
+      platform: string
       webhook_url: string
       secret: string
       message?: string
     }) => {
       const response = await apiClient.post<
         ApiResponse<{ status: string; error?: string }>
-      >('/dingtalk/test', data)
+      >('/robot/test', data)
       return response.data
     },
   })
 }
 
-// 创建钉钉配置
-function useCreateDingTalkConfig() {
+// 创建机器人配置
+function useCreateRobotConfig() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: {
+      platform: string
       name: string
       webhook_url: string
       secret: string
       notes?: string
     }) => {
-      const response = await apiClient.post<ApiResponse<DingTalkConfig>>(
-        '/dingtalk',
+      const response = await apiClient.post<ApiResponse<RobotConfig>>(
+        '/robot',
         data
       )
       return response.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: dingtalkKeys.all })
+      queryClient.invalidateQueries({ queryKey: robotKeys.all })
     },
   })
 }
 
-// 更新钉钉配置
-function useUpdateDingTalkConfig() {
+// 更新机器人配置
+function useUpdateRobotConfig() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({
@@ -134,6 +164,7 @@ function useUpdateDingTalkConfig() {
     }: {
       id: number
       data: {
+        platform?: string
         name?: string
         webhook_url?: string
         secret?: string
@@ -141,50 +172,62 @@ function useUpdateDingTalkConfig() {
         notes?: string
       }
     }) => {
-      const response = await apiClient.put<ApiResponse<DingTalkConfig>>(
-        `/dingtalk/${id}`,
+      const response = await apiClient.put<ApiResponse<RobotConfig>>(
+        `/robot/${id}`,
         data
       )
       return response.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: dingtalkKeys.all })
+      queryClient.invalidateQueries({ queryKey: robotKeys.all })
     },
   })
 }
 
-// 删除钉钉配置
-function useDeleteDingTalkConfig() {
+// 删除机器人配置
+function useDeleteRobotConfig() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiClient.delete(`/dingtalk/${id}`)
+      await apiClient.delete(`/robot/${id}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: dingtalkKeys.all })
+      queryClient.invalidateQueries({ queryKey: robotKeys.all })
     },
   })
 }
 
-const formSchema = z.object({
-  name: z.string().min(1, '名称不能为空'),
-  webhook_url: z.string().url('请输入有效的 Webhook URL').includes('dingtalk', {
-    message: 'Webhook URL 必须是钉钉地址',
-  }),
-  secret: z.string().min(1, '密钥不能为空'),
-  notes: z.string().optional(),
-})
+// 创建表单验证函数
+const createFormSchema = (platform: RobotPlatform) =>
+  z.object({
+    platform: z.enum(['dingtalk', 'feishu']),
+    name: z.string().min(1, '名称不能为空'),
+    webhook_url: z
+      .string()
+      .url('请输入有效的 Webhook URL')
+      .refine(
+        (url) => url.includes(PLATFORM_CONFIG[platform].urlPattern),
+        `Webhook URL 必须是${PLATFORM_CONFIG[platform].label}地址`
+      ),
+    secret: z.string().min(1, '密钥不能为空'),
+    notes: z.string().optional(),
+  })
 
 const editFormSchema = z.object({
+  platform: z.enum(['dingtalk', 'feishu']).optional(),
   name: z.string().min(1, '名称不能为空'),
-  webhook_url: z.string().url('请输入有效的 Webhook URL').optional().or(z.literal('')),
+  webhook_url: z
+    .string()
+    .url('请输入有效的 Webhook URL')
+    .optional()
+    .or(z.literal('')),
   secret: z.string().optional(),
   is_active: z.boolean().optional(),
   notes: z.string().optional(),
 })
 
-type DingTalkConfigForm = z.infer<typeof formSchema>
-type DingTalkConfigEditForm = z.infer<typeof editFormSchema>
+type RobotConfigForm = z.infer<ReturnType<typeof createFormSchema>>
+type RobotConfigEditForm = z.infer<typeof editFormSchema>
 
 /** 密钥显示组件 */
 function SecretDisplay({ maskedKey }: { maskedKey: string }) {
@@ -208,24 +251,37 @@ function SecretDisplay({ maskedKey }: { maskedKey: string }) {
   )
 }
 
-export function DingTalkSettings() {
-  const { data: configs = [], isLoading, refetch, isRefetching } = useDingTalkConfigs()
+/** 获取平台标签 */
+function getPlatformLabel(platform: RobotPlatform): string {
+  return PLATFORM_CONFIG[platform]?.label || platform
+}
 
-  const testWebhook = useTestDingTalkWebhook()
-  const createConfig = useCreateDingTalkConfig()
-  const updateConfig = useUpdateDingTalkConfig()
-  const deleteConfig = useDeleteDingTalkConfig()
+export function RobotSettings() {
+  const {
+    data: configs = [],
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useRobotConfigs()
+
+  const testWebhook = useTestRobotWebhook()
+  const createConfig = useCreateRobotConfig()
+  const updateConfig = useUpdateRobotConfig()
+  const deleteConfig = useDeleteRobotConfig()
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedConfig, setSelectedConfig] = useState<DingTalkConfig | null>(null)
-  const [editingConfig, setEditingConfig] = useState<DingTalkConfig | null>(null)
+  const [selectedConfig, setSelectedConfig] = useState<RobotConfig | null>(null)
+  const [editingConfig, setEditingConfig] = useState<RobotConfig | null>(null)
   const [isVerified, setIsVerified] = useState(false)
+  const [selectedPlatform, setSelectedPlatform] =
+    useState<RobotPlatform>('dingtalk')
 
-  const form = useForm<DingTalkConfigForm>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<RobotConfigForm>({
+    resolver: zodResolver(createFormSchema(selectedPlatform)),
     defaultValues: {
+      platform: 'dingtalk',
       name: '',
       webhook_url: '',
       secret: '',
@@ -233,9 +289,10 @@ export function DingTalkSettings() {
     },
   })
 
-  const editForm = useForm<DingTalkConfigEditForm>({
+  const editForm = useForm<RobotConfigEditForm>({
     resolver: zodResolver(editFormSchema),
     defaultValues: {
+      platform: 'dingtalk',
       name: '',
       webhook_url: '',
       secret: '',
@@ -243,6 +300,14 @@ export function DingTalkSettings() {
       notes: '',
     },
   })
+
+  // 平台切换时重新验证表单
+  const handlePlatformChange = (platform: RobotPlatform) => {
+    setSelectedPlatform(platform)
+    form.setValue('platform', platform)
+    form.setValue('webhook_url', '')
+    setIsVerified(false)
+  }
 
   // 测试 Webhook
   const handleTest = async () => {
@@ -255,14 +320,17 @@ export function DingTalkSettings() {
       return
     }
 
+    const platformLabel = getPlatformLabel(selectedPlatform)
+
     try {
       const response = await testWebhook.mutateAsync({
+        platform: values.platform,
         webhook_url: values.webhook_url,
         secret: values.secret,
-        message: `[DataForge] 钉钉机器人「${values.name || '未命名'}」配置测试消息`,
+        message: `[DataForge] ${platformLabel}机器人「${values.name || '未命名'}」配置测试消息`,
       })
       if (response.data?.status === 'success') {
-        toast.success('测试成功，请检查钉钉群是否收到消息')
+        toast.success(`测试成功，请检查${platformLabel}群是否收到消息`)
         setIsVerified(true)
       } else {
         toast.error(`测试失败: ${response.data?.error || response.message}`)
@@ -275,16 +343,18 @@ export function DingTalkSettings() {
     }
   }
 
-  const onSubmit = async (data: DingTalkConfigForm) => {
+  const onSubmit = async (data: RobotConfigForm) => {
     if (!isVerified) {
       toast.error('请先点击「测试连接」验证配置')
       return
     }
 
+    const platformLabel = getPlatformLabel(data.platform as RobotPlatform)
+
     try {
       const response = await createConfig.mutateAsync(data)
       if (response.code === 200) {
-        toast.success('钉钉配置创建成功')
+        toast.success(`${platformLabel}机器人配置创建成功`)
         setCreateDialogOpen(false)
         setIsVerified(false)
         form.reset()
@@ -298,9 +368,10 @@ export function DingTalkSettings() {
     }
   }
 
-  const handleEdit = (config: DingTalkConfig) => {
+  const handleEdit = (config: RobotConfig) => {
     setEditingConfig(config)
     editForm.reset({
+      platform: config.platform,
       name: config.name,
       webhook_url: '',
       secret: '',
@@ -310,7 +381,7 @@ export function DingTalkSettings() {
     setEditDialogOpen(true)
   }
 
-  const onEditSubmit = async (data: DingTalkConfigEditForm) => {
+  const onEditSubmit = async (data: RobotConfigEditForm) => {
     if (!editingConfig) return
     try {
       const updateData: Record<string, unknown> = {
@@ -319,6 +390,9 @@ export function DingTalkSettings() {
         notes: data.notes || null,
       }
       // 只有填写了才更新
+      if (data.platform && data.platform !== editingConfig.platform) {
+        updateData.platform = data.platform
+      }
       if (data.webhook_url && data.webhook_url.trim() !== '') {
         updateData.webhook_url = data.webhook_url
       }
@@ -331,8 +405,10 @@ export function DingTalkSettings() {
         data: updateData,
       })
 
+      const platformLabel = getPlatformLabel(editingConfig.platform)
+
       if (response.code === 200) {
-        toast.success('钉钉配置更新成功')
+        toast.success(`${platformLabel}机器人配置更新成功`)
         setEditDialogOpen(false)
         setEditingConfig(null)
         editForm.reset()
@@ -350,7 +426,8 @@ export function DingTalkSettings() {
     if (!selectedConfig) return
     try {
       await deleteConfig.mutateAsync(selectedConfig.id)
-      toast.success('钉钉配置删除成功')
+      const platformLabel = getPlatformLabel(selectedConfig.platform)
+      toast.success(`${platformLabel}机器人配置删除成功`)
       setDeleteDialogOpen(false)
       setSelectedConfig(null)
     } catch (error: unknown) {
@@ -365,12 +442,14 @@ export function DingTalkSettings() {
     setIsVerified(false)
   }
 
+  const platformConfig = PLATFORM_CONFIG[selectedPlatform]
+
   return (
     <div className='flex flex-1 flex-col'>
       <div className='flex-none'>
-        <h3 className='text-lg font-medium'>钉钉机器人配置</h3>
+        <h3 className='text-lg font-medium'>机器人配置</h3>
         <p className='text-muted-foreground text-sm'>
-          管理钉钉群机器人的 Webhook 和签名密钥配置。
+          管理钉钉/飞书群机器人的 Webhook 和签名密钥配置。
         </p>
       </div>
       <Separator className='my-4 flex-none' />
@@ -390,11 +469,21 @@ export function DingTalkSettings() {
               />
               刷新
             </Button>
-            <Button size='sm' onClick={() => {
-              setIsVerified(false)
-              form.reset()
-              setCreateDialogOpen(true)
-            }}>
+            <Button
+              size='sm'
+              onClick={() => {
+                setIsVerified(false)
+                setSelectedPlatform('dingtalk')
+                form.reset({
+                  platform: 'dingtalk',
+                  name: '',
+                  webhook_url: '',
+                  secret: '',
+                  notes: '',
+                })
+                setCreateDialogOpen(true)
+              }}
+            >
               <Plus className='mr-2 h-4 w-4' />
               添加配置
             </Button>
@@ -410,7 +499,7 @@ export function DingTalkSettings() {
         ) : configs.length === 0 ? (
           <Card>
             <CardContent className='flex h-32 items-center justify-center'>
-              <p className='text-muted-foreground'>暂无钉钉机器人配置</p>
+              <p className='text-muted-foreground'>暂无机器人配置</p>
             </CardContent>
           </Card>
         ) : (
@@ -422,6 +511,9 @@ export function DingTalkSettings() {
                     <div className='flex items-center gap-2'>
                       <MessageSquare className='text-muted-foreground h-5 w-5' />
                       <CardTitle className='text-base'>{config.name}</CardTitle>
+                      <Badge variant='outline'>
+                        {getPlatformLabel(config.platform)}
+                      </Badge>
                     </div>
                     <div className='flex gap-2'>
                       <Badge
@@ -448,18 +540,24 @@ export function DingTalkSettings() {
                     </div>
                   </div>
                   <CardDescription>
-                    {config.notes || '钉钉群机器人'}
+                    {config.notes ||
+                      PLATFORM_CONFIG[config.platform]?.description ||
+                      '群机器人'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className='space-y-3'>
                   <div>
-                    <p className='text-muted-foreground mb-1 text-xs'>Webhook URL</p>
-                    <code className='text-muted-foreground text-xs break-all'>
+                    <p className='text-muted-foreground mb-1 text-xs'>
+                      Webhook URL
+                    </p>
+                    <code className='text-muted-foreground break-all text-xs'>
                       {config.webhook_url_masked}
                     </code>
                   </div>
                   <div>
-                    <p className='text-muted-foreground mb-1 text-xs'>签名密钥</p>
+                    <p className='text-muted-foreground mb-1 text-xs'>
+                      签名密钥
+                    </p>
                     <SecretDisplay maskedKey={config.secret_masked} />
                   </div>
                   <div className='flex gap-2'>
@@ -495,19 +593,44 @@ export function DingTalkSettings() {
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className='max-w-lg'>
           <DialogHeader>
-            <DialogTitle>添加钉钉机器人配置</DialogTitle>
+            <DialogTitle>添加机器人配置</DialogTitle>
             <DialogDescription>
-              配置钉钉群机器人的 Webhook URL 和签名密钥。
+              配置钉钉/飞书群机器人的 Webhook URL 和签名密钥。
               <span className='text-destructive font-medium'>
                 必须先通过测试验证才能保存。
               </span>
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className='space-y-4'
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+              <FormField
+                control={form.control}
+                name='platform'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>平台</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value: RobotPlatform) => {
+                        field.onChange(value)
+                        handlePlatformChange(value)
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='选择平台' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='dingtalk'>钉钉</SelectItem>
+                        <SelectItem value='feishu'>飞书</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name='name'
@@ -531,7 +654,7 @@ export function DingTalkSettings() {
                     <FormControl>
                       <Input
                         {...field}
-                        placeholder='https://oapi.dingtalk.com/robot/send?access_token=xxx'
+                        placeholder={platformConfig.webhookPlaceholder}
                         className='font-mono text-sm'
                         onChange={(e) => {
                           field.onChange(e)
@@ -539,9 +662,7 @@ export function DingTalkSettings() {
                         }}
                       />
                     </FormControl>
-                    <FormDescription>
-                      从钉钉群设置中获取机器人 Webhook 地址
-                    </FormDescription>
+                    <FormDescription>{platformConfig.webhookHint}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -557,7 +678,9 @@ export function DingTalkSettings() {
                       <Input
                         {...field}
                         type='password'
-                        placeholder='SEC...'
+                        placeholder={
+                          selectedPlatform === 'dingtalk' ? 'SEC...' : '密钥'
+                        }
                         className='font-mono'
                         onChange={(e) => {
                           field.onChange(e)
@@ -588,10 +711,14 @@ export function DingTalkSettings() {
               />
 
               {/* 验证状态提示 */}
-              <div className={cn(
-                'flex items-center gap-2 rounded-lg border p-3',
-                isVerified ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950'
-              )}>
+              <div
+                className={cn(
+                  'flex items-center gap-2 rounded-lg border p-3',
+                  isVerified
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                    : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950'
+                )}
+              >
                 {isVerified ? (
                   <>
                     <ShieldCheck className='h-5 w-5 text-green-500' />
@@ -623,7 +750,12 @@ export function DingTalkSettings() {
                   onClick={handleTest}
                   disabled={testWebhook.isPending}
                 >
-                  <TestTube className={cn('mr-2 h-4 w-4', testWebhook.isPending && 'animate-pulse')} />
+                  <TestTube
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      testWebhook.isPending && 'animate-pulse'
+                    )}
+                  />
                   {testWebhook.isPending ? '测试中...' : '测试连接'}
                 </Button>
                 <Button
@@ -642,9 +774,9 @@ export function DingTalkSettings() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className='max-w-lg'>
           <DialogHeader>
-            <DialogTitle>编辑钉钉机器人配置</DialogTitle>
+            <DialogTitle>编辑机器人配置</DialogTitle>
             <DialogDescription>
-              修改钉钉机器人配置。Webhook URL 和密钥留空表示不修改。
+              修改机器人配置。Webhook URL 和密钥留空表示不修改。
               <span className='text-destructive font-medium'>
                 如果修改了 Webhook 或密钥，将自动重新验证。
               </span>
@@ -655,6 +787,35 @@ export function DingTalkSettings() {
               onSubmit={editForm.handleSubmit(onEditSubmit)}
               className='space-y-4'
             >
+              <FormField
+                control={editForm.control}
+                name='platform'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>平台</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value='dingtalk'>钉钉</SelectItem>
+                        <SelectItem value='feishu'>飞书</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      平台类型不可更改，如需更改请删除后重新创建
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={editForm.control}
                 name='name'
@@ -719,9 +880,7 @@ export function DingTalkSettings() {
                   <FormItem className='flex flex-row items-center justify-between rounded-lg border p-3'>
                     <div className='space-y-0.5'>
                       <FormLabel>启用状态</FormLabel>
-                      <FormDescription>
-                        是否启用此钉钉机器人配置
-                      </FormDescription>
+                      <FormDescription>是否启用此机器人配置</FormDescription>
                     </div>
                     <FormControl>
                       <Switch
@@ -772,10 +931,11 @@ export function DingTalkSettings() {
         handleConfirm={handleDelete}
         isLoading={deleteConfig.isPending}
         className='max-w-md'
-        title={`删除钉钉配置: ${selectedConfig?.name}?`}
+        title={`删除机器人配置: ${selectedConfig?.name}?`}
         desc={
           <>
-            您即将删除钉钉机器人配置 <strong>{selectedConfig?.name}</strong>。
+            您即将删除{getPlatformLabel(selectedConfig?.platform as RobotPlatform)}机器人配置{' '}
+            <strong>{selectedConfig?.name}</strong>。
             <br />
             此操作无法撤销。
           </>
