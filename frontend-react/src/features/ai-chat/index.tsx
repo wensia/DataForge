@@ -374,7 +374,7 @@ export function AIChat() {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="flex h-screen w-full overflow-hidden bg-background">
+      <div className="flex h-full w-full overflow-hidden bg-background" data-layout="fixed">
         {/* 桌面端侧边栏 */}
         <div
           className={cn(
