@@ -429,10 +429,19 @@ async def send_message(
 
             final_content = response.content or ""
 
-            # 如果 content 为空，使用普通对话获取最终答案
-            # DeepSeek API 在工具调用后可能返回空 content
+            # 如果 content 为空，添加引导提示后重新获取最终答案
+            # DeepSeek 在多轮工具调用后可能不生成最终文本回复
             if not final_content:
-                logger.info("工具调用后 content 为空，使用普通对话获取最终答案")
+                logger.info("工具调用后 content 为空，添加引导提示后重新获取回复")
+
+                # 添加引导提示，明确告诉模型需要根据工具结果生成回复
+                chat_history.append(
+                    AIChatMessage(
+                        role="user",
+                        content="请根据以上工具执行结果，用中文总结回答我最初的问题。使用 Markdown 格式输出。"
+                    )
+                )
+
                 response = await client.chat(chat_history, model=model)
                 total_tokens += response.tokens_used or 0
                 final_content = response.content or ""
@@ -785,17 +794,27 @@ async def send_message_stream(
             if not response.tool_calls:
                 full_content = response.content or ""
 
-                # 如果 content 为空，使用流式输出获取最终答案
-                # DeepSeek API 在工具调用后可能返回空 content
+                # 如果 content 为空，添加引导提示后重新获取最终答案
+                # DeepSeek 在多轮工具调用后可能不生成最终文本回复
                 if not full_content:
-                    logger.info("工具调用后 content 为空，使用流式输出获取最终答案")
+                    logger.info("工具调用后 content 为空，添加引导提示后重新获取回复")
+
+                    # 添加引导提示，明确告诉模型需要根据工具结果生成回复
+                    chat_history.append(
+                        AIChatMessage(
+                            role="user",
+                            content="请根据以上工具执行结果，用中文总结回答我最初的问题。使用 Markdown 格式输出。"
+                        )
+                    )
+
+                    # 使用不带工具的普通对话获取最终回复
                     async for chunk in client.chat_stream(chat_history, model=model):
                         if chunk.content:
                             full_content += chunk.content
                             yield {"type": "content", "content": chunk.content}
                             maybe_save_progress()
                         if chunk.tokens_used:
-                            total_tokens = chunk.tokens_used
+                            total_tokens += chunk.tokens_used
                         if chunk.finish_reason:
                             break
                 else:
