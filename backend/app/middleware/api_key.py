@@ -46,6 +46,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     JWT_PROTECTED_PREFIXES = [
         "/api/v1/users",  # 用户管理（由 JWT 中间件保护）
         "/api/v1/organization",  # 组织架构（由 JWT 中间件保护）
+        "/api/v1/dingtalk",  # 钉钉配置（由 JWT 中间件保护）
     ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
