@@ -75,8 +75,10 @@ export function UserAuthForm({
       // 使用 window.location.href 确保跳转生效
       window.location.href = targetPath
     } catch (error) {
-      // 错误已在 api-client 中处理
-      console.error('登录失败:', error)
+      // 显示 API 返回的错误消息
+      const message =
+        error instanceof Error ? error.message : '登录失败，请稍后重试'
+      toast.error(message)
     }
   }
 
