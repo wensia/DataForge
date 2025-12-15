@@ -15,9 +15,13 @@ import asyncio
 from typing import Any
 
 import gevent
+import nest_asyncio
 from celery import Task
 from loguru import logger
 from sqlmodel import Session
+
+# 允许嵌套事件循环（解决 gevent + asyncio 冲突）
+nest_asyncio.apply()
 
 from app.celery_app import celery_app
 from app.config import settings
