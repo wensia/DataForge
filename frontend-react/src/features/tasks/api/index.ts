@@ -255,3 +255,31 @@ export function useCancelExecution() {
     },
   })
 }
+
+/** 机器人配置类型 */
+export interface RobotConfig {
+  id: number
+  platform: string
+  name: string
+  webhook_url_masked: string
+  secret_masked: string
+  is_active: boolean
+  is_verified: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+// 获取机器人配置列表（用于任务通知选择）
+export function useRobotConfigs() {
+  return useQuery({
+    queryKey: ['robot-configs', 'active'],
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<RobotConfig[]>>(
+        '/robot',
+        { params: { is_active: true } }
+      )
+      return response.data.data
+    },
+  })
+}

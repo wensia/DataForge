@@ -49,6 +49,13 @@ class ScheduledTask(SQLModel, table=True):
     is_system: bool = Field(default=False, description="是否系统任务")
     category: str | None = Field(default=None, index=True, description="任务分类")
 
+    # 通知配置
+    notify_on_success: bool = Field(default=False, description="成功时通知")
+    notify_on_failure: bool = Field(default=False, description="失败时通知")
+    robot_config_id: int | None = Field(
+        default=None, foreign_key="robot_configs.id", description="通知机器人配置ID"
+    )
+
     # 执行统计
     last_run_at: datetime | None = Field(default=None, description="上次执行时间")
     next_run_at: datetime | None = Field(default=None, description="下次执行时间")
@@ -74,6 +81,9 @@ class ScheduledTaskCreate(SQLModel):
     handler_path: str
     handler_kwargs: str | None = None
     category: str | None = None
+    notify_on_success: bool = False
+    notify_on_failure: bool = False
+    robot_config_id: int | None = None
 
 
 class ScheduledTaskUpdate(SQLModel):
@@ -87,6 +97,9 @@ class ScheduledTaskUpdate(SQLModel):
     handler_kwargs: str | None = None
     status: TaskStatus | None = None
     category: str | None = None
+    notify_on_success: bool | None = None
+    notify_on_failure: bool | None = None
+    robot_config_id: int | None = None
 
 
 class ScheduledTaskResponse(SQLModel):
@@ -104,6 +117,9 @@ class ScheduledTaskResponse(SQLModel):
     status: TaskStatus
     is_system: bool
     category: str | None
+    notify_on_success: bool
+    notify_on_failure: bool
+    robot_config_id: int | None
     last_run_at: datetime | None
     next_run_at: datetime | None
     run_count: int

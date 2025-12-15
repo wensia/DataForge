@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -17,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { HandlerParamsForm } from './handler-params-form'
 import {
   Sheet,
@@ -29,7 +31,7 @@ import {
 } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SelectDropdown } from '@/components/select-dropdown'
-import { useCreateTask, useUpdateTask, useTaskHandlers, useTaskCategories } from '../api'
+import { useCreateTask, useUpdateTask, useTaskHandlers, useTaskCategories, useRobotConfigs } from '../api'
 import { taskTypes, categories as presetCategories } from '../data/data'
 import { type Task, type TaskType } from '../data/schema'
 
@@ -52,6 +54,9 @@ const formSchema = z
     handler_path: z.string().min(1, '请选择处理函数'),
     handler_kwargs: z.string().optional(),
     category: z.string().optional(),
+    notify_on_success: z.boolean(),
+    notify_on_failure: z.boolean(),
+    robot_config_id: z.number().nullable(),
   })
   .refine(
     (data) => {
@@ -71,6 +76,19 @@ const formSchema = z
       path: ['cron_expression'],
     }
   )
+  .refine(
+    (data) => {
+      // 如果启用了通知，必须选择机器人
+      if ((data.notify_on_success || data.notify_on_failure) && !data.robot_config_id) {
+        return false
+      }
+      return true
+    },
+    {
+      message: '启用通知时请选择通知机器人',
+      path: ['robot_config_id'],
+    }
+  )
 
 type TaskForm = z.infer<typeof formSchema>
 
@@ -85,6 +103,7 @@ export function TasksMutateDrawer({
 
   const { data: handlers = [] } = useTaskHandlers()
   const { data: existingCategories = [] } = useTaskCategories()
+  const { data: robotConfigs = [] } = useRobotConfigs()
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
 
@@ -111,6 +130,9 @@ export function TasksMutateDrawer({
       handler_path: '',
       handler_kwargs: '',
       category: '',
+      notify_on_success: false,
+      notify_on_failure: false,
+      robot_config_id: null,
     },
   })
 
@@ -128,6 +150,9 @@ export function TasksMutateDrawer({
         handler_path: currentRow.handler_path,
         handler_kwargs: currentRow.handler_kwargs || '',
         category: currentRow.category || '',
+        notify_on_success: currentRow.notify_on_success || false,
+        notify_on_failure: currentRow.notify_on_failure || false,
+        robot_config_id: currentRow.robot_config_id || null,
       })
 
       // 解析 handler_kwargs JSON 填充 paramsValue
@@ -181,6 +206,9 @@ export function TasksMutateDrawer({
             run_date: data.task_type === 'date' ? data.run_date : undefined,
             handler_kwargs: handlerKwargsJson,
             category: data.category || undefined,
+            notify_on_success: data.notify_on_success,
+            notify_on_failure: data.notify_on_failure,
+            robot_config_id: data.robot_config_id,
           },
         })
         toast.success('任务更新成功')
@@ -197,6 +225,9 @@ export function TasksMutateDrawer({
           handler_path: data.handler_path,
           handler_kwargs: handlerKwargsJson,
           category: data.category || undefined,
+          notify_on_success: data.notify_on_success,
+          notify_on_failure: data.notify_on_failure,
+          robot_config_id: data.robot_config_id,
         })
         toast.success('任务创建成功')
       }
@@ -430,6 +461,82 @@ export function TasksMutateDrawer({
                   </div>
                 </div>
               )}
+
+              {/* 通知配置 */}
+              <div className='space-y-4'>
+                <div className='flex items-center gap-2'>
+                  <Bell className='h-4 w-4' />
+                  <Label className='text-sm font-medium'>通知配置</Label>
+                </div>
+                <div className='rounded-md border p-4 space-y-4'>
+                  <FormField
+                    control={form.control}
+                    name='robot_config_id'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>通知机器人</FormLabel>
+                        <SelectDropdown
+                          defaultValue={field.value?.toString() || ''}
+                          onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+                          placeholder='选择机器人'
+                          items={robotConfigs.map((r) => ({
+                            label: `${r.name} (${r.platform === 'dingtalk' ? '钉钉' : '飞书'})`,
+                            value: r.id.toString(),
+                          }))}
+                        />
+                        <FormDescription>
+                          选择任务执行完成后发送通知的机器人
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className='grid grid-cols-2 gap-4'>
+                    <FormField
+                      control={form.control}
+                      name='notify_on_success'
+                      render={({ field }) => (
+                        <FormItem className='flex items-center justify-between rounded-md border p-3'>
+                          <div className='space-y-0.5'>
+                            <FormLabel className='text-sm'>成功通知</FormLabel>
+                            <FormDescription className='text-xs'>
+                              任务执行成功时发送通知
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='notify_on_failure'
+                      render={({ field }) => (
+                        <FormItem className='flex items-center justify-between rounded-md border p-3'>
+                          <div className='space-y-0.5'>
+                            <FormLabel className='text-sm'>失败通知</FormLabel>
+                            <FormDescription className='text-xs'>
+                              任务执行失败时发送通知
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
             </form>
           </Form>
         </ScrollArea>

@@ -18,6 +18,7 @@ from app.scheduler.task_logger import (
     get_log_output,
     init_log_context,
 )
+from app.services.notification_service import send_task_notification
 from app.utils.safe_eval import safe_eval
 
 
@@ -150,7 +151,7 @@ async def execute_task_with_execution(
 
         result_json = json.dumps(result, ensure_ascii=False) if result else None
 
-        def _mark_success() -> TaskExecution | None:
+        def _mark_success() -> tuple[TaskExecution | None, ScheduledTask | None]:
             with Session(engine) as session:
                 execution = session.get(TaskExecution, execution_id)
                 if execution:
@@ -173,11 +174,21 @@ async def execute_task_with_execution(
                 session.commit()
                 if execution:
                     session.refresh(execution)
-                return execution
+                if task:
+                    session.refresh(task)
+                return execution, task
 
-        execution = await asyncio.to_thread(_mark_success)
+        execution, task = await asyncio.to_thread(_mark_success)
 
         logger.info(f"任务 #{task_id} 执行成功, 耗时 {duration_ms}ms")
+
+        # 发送成功通知
+        if task and execution and task.notify_on_success and task.robot_config_id:
+            try:
+                await send_task_notification(task, execution, "success")
+            except Exception as notify_err:
+                logger.error(f"发送成功通知失败: {notify_err}")
+
         return execution  # type: ignore[return-value]
 
     except Exception as e:
@@ -192,7 +203,7 @@ async def execute_task_with_execution(
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
         error_tb = traceback.format_exc()
 
-        def _mark_failed() -> TaskExecution | None:
+        def _mark_failed() -> tuple[TaskExecution | None, ScheduledTask | None]:
             with Session(engine) as session:
                 execution = session.get(TaskExecution, execution_id)
                 if execution:
@@ -216,11 +227,21 @@ async def execute_task_with_execution(
                 session.commit()
                 if execution:
                     session.refresh(execution)
-                return execution
+                if task:
+                    session.refresh(task)
+                return execution, task
 
-        execution = await asyncio.to_thread(_mark_failed)
+        execution, task = await asyncio.to_thread(_mark_failed)
 
         logger.error(f"任务 #{task_id} 执行失败: {e}")
+
+        # 发送失败通知
+        if task and execution and task.notify_on_failure and task.robot_config_id:
+            try:
+                await send_task_notification(task, execution, "failure")
+            except Exception as notify_err:
+                logger.error(f"发送失败通知失败: {notify_err}")
+
         return execution  # type: ignore[return-value]
 
     finally:

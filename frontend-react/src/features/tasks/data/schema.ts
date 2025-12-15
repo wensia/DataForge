@@ -32,6 +32,9 @@ export const taskSchema = z.object({
   status: taskStatusEnum,
   is_system: z.boolean(),
   category: z.string().nullable(),
+  notify_on_success: z.boolean(),
+  notify_on_failure: z.boolean(),
+  robot_config_id: z.number().nullable(),
   last_run_at: z.string().nullable(),
   next_run_at: z.string().nullable(),
   run_count: z.number(),
@@ -53,6 +56,9 @@ export const taskCreateSchema = z.object({
   handler_path: z.string().min(1, '处理函数不能为空'),
   handler_kwargs: z.string().optional(),
   category: z.string().optional(),
+  notify_on_success: z.boolean().optional().default(false),
+  notify_on_failure: z.boolean().optional().default(false),
+  robot_config_id: z.number().nullable().optional(),
 })
 export type TaskCreate = z.infer<typeof taskCreateSchema>
 
@@ -66,6 +72,9 @@ export const taskUpdateSchema = z.object({
   handler_kwargs: z.string().optional(),
   status: taskStatusEnum.optional(),
   category: z.string().optional(),
+  notify_on_success: z.boolean().optional(),
+  notify_on_failure: z.boolean().optional(),
+  robot_config_id: z.number().nullable().optional(),
 })
 export type TaskUpdate = z.infer<typeof taskUpdateSchema>
 
