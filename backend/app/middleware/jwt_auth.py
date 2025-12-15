@@ -23,6 +23,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         "/api/v1/users",  # 用户管理
         "/api/v1/organization",  # 组织架构
         "/api/v1/robot",  # 机器人配置
+        "/api/v1/tasks",  # 定时任务管理
     ]
 
     # 豁免 JWT 认证的路由(即使匹配 PROTECTED_PREFIXES)
