@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Brain, PanelLeft, PanelLeftClose } from 'lucide-react'
 import {
@@ -12,6 +13,7 @@ import {
   type ThreadMessageLike,
   useExternalStoreRuntime,
 } from '@assistant-ui/react'
+import { useShallow } from 'zustand/shallow'
 
 import { Thread } from '@/components/assistant-ui/thread'
 import { ThreadList } from '@/components/assistant-ui/thread-list'
@@ -30,7 +32,7 @@ import {
   useProviders,
   useUpdateConversation,
 } from './api'
-import { useChatStream } from './hooks/use-chat-stream'
+import { useAiChatStreamStore } from './store/chat-stream-store'
 import type { Conversation, Message as ApiMessage } from './types'
 
 type StoreMessage = {
@@ -80,7 +82,40 @@ function toThreadData(conversation: Conversation) {
 }
 
 export function AIChat() {
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const queryClient = useQueryClient()
+  const {
+    bindQueryClient,
+    clearError,
+    conversationId: streamingConversationId,
+    error: streamError,
+    isStreaming: isStreaming,
+    pendingUserMessage,
+    start: startStream,
+    stop: stopStream,
+    streamingContent,
+    streamingMessageId,
+    streamingReasoning,
+  } = useAiChatStreamStore(
+    useShallow((s) => ({
+      bindQueryClient: s.bindQueryClient,
+      clearError: s.clearError,
+      conversationId: s.conversationId,
+      error: s.error,
+      isStreaming: s.isStreaming,
+      pendingUserMessage: s.pendingUserMessage,
+      start: s.start,
+      stop: s.stop,
+      streamingContent: s.streamingContent,
+      streamingMessageId: s.streamingMessageId,
+      streamingReasoning: s.streamingReasoning,
+    }))
+  )
+
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const raw = localStorage.getItem('ai-chat:selectedId')
+    const id = raw ? Number(raw) : null
+    return id && Number.isFinite(id) && id > 0 ? id : null
+  })
   const [selectedProvider, setSelectedProvider] = useState<string>('')
   const [useDeepThinking, setUseDeepThinking] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -99,19 +134,36 @@ export function AIChat() {
   const { data: conversationData, isLoading: isLoadingConversation } = useConversation(selectedId)
   const serverMessages = conversationData?.messages ?? []
 
-  // 流式聊天 Hook（自有后端 SSE）
-  const {
-    isStreaming,
-    streamingContent,
-    streamingReasoning,
-    pendingUserMessage,
-    streamingMessageId,
-    sendMessage,
-    stopStreaming,
-  } = useChatStream({
-    conversationId: selectedId,
-    onError: (err) => toast.error(err),
-  })
+  // 绑定 queryClient，保证切换页面后也能触发数据刷新
+  useEffect(() => {
+    bindQueryClient(queryClient)
+  }, [bindQueryClient, queryClient])
+
+  // 在任意页面触发的流式错误，统一 toast
+  useEffect(() => {
+    if (!streamError) return
+    toast.error(streamError)
+    clearError()
+  }, [clearError, streamError])
+
+  // 记住上次打开的对话（断点续传：返回页面后仍能定位）
+  useEffect(() => {
+    if (!selectedId) {
+      localStorage.removeItem('ai-chat:selectedId')
+      return
+    }
+    localStorage.setItem('ai-chat:selectedId', String(selectedId))
+  }, [selectedId])
+
+  // 如果当前有后台流式任务，但没有选中对话，自动定位到该对话
+  useEffect(() => {
+    if (selectedId) return
+    if (isStreaming && streamingConversationId) {
+      setSelectedId(streamingConversationId)
+    }
+  }, [isStreaming, selectedId, streamingConversationId])
+
+  const isStreamingForCurrent = !!selectedId && isStreaming && streamingConversationId === selectedId
 
   // 设置默认 provider
   useEffect(() => {
@@ -147,22 +199,31 @@ export function AIChat() {
     }))
 
     // 覆盖流式消息内容（如果后端已创建 assistant message 记录）
-    if (isStreaming && streamingMessageId) {
-      const idx = base.findIndex(
-        (m) => m.id === String(streamingMessageId) && m.role === 'assistant'
-      )
+    if (isStreamingForCurrent && streamingMessageId) {
+      const streamingText = formatStreaming(streamingReasoning, streamingContent)
+      const id = String(streamingMessageId)
+      const idx = base.findIndex((m) => m.id === id && m.role === 'assistant')
+
       if (idx >= 0) {
-        const streamingText = formatStreaming(streamingReasoning, streamingContent)
         base[idx] = {
           ...base[idx],
           content: streamingText || base[idx].content,
           status: 'streaming',
         }
+      } else {
+        base.push({
+          id,
+          role: 'assistant',
+          content: streamingText || '正在思考...',
+          createdAt: new Date(),
+          status: 'streaming',
+        })
       }
     }
 
     // 追加待发送的用户消息（避免重复）
     if (
+      isStreamingForCurrent &&
       pendingUserMessage &&
       !base.some((m) => m.role === 'user' && m.content === pendingUserMessage)
     ) {
@@ -175,25 +236,14 @@ export function AIChat() {
       })
     }
 
-    // 如果后端尚未创建 assistant message 记录，追加一个临时的流式响应
-    if (isStreaming && !streamingMessageId && (streamingContent || streamingReasoning)) {
-      base.push({
-        id: 'streaming',
-        role: 'assistant',
-        content: formatStreaming(streamingReasoning, streamingContent) || '正在思考...',
-        createdAt: new Date(),
-        status: 'streaming',
-      })
-    }
-
     return base
   }, [
     serverMessages,
-    isStreaming,
+    isStreamingForCurrent,
     pendingUserMessage,
     streamingContent,
-    streamingReasoning,
     streamingMessageId,
+    streamingReasoning,
   ])
 
   const handleSwitchToNewThread = useCallback(async () => {
@@ -201,21 +251,19 @@ export function AIChat() {
       const conversation = await createConversation.mutateAsync({
         ai_provider: selectedProvider || 'deepseek',
       })
-      stopStreaming()
       setSelectedId(conversation.id)
       setMobileSidebarOpen(false)
     } catch {
       toast.error('创建对话失败')
     }
-  }, [createConversation, selectedProvider, stopStreaming])
+  }, [createConversation, selectedProvider])
 
   const handleSwitchToThread = useCallback(
     (threadId: string) => {
-      stopStreaming()
       setSelectedId(Number(threadId))
       setMobileSidebarOpen(false)
     },
-    [stopStreaming]
+    []
   )
 
   const handleArchiveThread = useCallback(
@@ -262,7 +310,7 @@ export function AIChat() {
   )
 
   const runtime = useExternalStoreRuntime<StoreMessage>({
-    isRunning: isStreaming,
+    isRunning: isStreamingForCurrent,
     isLoading: isLoadingConversation,
     messages: storeMessages,
     convertMessage: (message): ThreadMessageLike => {
@@ -275,10 +323,17 @@ export function AIChat() {
       }
     },
     onNew: async (message) => {
-      if (isStreaming) return
-
       const content = extractText(message).trim()
       if (!content) return
+
+      // 全局只允许一个流式任务：如果其它对话正在生成，引导用户回到该对话
+      if (isStreaming) {
+        toast.error('已有对话正在生成，请先等待完成或点击停止。')
+        if (streamingConversationId) {
+          setSelectedId(streamingConversationId)
+        }
+        return
+      }
 
       let conversationId = selectedId
       if (!conversationId) {
@@ -294,10 +349,15 @@ export function AIChat() {
         }
       }
 
-      await sendMessage(content, selectedProvider || undefined, useDeepThinking, conversationId)
+      await startStream({
+        conversationId,
+        content,
+        aiProvider: selectedProvider || undefined,
+        useDeepThinking,
+      })
     },
     onCancel: async () => {
-      stopStreaming()
+      stopStream()
     },
     adapters: {
       threadList: {
