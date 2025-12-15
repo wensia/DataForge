@@ -180,44 +180,5 @@ class DatabaseScheduler(Scheduler):
         return self.schedule
 
 
-# 注册信号处理器，在任务执行后更新下次运行时间
-from celery.signals import task_postrun  # noqa: E402
-
-
-@task_postrun.connect
-def update_next_run_time(
-    sender: Any = None,
-    task_id: str | None = None,
-    task: Any = None,
-    args: tuple[Any, ...] | None = None,
-    kwargs: dict[str, Any] | None = None,
-    retval: Any = None,
-    state: str | None = None,
-    **extra: Any,
-) -> None:
-    """任务执行后更新数据库中的下次执行时间"""
-    if task is None or kwargs is None:
-        return
-
-    # 只处理我们的任务
-    if task.name != "dataforge.execute_task":
-        return
-
-    db_task_id = kwargs.get("task_id")
-    if not db_task_id:
-        return
-
-    try:
-        with Session(engine) as session:
-            db_task = session.get(ScheduledTask, db_task_id)
-            if db_task:
-                db_task.last_run_at = datetime.now()
-                # 计算下次执行时间
-                if db_task.task_type == TaskType.INTERVAL and db_task.interval_seconds:
-                    db_task.next_run_at = datetime.now() + timedelta(
-                        seconds=db_task.interval_seconds
-                    )
-                session.add(db_task)
-                session.commit()
-    except Exception as e:
-        logger.warning(f"更新任务下次执行时间失败: {e}")
+# 注意: task_postrun 信号处理器已移至 celery_tasks.py
+# 因为该信号需要在 Worker 进程中注册才能生效

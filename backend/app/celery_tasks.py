@@ -12,11 +12,13 @@
 """
 
 import asyncio
+from datetime import datetime, timedelta
 from typing import Any
 
 import gevent
 import nest_asyncio
 from celery import Task
+from celery.signals import task_postrun
 from loguru import logger
 from sqlmodel import Session
 
@@ -26,6 +28,7 @@ nest_asyncio.apply()
 from app.celery_app import celery_app
 from app.config import settings
 from app.database import engine
+from app.models.task import ScheduledTask, TaskType
 from app.models.task_execution import ExecutionStatus, TaskExecution
 
 # ============================================================================
@@ -344,3 +347,57 @@ def cleanup_old_executions() -> dict[str, Any]:
 
     logger.info(f"清理了 {deleted_count} 条过期执行记录")
     return {"success": True, "deleted_count": deleted_count}
+
+
+# ============================================================================
+# 任务执行后信号处理
+# ============================================================================
+
+
+@task_postrun.connect
+def update_next_run_time(
+    sender: Any = None,
+    task_id: str | None = None,
+    task: Any = None,
+    args: tuple[Any, ...] | None = None,
+    kwargs: dict[str, Any] | None = None,
+    retval: Any = None,
+    state: str | None = None,
+    **extra: Any,
+) -> None:
+    """任务执行后更新数据库中的 last_run_at 和 next_run_at
+
+    此信号处理器在 Worker 进程中运行，每次任务执行完成后触发。
+    确保定时任务的下次执行时间被正确更新。
+    """
+    if task is None or kwargs is None:
+        return
+
+    # 只处理我们的定时任务
+    if task.name != "dataforge.execute_task":
+        return
+
+    db_task_id = kwargs.get("task_id")
+    if not db_task_id:
+        return
+
+    try:
+        with Session(engine) as session:
+            db_task = session.get(ScheduledTask, db_task_id)
+            if db_task:
+                now = datetime.now()
+                db_task.last_run_at = now
+
+                # 计算下次执行时间（仅 INTERVAL 类型）
+                if db_task.task_type == TaskType.INTERVAL and db_task.interval_seconds:
+                    db_task.next_run_at = now + timedelta(
+                        seconds=db_task.interval_seconds
+                    )
+                    logger.debug(
+                        f"任务 #{db_task_id} 下次执行时间: {db_task.next_run_at}"
+                    )
+
+                session.add(db_task)
+                session.commit()
+    except Exception as e:
+        logger.warning(f"更新任务 #{db_task_id} 执行时间失败: {e}")
