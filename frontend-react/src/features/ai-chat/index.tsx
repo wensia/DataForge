@@ -410,7 +410,12 @@ export function AIChat() {
                     )
                   }
                   return (
-                    <MessageItem key={message.id} message={message} onCopy={() => handleCopyMessage(message.content)} />
+                    <MessageItem
+                      key={message.id}
+                      message={message}
+                      onCopy={() => handleCopyMessage(message.content)}
+                      onEdit={message.role === 'user' ? (content) => setInputMessage(content) : undefined}
+                    />
                   )
                 })}
                 {/* 待发送的用户消息 */}
@@ -692,6 +697,20 @@ function MessageItem({
               {format(new Date(message.created_at), 'HH:mm')}
               {'tokens_used' in message && message.tokens_used && ` · ${message.tokens_used} tokens`}
             </span>
+            {/* 用户消息的操作按钮 */}
+            {isUser && !isStreaming && (
+              <div className="hidden md:flex items-center gap-0.5">
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopy} title="复制">
+                  {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                </Button>
+                {onEdit && (
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleEdit} title="编辑">
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
+            {/* AI 消息的操作按钮 */}
             {!isUser && !isStreaming && (
               <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopy}>
                 {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}

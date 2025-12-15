@@ -36,6 +36,13 @@ from app.models.call_record import (
     DataSource,
     TranscriptStatus,
 )
+from app.models.dingtalk_config import (
+    DingTalkConfig,
+    DingTalkConfigCreate,
+    DingTalkConfigResponse,
+    DingTalkConfigUpdate,
+    DingTalkTestRequest,
+)
 from app.models.conversation import (
     Conversation,
     ConversationCreate,
@@ -243,4 +250,9 @@ __all__ = [
     "PromptWithAssignments",
     "AssignUsersRequest",
     "PromptAssignmentResponse",
+    "DingTalkConfig",
+    "DingTalkConfigCreate",
+    "DingTalkConfigResponse",
+    "DingTalkConfigUpdate",
+    "DingTalkTestRequest",
 ]
