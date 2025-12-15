@@ -19,7 +19,7 @@ import { PasswordInput } from '@/components/password-input'
 import { useLogin } from '@/features/auth/api'
 
 const formSchema = z.object({
-  email: z.string().min(1, '请输入账号'),
+  username: z.string().min(1, '请输入用户名'),
   password: z
     .string()
     .min(1, '请输入密码')
@@ -41,7 +41,7 @@ export function UserAuthForm({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
     },
   })
@@ -49,7 +49,7 @@ export function UserAuthForm({
   async function onSubmit(data: z.infer<typeof formSchema>) {
     try {
       const result = await loginMutation.mutateAsync({
-        email: data.email,
+        username: data.username,
         password: data.password,
       })
 
@@ -57,7 +57,7 @@ export function UserAuthForm({
       auth.setUser(result.user)
       auth.setAccessToken(result.token.access_token)
 
-      toast.success(`欢迎回来，${result.user.name || result.user.email}！`)
+      toast.success(`欢迎回来，${result.user.name}！`)
 
       // 登录后跳转，优先使用 redirect 参数，回退到首页
       const targetPath = (() => {
@@ -89,12 +89,12 @@ export function UserAuthForm({
       >
         <FormField
           control={form.control}
-          name='email'
+          name='username'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>账号</FormLabel>
+              <FormLabel>用户名</FormLabel>
               <FormControl>
-                <Input placeholder='用户名或邮箱' {...field} />
+                <Input placeholder='请输入 CRM 用户名' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

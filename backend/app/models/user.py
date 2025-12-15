@@ -62,22 +62,18 @@ class User(SQLModel, table=True):
 
 
 class UserCreate(SQLModel):
-    """创建用户请求模型"""
+    """创建用户请求模型（仅用于 CRM 同步场景）"""
 
-    email: str | None = Field(default=None, description="邮箱")
-    password: str | None = Field(
-        default=None, min_length=6, description="密码(至少6位)"
-    )
+    crm_id: str | None = Field(default=None, description="CRM 用户 ID")
     username: str | None = Field(default=None, description="用户名")
+    email: str | None = Field(default=None, description="邮箱")
     name: str = Field(description="显示名称")
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
 
 
 class UserUpdate(SQLModel):
-    """更新用户请求模型"""
+    """更新用户请求模型（仅本地扩展字段）"""
 
-    email: str | None = None
-    password: str | None = None
     role: UserRole | None = None
     is_active: bool | None = None
     ai_enabled: bool | None = None

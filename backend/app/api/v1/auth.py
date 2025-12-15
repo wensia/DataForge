@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 from loguru import logger
 from pydantic import BaseModel
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, select
 
 from app.clients.crm import CRMClient, CRMClientError
 from app.config import settings
@@ -19,26 +19,15 @@ from app.models.user import (
 )
 from app.schemas.response import ResponseModel
 from app.utils.auth import generate_api_key
-from app.utils.jwt_auth import (
-    TokenResponse,
-    create_access_token,
-    get_password_hash,
-    verify_password,
-)
+from app.utils.jwt_auth import TokenResponse, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["认证管理"])
 
 
 class LoginRequest(BaseModel):
-    """登录请求
+    """登录请求 - 仅支持 CRM 认证"""
 
-    支持两种登录方式:
-    1. 邮箱 + 密码 (本地认证)
-    2. 用户名 + 密码 (CRM 认证)
-    """
-
-    username: str | None = None  # CRM 用户名
-    email: str | None = None  # 本地邮箱
+    username: str  # CRM 用户名
     password: str
 
 
@@ -54,8 +43,6 @@ class ProfileUpdateRequest(BaseModel):
     """更新个人资料请求"""
 
     name: str | None = None
-    current_password: str | None = None
-    new_password: str | None = None
 
 
 async def _login_via_crm(
@@ -131,95 +118,37 @@ async def _login_via_crm(
     return user, identities, login_result.access_token
 
 
-async def _login_via_local(
-    email: str, password: str, session: Session
-) -> tuple[User, list[UserIdentity]]:
-    """通过本地数据库登录
-
-    Args:
-        email: 邮箱
-        password: 密码
-        session: 数据库会话
-
-    Returns:
-        tuple: (用户对象, 空身份列表)
-
-    Raises:
-        ValueError: 登录失败时抛出
-    """
-    statement = select(User).where(User.email == email)
-    user = session.exec(statement).first()
-
-    if not user:
-        raise ValueError("邮箱或密码错误")
-
-    if not user.password_hash:
-        raise ValueError("该账号不支持本地登录")
-
-    if not verify_password(password, user.password_hash):
-        raise ValueError("邮箱或密码错误")
-
-    return user, []
-
-
-def _is_email_format(s: str) -> bool:
-    """判断字符串是否为邮箱格式"""
-    return "@" in s and "." in s
-
-
 @router.post("/login", response_model=ResponseModel[LoginResponse])
 async def login(data: LoginRequest):
-    """用户登录
+    """用户登录 - 仅支持 CRM 认证
 
-    支持两种登录方式:
-    1. 用户名 + 密码 (CRM 认证，优先)
-    2. 邮箱 + 密码 (本地认证，备用)
-
-    判断逻辑:
-    - 如果提供 username 字段 → CRM 登录
-    - 如果 email 字段不是邮箱格式 → 视为用户名，CRM 登录
-    - 如果 email 字段是邮箱格式 → 本地登录
+    通过 CRM 系统验证用户名和密码，成功后创建或更新本地用户记录。
 
     Args:
-        data: 登录请求数据
+        data: 登录请求数据（用户名 + 密码）
 
     Returns:
         ResponseModel: 包含用户信息和 token 的响应
     """
-    if not data.username and not data.email:
-        return ResponseModel.error(code=400, message="请提供用户名或邮箱")
+    # 检查 CRM 配置
+    if not settings.crm_base_url or not settings.crm_service_key:
+        return ResponseModel.error(code=503, message="CRM 服务未配置")
 
     with Session(engine) as session:
         user: User | None = None
         identities: list[UserIdentity] = []
         crm_token: str | None = None
 
-        # 获取用于 CRM 登录的用户名（支持 username 字段或非邮箱格式的 email 字段）
-        login_username = data.username or (
-            data.email if data.email and not _is_email_format(data.email) else None
-        )
-
-        # 优先使用 CRM 登录
-        if login_username and settings.crm_base_url and settings.crm_service_key:
-            try:
-                user, identities, crm_token = await _login_via_crm(
-                    login_username, data.password, session
-                )
-            except CRMClientError as e:
-                logger.warning(f"CRM 登录失败: {e.message}")
-                return ResponseModel.error(code=e.status_code, message=e.message)
-            except Exception as e:
-                logger.error(f"CRM 登录异常: {e}")
-                return ResponseModel.error(code=500, message="登录服务异常，请稍后重试")
-
-        # 本地登录（仅当 email 是邮箱格式时）
-        if not user and data.email and _is_email_format(data.email):
-            try:
-                user, identities = await _login_via_local(
-                    data.email, data.password, session
-                )
-            except ValueError as e:
-                return ResponseModel.error(code=401, message=str(e))
+        try:
+            user, identities, crm_token = await _login_via_crm(
+                data.username, data.password, session
+            )
+        except CRMClientError as e:
+            logger.warning(f"CRM 登录失败: {e.message}")
+            return ResponseModel.error(code=e.status_code, message=e.message)
+        except Exception as e:
+            logger.error(f"CRM 登录异常: {e}")
+            return ResponseModel.error(code=500, message="登录服务异常，请稍后重试")
 
         if not user:
             return ResponseModel.error(code=401, message="用户名或密码错误")
@@ -302,7 +231,7 @@ async def get_current_user(request: Request):
 async def update_current_user(request: Request, data: ProfileUpdateRequest):
     """更新当前登录用户信息
 
-    可以更新用户名称和密码
+    仅可更新用户显示名称（其他信息由 CRM 系统管理）
 
     Args:
         data: 更新数据
@@ -324,22 +253,12 @@ async def update_current_user(request: Request, data: ProfileUpdateRequest):
         if data.name is not None:
             user.name = data.name
 
-        # 更新密码
-        if data.new_password:
-            if not data.current_password:
-                return ResponseModel.error(code=400, message="请输入当前密码")
-
-            if not verify_password(data.current_password, user.password_hash):
-                return ResponseModel.error(code=400, message="当前密码错误")
-
-            user.password_hash = get_password_hash(data.new_password)
-
         user.updated_at = datetime.utcnow()
         session.add(user)
         session.commit()
         session.refresh(user)
 
-        logger.info(f"用户更新个人资料: {user.email}")
+        logger.info(f"用户更新个人资料: {user.username or user.email}")
 
         return ResponseModel.success(
             data=UserResponse(

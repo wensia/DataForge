@@ -36,9 +36,9 @@ export interface LoginResponse {
   token: TokenResponse
 }
 
-// 登录请求
+// 登录请求 - 仅支持 CRM 用户名认证
 export interface LoginRequest {
-  email: string
+  username: string
   password: string
 }
 

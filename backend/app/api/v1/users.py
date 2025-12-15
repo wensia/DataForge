@@ -13,7 +13,6 @@ from app.database import engine
 from app.models.api_key import ApiKey
 from app.models.user import (
     User,
-    UserCreate,
     UserIdentity,
     UserResponse,
     UserRole,
@@ -21,7 +20,6 @@ from app.models.user import (
     UserWithIdentities,
 )
 from app.schemas.response import ResponseModel
-from app.utils.jwt_auth import get_password_hash
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
@@ -125,57 +123,6 @@ async def list_users(
         return ResponseModel.error(code=500, message="获取用户列表失败")
 
 
-@router.post("", response_model=ResponseModel)
-async def create_user(request: Request, data: UserCreate):
-    """创建新用户 (仅管理员)
-
-    Args:
-        data: 用户创建数据
-
-    Returns:
-        ResponseModel: 创建的用户信息
-    """
-    if not require_admin(request):
-        return ResponseModel.error(code=403, message="需要管理员权限")
-
-    with Session(engine) as session:
-        # 检查邮箱是否已存在
-        existing = session.exec(select(User).where(User.email == data.email)).first()
-        if existing:
-            return ResponseModel.error(code=400, message="该邮箱已被注册")
-
-        # 创建用户
-        user = User(
-            email=data.email,
-            password_hash=get_password_hash(data.password),
-            name=data.name,
-            role=data.role,
-        )
-
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-        logger.info(f"创建用户: {user.email} (角色: {user.role})")
-
-        return ResponseModel.success(
-            data=UserResponse(
-                id=user.id,
-                email=user.email,
-                username=user.username,
-                crm_id=user.crm_id,
-                name=user.name,
-                phone=user.phone,
-                role=user.role,
-                is_active=user.is_active,
-                ai_enabled=user.ai_enabled,
-                created_at=user.created_at,
-                last_login_at=user.last_login_at,
-            ),
-            message="用户创建成功",
-        )
-
-
 @router.get("/{user_id}", response_model=ResponseModel)
 async def get_user(request: Request, user_id: int):
     """获取用户详情 (仅管理员)
@@ -213,7 +160,10 @@ async def get_user(request: Request, user_id: int):
 
 @router.put("/{user_id}", response_model=ResponseModel)
 async def update_user(request: Request, user_id: int, data: UserUpdate):
-    """更新用户 (仅管理员)
+    """更新用户本地扩展信息 (仅管理员)
+
+    仅可更新本地扩展字段（角色、启用状态、AI功能），
+    用户基本信息由 CRM 系统管理。
 
     Args:
         user_id: 用户ID
@@ -230,24 +180,15 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
         if not user:
             return ResponseModel.error(code=404, message="用户不存在")
 
-        # 更新字段
-        if data.email is not None:
-            # 检查邮箱是否被其他用户使用
-            existing = session.exec(
-                select(User).where(User.email == data.email, User.id != user_id)
-            ).first()
-            if existing:
-                return ResponseModel.error(code=400, message="该邮箱已被使用")
-            user.email = data.email
-
-        if data.password is not None:
-            user.password_hash = get_password_hash(data.password)
-
+        # 只更新本地扩展字段
         if data.role is not None:
             user.role = data.role
 
         if data.is_active is not None:
             user.is_active = data.is_active
+
+        if data.ai_enabled is not None:
+            user.ai_enabled = data.ai_enabled
 
         user.updated_at = datetime.utcnow()
 
@@ -255,7 +196,7 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
         session.commit()
         session.refresh(user)
 
-        logger.info(f"更新用户: {user.email}")
+        logger.info(f"更新用户: {user.username or user.email}")
 
         return ResponseModel.success(
             data=UserResponse(
@@ -273,38 +214,6 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
             ),
             message="用户更新成功",
         )
-
-
-@router.delete("/{user_id}", response_model=ResponseModel)
-async def delete_user(request: Request, user_id: int):
-    """删除用户 (仅管理员)
-
-    Args:
-        user_id: 用户ID
-
-    Returns:
-        ResponseModel: 删除结果
-    """
-    if not require_admin(request):
-        return ResponseModel.error(code=403, message="需要管理员权限")
-
-    # 防止删除自己
-    current_user_id = getattr(request.state, "user_id", None)
-    if current_user_id == user_id:
-        return ResponseModel.error(code=400, message="不能删除自己的账号")
-
-    with Session(engine) as session:
-        user = session.get(User, user_id)
-        if not user:
-            return ResponseModel.error(code=404, message="用户不存在")
-
-        email = user.email
-        session.delete(user)
-        session.commit()
-
-        logger.info(f"删除用户: {email}")
-
-        return ResponseModel.success(data={"id": user_id}, message="用户删除成功")
 
 
 @router.post("/{user_id}/api-keys/{key_id}", response_model=ResponseModel)

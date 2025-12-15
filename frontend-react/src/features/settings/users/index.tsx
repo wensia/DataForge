@@ -16,15 +16,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import {
   RefreshCw,
-  Plus,
-  Trash2,
   CheckCircle,
   XCircle,
   Shield,
   User as UserIcon,
-  Dices,
-  Copy,
-  Check,
   Pencil,
   Bot,
 } from 'lucide-react'
@@ -32,7 +27,6 @@ import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
 import type { ApiResponse } from '@/lib/types'
 import { DataPageContent } from '@/components/layout/data-page-layout'
-import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,7 +62,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTablePagination, DataTableColumnHeader } from '@/components/data-table'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -81,7 +74,8 @@ import {
 /** 用户类型 */
 interface User {
   id: number
-  email: string
+  email: string | null
+  username: string | null
   name: string
   role: string
   is_active: boolean
@@ -109,26 +103,7 @@ function useUsers() {
   })
 }
 
-// 创建用户
-function useCreateUser() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (data: {
-      email?: string
-      password: string
-      name: string
-      role: string
-    }) => {
-      const response = await apiClient.post<ApiResponse<User>>('/users', data)
-      return response.data.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.all })
-    },
-  })
-}
-
-// 更新用户
+// 更新用户（仅本地扩展字段）
 function useUpdateUser() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -138,8 +113,6 @@ function useUpdateUser() {
     }: {
       id: number
       data: {
-        email?: string
-        password?: string
         role?: string
         is_active?: boolean
         ai_enabled?: boolean
@@ -150,19 +123,6 @@ function useUpdateUser() {
         data
       )
       return response.data.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.all })
-    },
-  })
-}
-
-// 删除用户
-function useDeleteUser() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: number) => {
-      await apiClient.delete(`/users/${id}`)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all })
@@ -188,66 +148,22 @@ const roleOptions = [
   { value: 'user', label: '普通用户', icon: UserIcon },
 ]
 
-const formSchema = z.object({
-  email: z.string().optional().or(z.literal('')),
-  password: z.string().min(6, '密码至少 6 个字符'),
-  name: z.string().min(1, '名称不能为空'),
-  role: z.string().min(1, '请选择角色'),
-})
-
 const editFormSchema = z.object({
-  email: z.string().optional().or(z.literal('')),
-  password: z.string().min(6, '密码至少 6 个字符').optional().or(z.literal('')),
   role: z.string().min(1, '请选择角色'),
   is_active: z.boolean(),
+  ai_enabled: z.boolean(),
 })
 
-/** 生成随机密码：2位大写 + 2位小写 + 4位数字 */
-function generateRandomPassword(): string {
-  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
-  const digits = '0123456789'
-
-  let password = ''
-  for (let i = 0; i < 2; i++) {
-    password += uppercase[Math.floor(Math.random() * uppercase.length)]
-  }
-  for (let i = 0; i < 2; i++) {
-    password += lowercase[Math.floor(Math.random() * lowercase.length)]
-  }
-  for (let i = 0; i < 4; i++) {
-    password += digits[Math.floor(Math.random() * digits.length)]
-  }
-  return password
-}
-
-type UserForm = z.infer<typeof formSchema>
 type EditUserForm = z.infer<typeof editFormSchema>
 
 export function UsersSettings() {
   const { data: users = [], isLoading, refetch, isRefetching } = useUsers()
-
-  const createUser = useCreateUser()
   const updateUser = useUpdateUser()
-  const deleteUser = useDeleteUser()
 
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
-  const [createdCredentials, setCreatedCredentials] = useState<{
-    name: string
-    password: string
-  } | null>(null)
-  const [editedCredentials, setEditedCredentials] = useState<{
-    name: string
-    password: string
-  } | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [editedCopied, setEditedCopied] = useState(false)
 
   const columns: ColumnDef<User>[] = [
     {
@@ -260,13 +176,14 @@ export function UsersSettings() {
       },
     },
     {
-      accessorKey: 'email',
+      accessorKey: 'username',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title='账号' />
+        <DataTableColumnHeader column={column} title='用户名' />
       ),
       cell: ({ row }) => {
+        const username = row.getValue('username') as string | null
         return (
-          <span className='text-muted-foreground'>{row.getValue('email')}</span>
+          <span className='text-muted-foreground'>{username || '-'}</span>
         )
       },
     },
@@ -309,6 +226,21 @@ export function UsersSettings() {
       },
     },
     {
+      accessorKey: 'ai_enabled',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title='AI 对话' />
+      ),
+      cell: ({ row }) => {
+        const aiEnabled = row.getValue('ai_enabled') as boolean
+        return (
+          <Badge variant={aiEnabled ? 'outline' : 'secondary'} className='gap-1'>
+            <Bot className='h-3 w-3' />
+            {aiEnabled ? '已开启' : '未开启'}
+          </Badge>
+        )
+      },
+    },
+    {
       accessorKey: 'last_login_at',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='最后登录' />
@@ -317,19 +249,6 @@ export function UsersSettings() {
         return (
           <span className='text-muted-foreground text-sm'>
             {formatDateTime(row.getValue('last_login_at'))}
-          </span>
-        )
-      },
-    },
-    {
-      accessorKey: 'created_at',
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title='创建时间' />
-      ),
-      cell: ({ row }) => {
-        return (
-          <span className='text-muted-foreground text-sm'>
-            {formatDateTime(row.getValue('created_at'))}
           </span>
         )
       },
@@ -364,17 +283,6 @@ export function UsersSettings() {
             >
               {user.is_active ? '禁用' : '启用'}
             </Button>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='text-destructive hover:text-destructive h-8 w-8'
-              onClick={() => {
-                setSelectedUser(user)
-                setDeleteDialogOpen(true)
-              }}
-            >
-              <Trash2 className='h-4 w-4' />
-            </Button>
           </div>
         )
       },
@@ -396,23 +304,12 @@ export function UsersSettings() {
     getSortedRowModel: getSortedRowModel(),
   })
 
-  const form = useForm<UserForm>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      name: '',
-      role: 'user',
-    },
-  })
-
   const editForm = useForm<EditUserForm>({
     resolver: zodResolver(editFormSchema),
     defaultValues: {
-      email: '',
-      password: '',
       role: 'user',
       is_active: true,
+      ai_enabled: false,
     },
   })
 
@@ -420,53 +317,37 @@ export function UsersSettings() {
   useEffect(() => {
     if (editingUser) {
       editForm.reset({
-        email: editingUser.email || '',
-        password: '',
         role: editingUser.role,
         is_active: editingUser.is_active,
+        ai_enabled: editingUser.ai_enabled,
       })
     }
   }, [editingUser, editForm])
-
-  const onSubmit = async (data: UserForm) => {
-    try {
-      const password = data.password
-      await createUser.mutateAsync(data)
-      toast.success('用户创建成功')
-      setCreateDialogOpen(false)
-      // 保存凭证用于复制
-      setCreatedCredentials({ name: data.name, password })
-      form.reset()
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : '创建失败，请重试'
-      toast.error(message)
-    }
-  }
 
   const onEditSubmit = async (data: EditUserForm) => {
     if (!editingUser) return
     try {
       // 只发送有变化的字段
       const updateData: {
-        email?: string
-        password?: string
         role?: string
         is_active?: boolean
+        ai_enabled?: boolean
       } = {}
 
-      if (data.email && data.email !== editingUser.email) {
-        updateData.email = data.email
-      }
-      const hasNewPassword = !!data.password
-      if (data.password) {
-        updateData.password = data.password
-      }
       if (data.role !== editingUser.role) {
         updateData.role = data.role
       }
       if (data.is_active !== editingUser.is_active) {
         updateData.is_active = data.is_active
+      }
+      if (data.ai_enabled !== editingUser.ai_enabled) {
+        updateData.ai_enabled = data.ai_enabled
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast.info('没有需要更新的内容')
+        setEditDialogOpen(false)
+        return
       }
 
       await updateUser.mutateAsync({
@@ -475,86 +356,11 @@ export function UsersSettings() {
       })
       toast.success('用户更新成功')
       setEditDialogOpen(false)
-
-      // 如果设置了新密码，显示凭证复制弹窗
-      if (hasNewPassword && data.password) {
-        setEditedCredentials({
-          name: editingUser.name,
-          password: data.password,
-        })
-      }
-
       setEditingUser(null)
       editForm.reset()
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : '更新失败，请重试'
-      toast.error(message)
-    }
-  }
-
-  const handleCopyCredentials = async () => {
-    if (!createdCredentials) return
-    const text = `用户名: ${createdCredentials.name}\n密码: ${createdCredentials.password}`
-
-    try {
-      // 优先使用现代 Clipboard API（需要 HTTPS）
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        // HTTP 环境下的备用方案
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.style.position = 'fixed'
-        textarea.style.left = '-9999px'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-      }
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-      toast.success('凭证已复制到剪贴板')
-    } catch {
-      toast.error('复制失败，请手动复制')
-    }
-  }
-
-  const handleCopyEditedCredentials = async () => {
-    if (!editedCredentials) return
-    const text = `用户名: ${editedCredentials.name}\n密码: ${editedCredentials.password}`
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.style.position = 'fixed'
-        textarea.style.left = '-9999px'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-      }
-      setEditedCopied(true)
-      setTimeout(() => setEditedCopied(false), 2000)
-      toast.success('凭证已复制到剪贴板')
-    } catch {
-      toast.error('复制失败，请手动复制')
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!selectedUser) return
-    try {
-      await deleteUser.mutateAsync(selectedUser.id)
-      toast.success('用户删除成功')
-      setDeleteDialogOpen(false)
-      setSelectedUser(null)
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : '删除失败，请重试'
       toast.error(message)
     }
   }
@@ -567,14 +373,17 @@ export function UsersSettings() {
           <div className='flex w-full items-center justify-between'>
             <div className='flex items-center gap-4'>
               <h1 className='text-lg font-semibold'>用户管理</h1>
+              <span className='text-muted-foreground text-sm'>
+                用户数据来自 CRM 系统，仅可编辑本地扩展设置
+              </span>
+            </div>
+            <div className='flex items-center gap-4'>
               <Input
-                placeholder='搜索用户名或账号...'
+                placeholder='搜索用户...'
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 className='w-64'
               />
-            </div>
-            <div className='flex gap-2'>
               <Button
                 variant='outline'
                 size='sm'
@@ -584,10 +393,6 @@ export function UsersSettings() {
                 <RefreshCw
                   className={cn('h-4 w-4', isRefetching && 'animate-spin')}
                 />
-              </Button>
-              <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-                <Plus className='mr-2 h-4 w-4' />
-                添加用户
               </Button>
             </div>
           </div>
@@ -676,131 +481,7 @@ export function UsersSettings() {
           )}
       </DataPageContent>
 
-      {/* 创建用户对话框 */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>添加用户</DialogTitle>
-            <DialogDescription>创建新的系统用户账号。</DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className='space-y-4'
-            >
-              <FormField
-                control={form.control}
-                name='name'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>名称</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder='输入用户名称' />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='email'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      账号 <span className='text-muted-foreground'>(可选)</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type='text'
-                        placeholder='用户名或邮箱'
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='password'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>密码</FormLabel>
-                    <div className='flex gap-2'>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='text'
-                          placeholder='输入密码'
-                          autoComplete='new-password'
-                        />
-                      </FormControl>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='icon'
-                        onClick={() => {
-                          const pwd = generateRandomPassword()
-                          form.setValue('password', pwd)
-                        }}
-                        title='生成随机密码'
-                      >
-                        <Dices className='h-4 w-4' />
-                      </Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='role'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>角色</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='选择角色' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {roleOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <div className='flex items-center gap-2'>
-                              <option.icon className='h-4 w-4' />
-                              {option.label}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button
-                  variant='outline'
-                  type='button'
-                  onClick={() => setCreateDialogOpen(false)}
-                >
-                  取消
-                </Button>
-                <Button type='submit' disabled={createUser.isPending}>
-                  {createUser.isPending ? '创建中...' : '创建'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* 编辑用户对话框 */}
+      {/* 编辑用户对话框 - 仅可编辑本地扩展字段 */}
       <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
@@ -813,9 +494,10 @@ export function UsersSettings() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑用户</DialogTitle>
+            <DialogTitle>编辑用户设置</DialogTitle>
             <DialogDescription>
-              修改用户信息。用户名不可修改。
+              修改用户的本地扩展设置（角色、状态、AI 功能）。
+              用户基本信息由 CRM 系统管理。
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
@@ -825,68 +507,17 @@ export function UsersSettings() {
             >
               {/* 用户名 - 只读 */}
               <div className='space-y-2'>
-                <label className='text-sm font-medium'>名称</label>
-                <Input
-                  value={editingUser?.name || ''}
-                  disabled
-                  className='bg-muted'
-                />
-                <p className='text-muted-foreground text-xs'>用户名不可修改</p>
+                <label className='text-sm font-medium'>用户</label>
+                <div className='flex items-center gap-2 rounded-md border bg-muted/50 p-3'>
+                  <UserIcon className='h-4 w-4 text-muted-foreground' />
+                  <span className='font-medium'>{editingUser?.name}</span>
+                  {editingUser?.username && (
+                    <span className='text-muted-foreground'>
+                      ({editingUser.username})
+                    </span>
+                  )}
+                </div>
               </div>
-
-              <FormField
-                control={editForm.control}
-                name='email'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>账号</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type='text'
-                        placeholder='用户名或邮箱'
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name='password'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      新密码{' '}
-                      <span className='text-muted-foreground'>(留空不修改)</span>
-                    </FormLabel>
-                    <div className='flex gap-2'>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='text'
-                          placeholder='输入新密码'
-                          autoComplete='new-password'
-                        />
-                      </FormControl>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='icon'
-                        onClick={() => {
-                          const pwd = generateRandomPassword()
-                          editForm.setValue('password', pwd)
-                        }}
-                        title='生成随机密码'
-                      >
-                        <Dices className='h-4 w-4' />
-                      </Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <FormField
                 control={editForm.control}
@@ -937,6 +568,27 @@ export function UsersSettings() {
                 )}
               />
 
+              <FormField
+                control={editForm.control}
+                name='ai_enabled'
+                render={({ field }) => (
+                  <FormItem className='flex items-center justify-between rounded-lg border p-3'>
+                    <div className='space-y-0.5'>
+                      <FormLabel>AI 对话功能</FormLabel>
+                      <p className='text-muted-foreground text-sm'>
+                        开启后用户可以使用 AI 对话功能
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
               <DialogFooter>
                 <Button
                   variant='outline'
@@ -955,134 +607,6 @@ export function UsersSettings() {
               </DialogFooter>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
-
-      {/* 删除确认对话框 */}
-      <ConfirmDialog
-        destructive
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        handleConfirm={handleDelete}
-        isLoading={deleteUser.isPending}
-        className='max-w-md'
-        title={`删除用户: ${selectedUser?.name}?`}
-        desc={
-          <>
-            您即将删除用户 <strong>{selectedUser?.name}</strong>
-            {selectedUser?.email && ` (${selectedUser.email})`}。
-            <br />
-            此操作无法撤销。
-          </>
-        }
-        confirmText='删除'
-      />
-
-      {/* 凭证复制对话框 */}
-      <Dialog
-        open={!!createdCredentials}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCreatedCredentials(null)
-            setCopied(false)
-          }
-        }}
-      >
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle>用户创建成功</DialogTitle>
-            <DialogDescription>
-              请保存以下登录凭证，密码不会再次显示。
-            </DialogDescription>
-          </DialogHeader>
-          <div className='space-y-3 rounded-md border bg-muted/50 p-4'>
-            <div className='flex items-center justify-between'>
-              <span className='text-muted-foreground text-sm'>用户名</span>
-              <span className='font-mono font-medium'>
-                {createdCredentials?.name}
-              </span>
-            </div>
-            <Separator />
-            <div className='flex items-center justify-between'>
-              <span className='text-muted-foreground text-sm'>密码</span>
-              <span className='font-mono font-medium'>
-                {createdCredentials?.password}
-              </span>
-            </div>
-          </div>
-          <DialogFooter className='sm:justify-between'>
-            <Button
-              variant='outline'
-              onClick={() => {
-                setCreatedCredentials(null)
-                setCopied(false)
-              }}
-            >
-              关闭
-            </Button>
-            <Button onClick={handleCopyCredentials} className='gap-2'>
-              {copied ? (
-                <Check className='h-4 w-4' />
-              ) : (
-                <Copy className='h-4 w-4' />
-              )}
-              {copied ? '已复制' : '复制凭证'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 编辑用户凭证复制对话框 */}
-      <Dialog
-        open={!!editedCredentials}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditedCredentials(null)
-            setEditedCopied(false)
-          }
-        }}
-      >
-        <DialogContent className='sm:max-w-md'>
-          <DialogHeader>
-            <DialogTitle>密码已更新</DialogTitle>
-            <DialogDescription>
-              请保存以下登录凭证，密码不会再次显示。
-            </DialogDescription>
-          </DialogHeader>
-          <div className='space-y-3 rounded-md border bg-muted/50 p-4'>
-            <div className='flex items-center justify-between'>
-              <span className='text-muted-foreground text-sm'>用户名</span>
-              <span className='font-mono font-medium'>
-                {editedCredentials?.name}
-              </span>
-            </div>
-            <Separator />
-            <div className='flex items-center justify-between'>
-              <span className='text-muted-foreground text-sm'>新密码</span>
-              <span className='font-mono font-medium'>
-                {editedCredentials?.password}
-              </span>
-            </div>
-          </div>
-          <DialogFooter className='sm:justify-between'>
-            <Button
-              variant='outline'
-              onClick={() => {
-                setEditedCredentials(null)
-                setEditedCopied(false)
-              }}
-            >
-              关闭
-            </Button>
-            <Button onClick={handleCopyEditedCredentials} className='gap-2'>
-              {editedCopied ? (
-                <Check className='h-4 w-4' />
-              ) : (
-                <Copy className='h-4 w-4' />
-              )}
-              {editedCopied ? '已复制' : '复制凭证'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
