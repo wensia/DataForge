@@ -58,6 +58,7 @@ class DatabaseScheduleEntry(ScheduleEntry):
             kwargs=kwargs,
             options={},
             app=app or current_app,
+            last_run_at=task.last_run_at,  # 关键：传递上次执行时间给 is_due()
         )
 
     def _make_schedule(self, task: ScheduledTask) -> schedule:

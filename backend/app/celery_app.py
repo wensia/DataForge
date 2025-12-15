@@ -61,6 +61,9 @@ celery_app.conf.update(
     worker_soft_shutdown_timeout=settings.celery_worker_soft_shutdown_timeout,
     # ---------- Beat 配置 ----------
     beat_scheduler="app.celery_scheduler:DatabaseScheduler",
+    # 数据库调度器需要更频繁检查任务（默认 300 秒太长）
+    # 官方文档: django-celery-beat 推荐 5 秒
+    beat_max_loop_interval=5,
 )
 
 
