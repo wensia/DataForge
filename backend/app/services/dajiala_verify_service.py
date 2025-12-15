@@ -50,12 +50,22 @@ async def verify_dajiala_credentials(
 
             # 检查响应
             code = result.get("code")
+            remain_money = result.get("remain_money")
+
+            # 优先检查 remain_money - 如果有余额信息，说明 key 是有效的
+            # code 101 "get articles failed" 只是表示测试公众号没有文章，不代表 key 无效
+            if remain_money is not None:
+                return {
+                    "success": True,
+                    "message": "验证成功",
+                    "remain_money": remain_money,
+                }
 
             if code == 0:
                 return {
                     "success": True,
                     "message": "验证成功",
-                    "remain_money": result.get("remain_money"),
+                    "remain_money": remain_money,
                 }
             elif code == 10002:
                 return {
