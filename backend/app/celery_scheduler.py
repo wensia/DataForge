@@ -23,62 +23,87 @@ from app.models.task import ScheduledTask, TaskStatus, TaskType
 
 
 class DatabaseScheduleEntry(ScheduleEntry):
-    """数据库任务调度项"""
+    """数据库任务调度项
+
+    重要: __init__ 签名必须与 ScheduleEntry 兼容，因为 _next_instance() 会创建新实例。
+
+    支持两种初始化方式：
+    1. 从数据库任务创建：使用类方法 from_task()
+    2. 从 _next_instance 复制：使用标准 ScheduleEntry 参数
+    """
+
+    # 保存数据库任务 ID，用于信号处理器更新执行时间
+    task_model_id: int | None = None
 
     def __init__(
         self,
-        task: ScheduledTask | str | None = None,
+        name: str | None = None,
+        task: str | None = None,
+        last_run_at: datetime | None = None,
+        total_run_count: int | None = None,
+        schedule: Any = None,
+        args: tuple = (),
+        kwargs: dict | None = None,
+        options: dict | None = None,
+        relative: bool = False,
         app: Any = None,
-        **entry_kwargs: Any,
+        **extra_kwargs: Any,
     ) -> None:
-        # 支持两种初始化方式：
-        # 1. 从数据库任务创建（task 是 ScheduledTask 对象）
-        # 2. 从 _next_instance 复制（task 是字符串或 entry_kwargs 包含参数）
+        # 提取自定义参数
+        self.task_model_id = extra_kwargs.pop("task_model_id", None)
 
-        if isinstance(task, ScheduledTask):
-            # 从数据库任务创建
-            self.task_model = task
+        super().__init__(
+            name=name,
+            task=task,
+            last_run_at=last_run_at,
+            total_run_count=total_run_count,
+            schedule=schedule,
+            args=args,
+            kwargs=kwargs,
+            options=options,
+            relative=relative,
+            app=app,
+        )
 
-            # 构建 Celery 任务参数
-            name = f"task_{task.id}_{task.name}"
-            celery_task = "dataforge.execute_task"
+    @classmethod
+    def from_task(cls, task: ScheduledTask, app: Any = None) -> "DatabaseScheduleEntry":
+        """从数据库任务创建调度项"""
+        # 构建 Celery 任务参数
+        name = f"task_{task.id}_{task.name}"
+        celery_task = "dataforge.execute_task"
 
-            # 解析 handler_kwargs
-            handler_kwargs: dict[str, Any] = {}
-            if task.handler_kwargs:
-                try:
-                    handler_kwargs = json.loads(task.handler_kwargs)
-                except json.JSONDecodeError:
-                    pass
+        # 解析 handler_kwargs
+        handler_kwargs: dict[str, Any] = {}
+        if task.handler_kwargs:
+            try:
+                handler_kwargs = json.loads(task.handler_kwargs)
+            except json.JSONDecodeError:
+                pass
 
-            # 任务参数
-            kwargs = {
-                "task_id": task.id,
-                "handler_path": task.handler_path,
-                "handler_kwargs": handler_kwargs,
-                "trigger_type": "scheduled",
-            }
+        # 任务参数
+        kwargs = {
+            "task_id": task.id,
+            "handler_path": task.handler_path,
+            "handler_kwargs": handler_kwargs,
+            "trigger_type": "scheduled",
+        }
 
-            # 创建调度器
-            sched = self._make_schedule(task)
+        # 创建调度器
+        sched = cls._make_schedule_static(task)
 
-            super().__init__(
-                name=name,
-                task=celery_task,
-                schedule=sched,
-                kwargs=kwargs,
-                options={},
-                app=app or current_app,
-                last_run_at=task.last_run_at,  # 关键：传递上次执行时间给 is_due()
-            )
-        else:
-            # 从 _next_instance 复制（Celery 内部调用）
-            # 提取并保存 task_model，然后传递其余参数给父类
-            self.task_model = entry_kwargs.pop("task_model", None)
-            # task 参数在这里是 Celery 任务名称字符串，直接传递给父类
-            super().__init__(task=task, app=app, **entry_kwargs)
+        return cls(
+            name=name,
+            task=celery_task,
+            schedule=sched,
+            kwargs=kwargs,
+            options={},
+            app=app or current_app,
+            last_run_at=task.last_run_at,
+            task_model_id=task.id,  # 保存任务 ID
+        )
 
-    def _make_schedule(self, task: ScheduledTask) -> schedule:
+    @staticmethod
+    def _make_schedule_static(task: ScheduledTask) -> schedule:
         """根据任务类型创建 Celery schedule"""
         if task.task_type == TaskType.CRON and task.cron_expression:
             # 解析 cron 表达式 (分 时 日 月 周)
@@ -108,6 +133,19 @@ class DatabaseScheduleEntry(ScheduleEntry):
         # 默认返回一个很长的间隔（相当于永不执行）
         return schedule(timedelta(days=36500))
 
+    def _next_instance(self, last_run_at: datetime | None = None, only_update_last_run_at: bool = False) -> "DatabaseScheduleEntry":
+        """创建下一个实例，保留 task_model_id"""
+        return self.__class__(
+            name=self.name,
+            task=self.task,
+            schedule=self.schedule,
+            kwargs=self.kwargs,
+            options=self.options,
+            last_run_at=self._default_now() if only_update_last_run_at else last_run_at,
+            total_run_count=self.total_run_count + 1,
+            app=self.app,
+            task_model_id=self.task_model_id,  # 保留任务 ID
+        )
 
 class DatabaseScheduler(Scheduler):
     """从数据库加载任务的调度器"""
@@ -140,7 +178,7 @@ class DatabaseScheduler(Scheduler):
                 for task in tasks:
                     entry_name = f"task_{task.id}_{task.name}"
                     try:
-                        entry = DatabaseScheduleEntry(task, app=self.app)
+                        entry = DatabaseScheduleEntry.from_task(task, app=self.app)
                         new_schedule[entry_name] = entry
                         logger.debug(f"加载任务调度: {task.name}")
                     except Exception as e:
