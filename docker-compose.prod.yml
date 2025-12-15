@@ -118,6 +118,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      # Beat 没有内置健康检查命令，禁用继承的健康检查
+      disable: true
 
 networks:
   dataforge-network:
