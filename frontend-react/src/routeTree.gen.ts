@@ -40,6 +40,7 @@ import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsFeishuRouteImport } from './routes/_authenticated/settings/feishu'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
+import { Route as AuthenticatedSettingsDingtalkRouteImport } from './routes/_authenticated/settings/dingtalk'
 import { Route as AuthenticatedSettingsAsrRouteImport } from './routes/_authenticated/settings/asr'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_authenticated/settings/api-keys'
@@ -217,6 +218,12 @@ const AuthenticatedSettingsDisplayRoute =
     path: '/display',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedSettingsDingtalkRoute =
+  AuthenticatedSettingsDingtalkRouteImport.update({
+    id: '/dingtalk',
+    path: '/dingtalk',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsAsrRoute =
   AuthenticatedSettingsAsrRouteImport.update({
     id: '/asr',
@@ -302,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/asr': typeof AuthenticatedSettingsAsrRoute
+  '/settings/dingtalk': typeof AuthenticatedSettingsDingtalkRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -343,6 +351,7 @@ export interface FileRoutesByTo {
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/asr': typeof AuthenticatedSettingsAsrRoute
+  '/settings/dingtalk': typeof AuthenticatedSettingsDingtalkRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -387,6 +396,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/asr': typeof AuthenticatedSettingsAsrRoute
+  '/_authenticated/settings/dingtalk': typeof AuthenticatedSettingsDingtalkRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/feishu': typeof AuthenticatedSettingsFeishuRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/asr'
+    | '/settings/dingtalk'
     | '/settings/display'
     | '/settings/feishu'
     | '/settings/notifications'
@@ -472,6 +483,7 @@ export interface FileRouteTypes {
     | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/asr'
+    | '/settings/dingtalk'
     | '/settings/display'
     | '/settings/feishu'
     | '/settings/notifications'
@@ -515,6 +527,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/api-keys'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/asr'
+    | '/_authenticated/settings/dingtalk'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/feishu'
     | '/_authenticated/settings/notifications'
@@ -766,6 +779,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsDisplayRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/settings/dingtalk': {
+      id: '/_authenticated/settings/dingtalk'
+      path: '/dingtalk'
+      fullPath: '/settings/dingtalk'
+      preLoaderRoute: typeof AuthenticatedSettingsDingtalkRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/asr': {
       id: '/_authenticated/settings/asr'
       path: '/asr'
@@ -845,6 +865,7 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsApiKeysRoute: typeof AuthenticatedSettingsApiKeysRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
   AuthenticatedSettingsAsrRoute: typeof AuthenticatedSettingsAsrRoute
+  AuthenticatedSettingsDingtalkRoute: typeof AuthenticatedSettingsDingtalkRoute
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
   AuthenticatedSettingsFeishuRoute: typeof AuthenticatedSettingsFeishuRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
@@ -860,6 +881,7 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsApiKeysRoute: AuthenticatedSettingsApiKeysRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
     AuthenticatedSettingsAsrRoute: AuthenticatedSettingsAsrRoute,
+    AuthenticatedSettingsDingtalkRoute: AuthenticatedSettingsDingtalkRoute,
     AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
     AuthenticatedSettingsFeishuRoute: AuthenticatedSettingsFeishuRoute,
     AuthenticatedSettingsNotificationsRoute:

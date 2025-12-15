@@ -16,6 +16,7 @@ import {
   Layers,
   Download,
   MessageCircle,
+  Send,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -135,6 +136,11 @@ export const sidebarData: SidebarData = {
           title: 'ASR 配置',
           url: '/settings/asr',
           icon: Mic,
+        },
+        {
+          title: '钉钉配置',
+          url: '/settings/dingtalk',
+          icon: Send,
         },
         {
           title: '用户管理',

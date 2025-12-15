@@ -665,7 +665,28 @@ function MessageItem({
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           ) : (
             <>
-              <MarkdownContent content={message.content || (isIncomplete && !isStreaming ? '(生成中断)' : '')} />
+              {/* 思考过程（可折叠） */}
+              {'reasoning_content' in message && message.reasoning_content && (
+                <details className="mb-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <Brain className="h-3 w-3" />
+                    查看思考过程
+                  </summary>
+                  <div className="mt-2 max-h-60 overflow-y-auto rounded border border-amber-200 bg-amber-50 p-2 text-sm dark:border-amber-800 dark:bg-amber-950/30">
+                    <MarkdownContent content={message.reasoning_content} />
+                  </div>
+                </details>
+              )}
+              {/* 正式回复内容 */}
+              <MarkdownContent
+                content={
+                  message.content ||
+                  (isIncomplete && !isStreaming ? '(生成中断)' : '') ||
+                  ('reasoning_content' in message && message.reasoning_content && !message.content
+                    ? '(请展开上方查看思考过程)'
+                    : '')
+                }
+              />
               {/* 未完成状态指示 */}
               {isIncomplete && !isStreaming && (
                 <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">

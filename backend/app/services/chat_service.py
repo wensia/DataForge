@@ -336,7 +336,11 @@ async def send_message(
         provider_id, client, model = _resolve_ai_client(session, provider)
 
         # 检查是否支持 Function Calling (目前只有 DeepSeek 支持)
-        use_tools = enable_tools and isinstance(client, DeepSeekClient)
+        # 注意: deepseek-reasoner 模型不支持工具调用，深度思考时禁用工具
+        use_tools = enable_tools and isinstance(client, DeepSeekClient) and not use_deep_thinking
+
+        if enable_tools and use_deep_thinking:
+            logger.info("深度思考模式与工具调用不兼容，已禁用工具调用")
 
         # 添加系统提示（如果启用工具或是数据分析对话）
         if use_tools or conversation.conversation_type == ConversationType.ANALYSIS:
@@ -617,7 +621,11 @@ async def send_message_stream(
         provider_id, client, model = _resolve_ai_client(session, provider)
 
         # 检查是否支持 Function Calling (目前只有 DeepSeek 支持)
-        use_tools = enable_tools and isinstance(client, DeepSeekClient)
+        # 注意: deepseek-reasoner 模型不支持工具调用，深度思考时禁用工具
+        use_tools = enable_tools and isinstance(client, DeepSeekClient) and not use_deep_thinking
+
+        if enable_tools and use_deep_thinking:
+            logger.info("深度思考模式与工具调用不兼容，已禁用工具调用")
 
         # 添加系统提示（如果启用工具或是数据分析对话）
         if use_tools or conversation.conversation_type == ConversationType.ANALYSIS:
