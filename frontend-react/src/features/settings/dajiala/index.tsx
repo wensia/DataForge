@@ -240,17 +240,24 @@ const formSchema = z.object({
 
 type DajialaConfigForm = z.infer<typeof formSchema>
 
-const fetchFormSchema = z.object({
+// 基础 schema（不含 refine，用于类型推断）
+const fetchFormBaseSchema = z.object({
   biz: z.string().optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   pages: z.coerce.number().min(1, '至少采集 1 页').max(100, '最多采集 100 页'),
-}).refine((data) => data.biz || data.url || data.name, {
-  message: '请填写公众号 biz、文章链接或公众号名称中的任意一项',
-  path: ['biz'],
 })
 
-type FetchForm = z.infer<typeof fetchFormSchema>
+// 带验证的完整 schema
+const fetchFormSchema = fetchFormBaseSchema.refine(
+  (data) => data.biz || data.url || data.name,
+  {
+    message: '请填写公众号 biz、文章链接或公众号名称中的任意一项',
+    path: ['biz'],
+  }
+)
+
+type FetchForm = z.infer<typeof fetchFormBaseSchema>
 
 /** 密钥显示组件 */
 function CredentialDisplay({
@@ -342,8 +349,9 @@ function DajialaConfigList() {
     },
   })
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchForm = useForm<FetchForm>({
-    resolver: zodResolver(fetchFormSchema),
+    resolver: zodResolver(fetchFormSchema) as any,
     defaultValues: {
       biz: '',
       url: '',
