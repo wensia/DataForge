@@ -13,6 +13,8 @@
     "knip": "knip"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.11.51",
+    "@assistant-ui/react-markdown": "^0.11.8",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

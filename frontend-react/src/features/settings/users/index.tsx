@@ -468,7 +468,7 @@ export function UsersSettings() {
       setEditDialogOpen(false)
 
       // 如果设置了新密码，显示凭证复制弹窗
-      if (hasNewPassword) {
+      if (hasNewPassword && data.password) {
         setEditedCredentials({
           name: editingUser.name,
           password: data.password,

@@ -15,7 +15,7 @@ from app.middleware import APIKeyMiddleware
 from app.middleware.jwt_auth import JWTAuthMiddleware
 from app.models import (  # noqa: F401 确保模型被导入
     ApiKey,
-    DingTalkConfig,
+    RobotConfig,
     ScheduledTask,
     TaskExecution,
     User,

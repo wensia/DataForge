@@ -21,9 +21,11 @@ export const chatKeys = {
   all: ['chat'] as const,
   conversations: (params?: { conversation_type?: string; include_archived?: boolean }) =>
     [...chatKeys.all, 'conversations', params] as const,
+  conversationsRoot: () => [...chatKeys.all, 'conversations'] as const,
   conversation: (id: number) => [...chatKeys.all, 'conversation', id] as const,
   messages: (conversationId: number, params?: { page?: number; page_size?: number }) =>
     [...chatKeys.all, 'messages', conversationId, params] as const,
+  messagesRoot: (conversationId: number) => [...chatKeys.all, 'messages', conversationId] as const,
   providers: () => [...chatKeys.all, 'providers'] as const,
 }
 
@@ -109,7 +111,7 @@ export function useCreateConversation() {
       return response.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsRoot() })
     },
   })
 }
@@ -133,7 +135,7 @@ export function useUpdateConversation() {
       return response.data.data
     },
     onSuccess: (_, { conversationId }) => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsRoot() })
       queryClient.invalidateQueries({ queryKey: chatKeys.conversation(conversationId) })
     },
   })
@@ -148,7 +150,7 @@ export function useDeleteConversation() {
       await apiClient.delete(`/chat/conversations/${conversationId}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsRoot() })
     },
   })
 }
@@ -173,8 +175,8 @@ export function useSendMessage() {
     },
     onSuccess: (_, { conversationId }) => {
       queryClient.invalidateQueries({ queryKey: chatKeys.conversation(conversationId) })
-      queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) })
-      queryClient.invalidateQueries({ queryKey: chatKeys.conversations() })
+      queryClient.invalidateQueries({ queryKey: chatKeys.messagesRoot(conversationId) })
+      queryClient.invalidateQueries({ queryKey: chatKeys.conversationsRoot() })
     },
   })
 }

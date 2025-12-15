@@ -37,7 +37,12 @@ interface UseChatStreamReturn {
   streamingMessageId: number | null // 当前流式消息的 ID
 
   // 方法
-  sendMessage: (content: string, aiProvider?: string, useDeepThinking?: boolean) => Promise<void>
+  sendMessage: (
+    content: string,
+    aiProvider?: string,
+    useDeepThinking?: boolean,
+    conversationIdOverride?: number | null
+  ) => Promise<void>
   stopStreaming: () => void
   clearError: () => void
 }
@@ -57,8 +62,14 @@ export function useChatStream({
   const queryClient = useQueryClient()
 
   const sendMessage = useCallback(
-    async (content: string, aiProvider?: string, useDeepThinking?: boolean) => {
-      if (!conversationId) {
+    async (
+      content: string,
+      aiProvider?: string,
+      useDeepThinking?: boolean,
+      conversationIdOverride?: number | null
+    ) => {
+      const targetConversationId = conversationIdOverride ?? conversationId
+      if (!targetConversationId) {
         setError('请先选择或创建对话')
         return
       }
@@ -81,7 +92,7 @@ export function useChatStream({
         const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
         const response = await fetch(
-          `${baseUrl}/chat/conversations/${conversationId}/messages/stream`,
+          `${baseUrl}/chat/conversations/${targetConversationId}/messages/stream`,
           {
             method: 'POST',
             headers: {
@@ -146,7 +157,7 @@ export function useChatStream({
                     setStreamingMessageId(event.assistant_message_id)
                   }
                   queryClient.invalidateQueries({
-                    queryKey: ['chat', 'conversation', conversationId],
+                    queryKey: ['chat', 'conversation', targetConversationId],
                   })
                   break
 
@@ -192,7 +203,7 @@ export function useChatStream({
                   // 清除流式消息 ID 并刷新消息列表
                   setStreamingMessageId(null)
                   queryClient.invalidateQueries({
-                    queryKey: ['chat', 'conversation', conversationId],
+                    queryKey: ['chat', 'conversation', targetConversationId],
                   })
                   queryClient.invalidateQueries({
                     queryKey: ['chat', 'conversations'],
