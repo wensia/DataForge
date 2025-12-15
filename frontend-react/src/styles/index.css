@@ -92,3 +92,13 @@
     height: 0;
   }
 }
+
+/* Select 组件值宽度自适应，防止数字被遮挡 */
+[data-slot='select-trigger'] {
+  min-width: fit-content;
+}
+
+[data-slot='select-trigger'] [data-slot='select-value'] {
+  min-width: max-content;
+  overflow: visible;
+}

@@ -4,15 +4,33 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query, Request
 from loguru import logger
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from app.clients.crm import CRMClient, CRMClientError
+from app.config import settings
 from app.database import engine
 from app.models.api_key import ApiKey
-from app.models.user import User, UserCreate, UserResponse, UserRole, UserUpdate
+from app.models.user import (
+    User,
+    UserCreate,
+    UserIdentity,
+    UserResponse,
+    UserRole,
+    UserUpdate,
+    UserWithIdentities,
+)
 from app.schemas.response import ResponseModel
 from app.utils.jwt_auth import get_password_hash
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
+
+
+class CRMUserListResponse(BaseModel):
+    """CRM 用户列表响应"""
+
+    items: list[UserWithIdentities]
+    total: int
 
 
 def require_admin(request: Request) -> bool:
@@ -20,54 +38,90 @@ def require_admin(request: Request) -> bool:
     return getattr(request.state, "user_role", None) == UserRole.ADMIN.value
 
 
-@router.get("", response_model=ResponseModel)
+@router.get("", response_model=ResponseModel[CRMUserListResponse])
 async def list_users(
     request: Request,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    is_active: bool | None = None,
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(100, ge=1, le=500, description="每页数量"),
+    search: str | None = Query(None, description="搜索关键词"),
+    is_active: bool | None = Query(None, description="按启用状态筛选"),
+    campus_id: str | None = Query(None, description="按校区筛选"),
+    department_id: str | None = Query(None, description="按部门筛选"),
 ):
-    """获取用户列表 (仅管理员)
+    """获取用户列表 (从 CRM 获取)
 
     Args:
-        skip: 跳过的记录数
-        limit: 返回的最大记录数
+        page: 页码
+        size: 每页数量
+        search: 搜索关键词（姓名/用户名）
         is_active: 按启用状态筛选
+        campus_id: 按校区筛选
+        department_id: 按部门筛选
 
     Returns:
-        ResponseModel: 用户列表
+        ResponseModel: 用户列表（包含身份信息）
     """
-    if not require_admin(request):
-        return ResponseModel.error(code=403, message="需要管理员权限")
+    # 检查 CRM 配置
+    if not settings.crm_base_url or not settings.crm_service_key:
+        return ResponseModel.error(code=503, message="CRM 服务未配置")
 
-    with Session(engine) as session:
-        statement = select(User)
-        if is_active is not None:
-            statement = statement.where(User.is_active == is_active)
-        statement = statement.offset(skip).limit(limit)
+    try:
+        crm_client = CRMClient()
+        crm_users, total = await crm_client.get_users(
+            page=page,
+            size=size,
+            search=search,
+            is_active=is_active,
+            campus_id=campus_id,
+            department_id=department_id,
+        )
 
-        users = session.exec(statement).all()
+        # 转换为响应格式
+        items = []
+        for u in crm_users:
+            identities = [
+                UserIdentity(
+                    identity_id=i.identity_id,
+                    campus_id=i.campus_id,
+                    campus_name=i.campus_name,
+                    department_id=i.department_id,
+                    department_name=i.department_name,
+                    position_id=i.position_id,
+                    position_name=i.position_name,
+                    position_level=i.position_level,
+                    is_active=i.is_active,
+                )
+                for i in u.identities
+            ]
+            items.append(
+                UserWithIdentities(
+                    id=0,  # CRM 用户没有本地 ID
+                    email=u.email,
+                    username=u.username,
+                    crm_id=u.id,
+                    name=u.name,
+                    phone=u.phone,
+                    role=UserRole.ADMIN if u.is_superuser else UserRole.USER,
+                    is_active=u.is_active,
+                    created_at=u.joined_at or datetime.utcnow(),
+                    last_login_at=None,
+                    identities=identities,
+                )
+            )
+
+        logger.debug(f"获取 CRM 用户列表: {total} 个用户")
 
         return ResponseModel.success(
-            data={
-                "items": [
-                    UserResponse(
-                        id=u.id,
-                        email=u.email,
-                        username=u.username,
-                        crm_id=u.crm_id,
-                        name=u.name,
-                        phone=u.phone,
-                        role=u.role,
-                        is_active=u.is_active,
-                        created_at=u.created_at,
-                        last_login_at=u.last_login_at,
-                    )
-                    for u in users
-                ],
-                "total": len(users),
-            }
+            data=CRMUserListResponse(items=items, total=total),
+            message="获取成功",
         )
+
+    except CRMClientError as e:
+        logger.warning(f"获取 CRM 用户列表失败: {e.message}")
+        return ResponseModel.error(code=e.status_code, message=e.message)
+    except Exception as e:
+        logger.error(f"获取用户列表异常: {e}")
+        return ResponseModel.error(code=500, message="获取用户列表失败")
 
 
 @router.post("", response_model=ResponseModel)

@@ -243,6 +243,49 @@ class CRMClient:
             items = [CRMPosition(**item) for item in data["data"]["items"]]
             return items, data["data"]["total"]
 
+    async def get_users(
+        self,
+        page: int = 1,
+        size: int = 100,
+        search: str | None = None,
+        is_active: bool | None = None,
+        campus_id: str | None = None,
+        department_id: str | None = None,
+    ) -> tuple[list[CRMUser], int]:
+        """获取用户列表
+
+        Args:
+            page: 页码
+            size: 每页数量
+            search: 搜索关键词（姓名/用户名）
+            is_active: 筛选是否启用
+            campus_id: 筛选校区ID
+            department_id: 筛选部门ID
+
+        Returns:
+            tuple[list[CRMUser], int]: 用户列表和总数
+        """
+        params = {"page": page, "size": size}
+        if search:
+            params["search"] = search
+        if is_active is not None:
+            params["is_active"] = is_active
+        if campus_id:
+            params["campus_id"] = campus_id
+        if department_id:
+            params["department_id"] = department_id
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.base_url}/users",
+                headers=self._headers(),
+                params=params,
+            )
+
+            data = self._handle_response(response)
+            items = [CRMUser(**item) for item in data["data"]["items"]]
+            return items, data["data"]["total"]
+
 
 # 单例客户端
 crm_client = CRMClient()

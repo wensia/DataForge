@@ -21,6 +21,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     # 需要 JWT 认证的路由前缀
     PROTECTED_PREFIXES = [
         "/api/v1/users",  # 用户管理
+        "/api/v1/organization",  # 组织架构
     ]
 
     # 豁免 JWT 认证的路由(即使匹配 PROTECTED_PREFIXES)

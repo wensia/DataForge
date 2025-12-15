@@ -234,7 +234,68 @@ Authorization: Bearer {用户访问令牌}
 
 ---
 
-### 5. 获取校区列表
+### 5. 获取用户列表
+
+**GET** `/users`
+
+获取系统用户列表，支持分页和筛选。
+
+**请求头**
+```
+X-Service-Key: {服务端API Key}
+```
+
+**查询参数**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，默认1 |
+| size | int | 否 | 每页数量，默认100，最大500 |
+| search | string | 否 | 搜索关键词（姓名/用户名） |
+| is_active | bool | 否 | 筛选是否启用 |
+| campus_id | string | 否 | 筛选校区ID |
+| department_id | string | 否 | 筛选部门ID |
+
+**响应示例**
+```json
+{
+  "success": true,
+  "message": "获取成功",
+  "data": {
+    "items": [
+      {
+        "id": "ea3faaed-a2a6-4c7c-a636-e62d36808cbf",
+        "username": "zhangsan",
+        "name": "张三",
+        "email": "zhangsan@example.com",
+        "phone": "13800138000",
+        "is_superuser": false,
+        "is_active": true,
+        "joined_at": "2024-01-01T00:00:00+08:00",
+        "identities": [
+          {
+            "identity_id": "uuid",
+            "campus_id": "uuid",
+            "campus_name": "西南楼校区",
+            "department_id": "uuid",
+            "department_name": "咨询部",
+            "position_id": "uuid",
+            "position_name": "咨询经理",
+            "position_level": 3,
+            "is_active": true,
+            "can_manage_leads": true,
+            "can_access_pool": true
+          }
+        ]
+      }
+    ],
+    "total": 50
+  }
+}
+```
+
+---
+
+### 6. 获取校区列表
 
 **GET** `/organization/campuses`
 
@@ -275,7 +336,7 @@ X-Service-Key: {服务端API Key}
 
 ---
 
-### 6. 获取部门列表
+### 7. 获取部门列表
 
 **GET** `/organization/departments`
 
@@ -313,7 +374,7 @@ X-Service-Key: {服务端API Key}
 
 ---
 
-### 7. 获取职位列表
+### 8. 获取职位列表
 
 **GET** `/organization/positions`
 
@@ -389,6 +450,7 @@ X-Service-Key: {服务端API Key}
 | /auth/verify-token | 100次 |
 | /auth/refresh | 100次 |
 | /users/me | 60次 |
+| /users | 60次 |
 | /organization/* | 100次 |
 
 超出限制时返回 `429 Too Many Requests`。
@@ -461,6 +523,24 @@ class CRMClient:
         resp = requests.get(
             f"{self.base_url}/users/me",
             headers=self._headers(with_auth=True)
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_users(self, page: int = 1, size: int = 100, search: str = None,
+                  is_active: bool = None, campus_id: str = None) -> dict:
+        """获取用户列表"""
+        params = {"page": page, "size": size}
+        if search:
+            params["search"] = search
+        if is_active is not None:
+            params["is_active"] = is_active
+        if campus_id:
+            params["campus_id"] = campus_id
+        resp = requests.get(
+            f"{self.base_url}/users",
+            headers=self._headers(),
+            params=params
         )
         resp.raise_for_status()
         return resp.json()
@@ -584,6 +664,17 @@ class CRMClient {
     return resp.json();
   }
 
+  async getUsers(page = 1, size = 100, search?: string, isActive?: boolean): Promise<any> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    if (search) params.append('search', search);
+    if (isActive !== undefined) params.append('is_active', String(isActive));
+    const resp = await fetch(
+      `${this.baseUrl}/users?${params.toString()}`,
+      { headers: this.headers() }
+    );
+    return resp.json();
+  }
+
   async getCampuses(page = 1, size = 100): Promise<any> {
     const resp = await fetch(
       `${this.baseUrl}/organization/campuses?page=${page}&size=${size}`,
@@ -647,20 +738,24 @@ curl -X POST "$BASE_URL/auth/verify-token" \
   -H "X-Service-Key: $SERVICE_KEY" \
   -d '{"token": "eyJhbGciOiJIUzI1NiIs..."}'
 
-# 3. 获取用户信息
+# 3. 获取当前用户信息
 curl -X GET "$BASE_URL/users/me" \
   -H "X-Service-Key: $SERVICE_KEY" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
 
-# 4. 获取校区列表
+# 4. 获取用户列表
+curl -X GET "$BASE_URL/users?size=10&is_active=true" \
+  -H "X-Service-Key: $SERVICE_KEY"
+
+# 5. 获取校区列表
 curl -X GET "$BASE_URL/organization/campuses?size=10" \
   -H "X-Service-Key: $SERVICE_KEY"
 
-# 5. 获取部门列表
+# 6. 获取部门列表
 curl -X GET "$BASE_URL/organization/departments" \
   -H "X-Service-Key: $SERVICE_KEY"
 
-# 6. 获取职位列表
+# 7. 获取职位列表
 curl -X GET "$BASE_URL/organization/positions" \
   -H "X-Service-Key: $SERVICE_KEY"
 ```

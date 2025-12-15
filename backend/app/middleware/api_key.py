@@ -42,6 +42,12 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/openapi.json",  # OpenAPI Schema
     ]
 
+    # 由 JWTAuthMiddleware 保护的路径前缀（豁免 API Key 检查）
+    JWT_PROTECTED_PREFIXES = [
+        "/api/v1/users",  # 用户管理（由 JWT 中间件保护）
+        "/api/v1/organization",  # 组织架构（由 JWT 中间件保护）
+    ]
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """处理请求
 
@@ -55,6 +61,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         # 检查路径是否豁免验证
         request_path = request.url.path
         if request_path in self.EXEMPT_PATHS:
+            return await call_next(request)
+
+        # 检查是否由 JWT 中间件保护（跳过 API Key 检查）
+        if any(request_path.startswith(prefix) for prefix in self.JWT_PROTECTED_PREFIXES):
             return await call_next(request)
 
         # 尝试获取 JWT token
