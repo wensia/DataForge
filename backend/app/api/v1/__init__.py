@@ -9,6 +9,7 @@ from app.api.v1 import (
     asr_config,
     auth,
     chat,
+    dajiala_config,
     data_analysis,
     feishu_config,
     health,
@@ -38,6 +39,7 @@ router.include_router(organization.router)
 router.include_router(data_analysis.router)
 router.include_router(ai_config.router)
 router.include_router(asr_config.router)
+router.include_router(dajiala_config.router)
 router.include_router(record_proxy.router)
 router.include_router(user_preferences.router)
 router.include_router(staff_mapping.router)

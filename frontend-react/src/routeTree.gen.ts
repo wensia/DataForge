@@ -14,6 +14,7 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTaskExecutionsRouteImport } from './routes/_authenticated/task-executions'
+import { Route as AuthenticatedDajialaRouteImport } from './routes/_authenticated/dajiala'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
@@ -77,6 +78,11 @@ const AuthenticatedTaskExecutionsRoute =
     path: '/task-executions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedDajialaRoute = AuthenticatedDajialaRouteImport.update({
+  id: '/dajiala',
+  path: '/dajiala',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -297,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/dajiala': typeof AuthenticatedDajialaRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -339,6 +346,7 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
+  '/dajiala': typeof AuthenticatedDajialaRoute
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -384,6 +392,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
+  '/_authenticated/dajiala': typeof AuthenticatedDajialaRoute
   '/_authenticated/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -429,6 +438,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
+    | '/dajiala'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -471,6 +481,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
+    | '/dajiala'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -515,6 +526,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/accounts'
+    | '/_authenticated/dajiala'
     | '/_authenticated/task-executions'
     | '/_authenticated/'
     | '/_authenticated/admin/pages'
@@ -595,6 +607,13 @@ declare module '@tanstack/react-router' {
       path: '/task-executions'
       fullPath: '/task-executions'
       preLoaderRoute: typeof AuthenticatedTaskExecutionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dajiala': {
+      id: '/_authenticated/dajiala'
+      path: '/dajiala'
+      fullPath: '/dajiala'
+      preLoaderRoute: typeof AuthenticatedDajialaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/accounts': {
@@ -899,6 +918,7 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
+  AuthenticatedDajialaRoute: typeof AuthenticatedDajialaRoute
   AuthenticatedTaskExecutionsRoute: typeof AuthenticatedTaskExecutionsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
@@ -919,6 +939,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
+  AuthenticatedDajialaRoute: AuthenticatedDajialaRoute,
   AuthenticatedTaskExecutionsRoute: AuthenticatedTaskExecutionsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,

@@ -44,6 +44,12 @@ from app.models.robot_config import (
     RobotPlatform,
     RobotTestRequest,
 )
+from app.models.dajiala_config import (
+    DajialaConfig,
+    DajialaConfigCreate,
+    DajialaConfigResponse,
+    DajialaConfigUpdate,
+)
 from app.models.conversation import (
     Conversation,
     ConversationCreate,
@@ -257,4 +263,8 @@ __all__ = [
     "RobotConfigUpdate",
     "RobotPlatform",
     "RobotTestRequest",
+    "DajialaConfig",
+    "DajialaConfigCreate",
+    "DajialaConfigResponse",
+    "DajialaConfigUpdate",
 ]
