@@ -418,6 +418,42 @@ status() {
     echo "  API文档:  http://localhost:$BACKEND_PORT/docs"
     echo "=========================================="
     echo ""
+
+    # 健康检查摘要
+    local has_warning=false
+
+    # 检查 Celery Beat
+    local beat_running=false
+    if [ -f "$CELERY_BEAT_PID_FILE" ]; then
+        local beat_pid=$(cat "$CELERY_BEAT_PID_FILE")
+        if ps -p $beat_pid > /dev/null 2>&1; then
+            beat_running=true
+        fi
+    fi
+    if [ "$beat_running" = false ]; then
+        error "⚠️  Celery Beat 未运行 - 定时任务将不会自动执行！"
+        echo -e "    运行 ${YELLOW}./manage.sh start-beat${NC} 启动调度器"
+        has_warning=true
+    fi
+
+    # 检查 Celery Worker
+    local worker_running=false
+    if [ -f "$CELERY_WORKER_PID_FILE" ]; then
+        local worker_pid=$(cat "$CELERY_WORKER_PID_FILE")
+        if ps -p $worker_pid > /dev/null 2>&1; then
+            worker_running=true
+        fi
+    fi
+    if [ "$worker_running" = false ]; then
+        error "⚠️  Celery Worker 未运行 - 任务无法被执行！"
+        echo -e "    运行 ${YELLOW}./manage.sh start-worker${NC} 启动执行器"
+        has_warning=true
+    fi
+
+    if [ "$has_warning" = false ]; then
+        success "✓ 所有核心服务运行正常"
+    fi
+    echo ""
 }
 
 # 查看日志
