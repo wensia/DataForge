@@ -162,6 +162,11 @@ async def _login_via_local(
     return user, []
 
 
+def _is_email_format(s: str) -> bool:
+    """判断字符串是否为邮箱格式"""
+    return "@" in s and "." in s
+
+
 @router.post("/login", response_model=ResponseModel[LoginResponse])
 async def login(data: LoginRequest):
     """用户登录
@@ -169,6 +174,11 @@ async def login(data: LoginRequest):
     支持两种登录方式:
     1. 用户名 + 密码 (CRM 认证，优先)
     2. 邮箱 + 密码 (本地认证，备用)
+
+    判断逻辑:
+    - 如果提供 username 字段 → CRM 登录
+    - 如果 email 字段不是邮箱格式 → 视为用户名，CRM 登录
+    - 如果 email 字段是邮箱格式 → 本地登录
 
     Args:
         data: 登录请求数据
@@ -184,11 +194,16 @@ async def login(data: LoginRequest):
         identities: list[UserIdentity] = []
         crm_token: str | None = None
 
+        # 获取用于 CRM 登录的用户名（支持 username 字段或非邮箱格式的 email 字段）
+        login_username = data.username or (
+            data.email if data.email and not _is_email_format(data.email) else None
+        )
+
         # 优先使用 CRM 登录
-        if data.username and settings.crm_base_url and settings.crm_service_key:
+        if login_username and settings.crm_base_url and settings.crm_service_key:
             try:
                 user, identities, crm_token = await _login_via_crm(
-                    data.username, data.password, session
+                    login_username, data.password, session
                 )
             except CRMClientError as e:
                 logger.warning(f"CRM 登录失败: {e.message}")
@@ -197,8 +212,8 @@ async def login(data: LoginRequest):
                 logger.error(f"CRM 登录异常: {e}")
                 return ResponseModel.error(code=500, message="登录服务异常，请稍后重试")
 
-        # 本地登录（备用方式或 CRM 未配置时）
-        if not user and data.email:
+        # 本地登录（仅当 email 是邮箱格式时）
+        if not user and data.email and _is_email_format(data.email):
             try:
                 user, identities = await _login_via_local(
                     data.email, data.password, session
