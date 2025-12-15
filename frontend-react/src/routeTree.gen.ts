@@ -14,7 +14,6 @@ import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTaskExecutionsRouteImport } from './routes/_authenticated/task-executions'
-import { Route as AuthenticatedDajialaRouteImport } from './routes/_authenticated/dajiala'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
@@ -31,6 +30,7 @@ import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedDajialaIndexRouteImport } from './routes/_authenticated/dajiala/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAnalysisIndexRouteImport } from './routes/_authenticated/analysis/index'
@@ -79,11 +79,6 @@ const AuthenticatedTaskExecutionsRoute =
     path: '/task-executions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDajialaRoute = AuthenticatedDajialaRouteImport.update({
-  id: '/dajiala',
-  path: '/dajiala',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAccountsRoute = AuthenticatedAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -165,6 +160,12 @@ const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
     path: '/help-center/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDajialaIndexRoute =
+  AuthenticatedDajialaIndexRouteImport.update({
+    id: '/dajiala/',
+    path: '/dajiala/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
@@ -268,9 +269,9 @@ const AuthenticatedErrorsErrorRoute =
   } as any)
 const AuthenticatedDajialaArticlesRoute =
   AuthenticatedDajialaArticlesRouteImport.update({
-    id: '/articles',
-    path: '/articles',
-    getParentRoute: () => AuthenticatedDajialaRoute,
+    id: '/dajiala/articles',
+    path: '/dajiala/articles',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAnalysisStaffMappingRoute =
   AuthenticatedAnalysisStaffMappingRouteImport.update({
@@ -310,7 +311,6 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
-  '/dajiala': typeof AuthenticatedDajialaRouteWithChildren
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -335,6 +335,7 @@ export interface FileRoutesByFullPath {
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/dajiala': typeof AuthenticatedDajialaIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
@@ -354,7 +355,6 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/accounts': typeof AuthenticatedAccountsRoute
-  '/dajiala': typeof AuthenticatedDajialaRouteWithChildren
   '/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -379,6 +379,7 @@ export interface FileRoutesByTo {
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/dajiala': typeof AuthenticatedDajialaIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
@@ -401,7 +402,6 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
-  '/_authenticated/dajiala': typeof AuthenticatedDajialaRouteWithChildren
   '/_authenticated/task-executions': typeof AuthenticatedTaskExecutionsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/pages': typeof AuthenticatedAdminPagesRoute
@@ -426,6 +426,7 @@ export interface FileRoutesById {
   '/_authenticated/analysis/': typeof AuthenticatedAnalysisIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/dajiala/': typeof AuthenticatedDajialaIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
@@ -448,7 +449,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
-    | '/dajiala'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -473,6 +473,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/apps'
     | '/chats'
+    | '/dajiala'
     | '/help-center'
     | '/settings/'
     | '/tasks'
@@ -492,7 +493,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/accounts'
-    | '/dajiala'
     | '/task-executions'
     | '/'
     | '/admin/pages'
@@ -517,6 +517,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/apps'
     | '/chats'
+    | '/dajiala'
     | '/help-center'
     | '/settings'
     | '/tasks'
@@ -538,7 +539,6 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/accounts'
-    | '/_authenticated/dajiala'
     | '/_authenticated/task-executions'
     | '/_authenticated/'
     | '/_authenticated/admin/pages'
@@ -563,6 +563,7 @@ export interface FileRouteTypes {
     | '/_authenticated/analysis/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
+    | '/_authenticated/dajiala/'
     | '/_authenticated/help-center/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
@@ -620,13 +621,6 @@ declare module '@tanstack/react-router' {
       path: '/task-executions'
       fullPath: '/task-executions'
       preLoaderRoute: typeof AuthenticatedTaskExecutionsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dajiala': {
-      id: '/_authenticated/dajiala'
-      path: '/dajiala'
-      fullPath: '/dajiala'
-      preLoaderRoute: typeof AuthenticatedDajialaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/accounts': {
@@ -739,6 +733,13 @@ declare module '@tanstack/react-router' {
       path: '/help-center'
       fullPath: '/help-center'
       preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dajiala/': {
+      id: '/_authenticated/dajiala/'
+      path: '/dajiala'
+      fullPath: '/dajiala'
+      preLoaderRoute: typeof AuthenticatedDajialaIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/chats/': {
@@ -862,10 +863,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/dajiala/articles': {
       id: '/_authenticated/dajiala/articles'
-      path: '/articles'
+      path: '/dajiala/articles'
       fullPath: '/dajiala/articles'
       preLoaderRoute: typeof AuthenticatedDajialaArticlesRouteImport
-      parentRoute: typeof AuthenticatedDajialaRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/analysis/staff-mapping': {
       id: '/_authenticated/analysis/staff-mapping'
@@ -935,33 +936,23 @@ const AuthenticatedSettingsRouteRouteWithChildren =
     AuthenticatedSettingsRouteRouteChildren,
   )
 
-interface AuthenticatedDajialaRouteChildren {
-  AuthenticatedDajialaArticlesRoute: typeof AuthenticatedDajialaArticlesRoute
-}
-
-const AuthenticatedDajialaRouteChildren: AuthenticatedDajialaRouteChildren = {
-  AuthenticatedDajialaArticlesRoute: AuthenticatedDajialaArticlesRoute,
-}
-
-const AuthenticatedDajialaRouteWithChildren =
-  AuthenticatedDajialaRoute._addFileChildren(AuthenticatedDajialaRouteChildren)
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
-  AuthenticatedDajialaRoute: typeof AuthenticatedDajialaRouteWithChildren
   AuthenticatedTaskExecutionsRoute: typeof AuthenticatedTaskExecutionsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAdminPagesRoute: typeof AuthenticatedAdminPagesRoute
   AuthenticatedAnalysisAiRoute: typeof AuthenticatedAnalysisAiRoute
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
+  AuthenticatedDajialaArticlesRoute: typeof AuthenticatedDajialaArticlesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedAiChatTestIndexRoute: typeof AuthenticatedAiChatTestIndexRoute
   AuthenticatedAiChatIndexRoute: typeof AuthenticatedAiChatIndexRoute
   AuthenticatedAnalysisIndexRoute: typeof AuthenticatedAnalysisIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedDajialaIndexRoute: typeof AuthenticatedDajialaIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
@@ -970,7 +961,6 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
-  AuthenticatedDajialaRoute: AuthenticatedDajialaRouteWithChildren,
   AuthenticatedTaskExecutionsRoute: AuthenticatedTaskExecutionsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAdminPagesRoute: AuthenticatedAdminPagesRoute,
@@ -978,12 +968,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalysisChatRoute: AuthenticatedAnalysisChatRoute,
   AuthenticatedAnalysisStaffMappingRoute:
     AuthenticatedAnalysisStaffMappingRoute,
+  AuthenticatedDajialaArticlesRoute: AuthenticatedDajialaArticlesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedAiChatTestIndexRoute: AuthenticatedAiChatTestIndexRoute,
   AuthenticatedAiChatIndexRoute: AuthenticatedAiChatIndexRoute,
   AuthenticatedAnalysisIndexRoute: AuthenticatedAnalysisIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedDajialaIndexRoute: AuthenticatedDajialaIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
