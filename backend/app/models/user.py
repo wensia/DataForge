@@ -45,6 +45,7 @@ class User(SQLModel, table=True):
     name: str = Field(description="显示名称")
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
     is_active: bool = Field(default=True, description="是否启用")
+    ai_enabled: bool = Field(default=False, description="是否启用 AI 对话功能")
 
     created_at: datetime = Field(
         default_factory=datetime.utcnow, description="创建时间"
@@ -79,6 +80,7 @@ class UserUpdate(SQLModel):
     password: str | None = None
     role: UserRole | None = None
     is_active: bool | None = None
+    ai_enabled: bool | None = None
 
 
 class UserResponse(SQLModel):
@@ -92,6 +94,7 @@ class UserResponse(SQLModel):
     phone: str | None = None
     role: UserRole
     is_active: bool
+    ai_enabled: bool
     created_at: datetime
     last_login_at: datetime | None = None
 

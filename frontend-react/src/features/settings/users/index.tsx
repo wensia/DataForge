@@ -26,6 +26,7 @@ import {
   Copy,
   Check,
   Pencil,
+  Bot,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -70,6 +71,12 @@ import {
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DataTablePagination, DataTableColumnHeader } from '@/components/data-table'
 import { Switch } from '@/components/ui/switch'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 /** 用户类型 */
 interface User {
@@ -78,6 +85,7 @@ interface User {
   name: string
   role: string
   is_active: boolean
+  ai_enabled: boolean
   created_at: string
   last_login_at: string | null
 }
@@ -134,6 +142,7 @@ function useUpdateUser() {
         password?: string
         role?: string
         is_active?: boolean
+        ai_enabled?: boolean
       }
     }) => {
       const response = await apiClient.put<ApiResponse<User>>(
@@ -612,16 +621,45 @@ export function UsersSettings() {
               <TableBody>
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
+                    <ContextMenu key={row.id}>
+                      <ContextMenuTrigger asChild>
+                        <TableRow className='cursor-context-menu'>
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem
+                          onClick={() => {
+                            const user = row.original
+                            updateUser.mutate(
+                              {
+                                id: user.id,
+                                data: { ai_enabled: !user.ai_enabled },
+                              },
+                              {
+                                onSuccess: () => {
+                                  toast.success(
+                                    user.ai_enabled
+                                      ? 'AI 对话已禁用'
+                                      : 'AI 对话已启用'
+                                  )
+                                },
+                              }
+                            )
+                          }}
+                        >
+                          <Bot className='mr-2 h-4 w-4' />
+                          {row.original.ai_enabled ? '禁用 AI 对话' : '启用 AI 对话'}
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                   ))
                 ) : (
                   <TableRow>

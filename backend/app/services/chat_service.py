@@ -790,8 +790,38 @@ async def send_message_stream(
                 total_tokens += response.tokens_used or 0
 
             # 工具调用完成，最终结果流式输出
-            # 如果最后的 response 没有工具调用，使用流式输出最终内容
-            if not response.tool_calls:
+            # 使用 Function Calling 后，DeepSeek 可能出现两种异常情况：
+            # 1) 在达到最大工具轮次后仍持续返回 tool_calls（循环未收敛）
+            # 2) 工具调用结束但不生成最终文本回复（content 为空）
+            # 这两种情况下都强制用普通对话生成最终答案，避免前端出现“生成结束但内容为空”。
+
+            if response.tool_calls:
+                logger.warning(
+                    "工具调用达到最大轮次仍未收敛，强制生成最终回复: "
+                    f"conversation_id={conversation_id}, tool_calls={[tc.function.name for tc in response.tool_calls]}"
+                )
+
+                # 明确告诉模型不要再调用工具，直接总结结果输出
+                chat_history.append(
+                    AIChatMessage(
+                        role="user",
+                        content=(
+                            "请停止调用工具。请根据以上所有工具执行结果，用中文总结回答我最初的问题，"
+                            "并使用 Markdown 格式输出。"
+                        ),
+                    )
+                )
+
+                async for chunk in client.chat_stream(chat_history, model=model):
+                    if chunk.content:
+                        full_content += chunk.content
+                        yield {"type": "content", "content": chunk.content}
+                        maybe_save_progress()
+                    if chunk.tokens_used:
+                        total_tokens += chunk.tokens_used
+                    if chunk.finish_reason:
+                        break
+            else:
                 full_content = response.content or ""
 
                 # 如果 content 为空，添加引导提示后重新获取最终答案
@@ -803,7 +833,10 @@ async def send_message_stream(
                     chat_history.append(
                         AIChatMessage(
                             role="user",
-                            content="请根据以上工具执行结果，用中文总结回答我最初的问题。使用 Markdown 格式输出。"
+                            content=(
+                                "请根据以上工具执行结果，用中文总结回答我最初的问题。"
+                                "使用 Markdown 格式输出。"
+                            ),
                         )
                     )
 
@@ -853,6 +886,16 @@ async def send_message_stream(
 
                 if chunk.finish_reason:
                     logger.debug(f"流式响应完成: finish_reason={chunk.finish_reason}")
+
+        if not full_content:
+            logger.warning(
+                "流式对话未生成可展示内容，写入兜底提示: "
+                f"conversation_id={conversation_id}, provider={provider_id}"
+            )
+            full_content = (
+                "未生成可展示的内容（可能是工具调用未返回最终回复）。"
+                "请尝试缩小问题范围或重试。"
+            )
 
         # 更新 AI 回复（完成状态）
         assistant_message.content = full_content

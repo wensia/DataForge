@@ -8,7 +8,7 @@ import json
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models.conversation import (
@@ -19,12 +19,33 @@ from app.models.conversation import (
     SendMessageRequest,
     SendMessageResponse,
 )
+from app.models.user import User
 from app.schemas.response import ResponseModel
 from app.services import chat_service
 from app.services.chat_service import ChatServiceError
 from app.utils.jwt_auth import TokenPayload, get_current_user
 
 router = APIRouter(prefix="/chat", tags=["AI 对话"])
+
+
+def check_ai_permission(session: Session, user_id: int) -> ResponseModel | None:
+    """检查用户是否有 AI 对话权限
+
+    Args:
+        session: 数据库会话
+        user_id: 用户 ID
+
+    Returns:
+        None 如果有权限，ResponseModel 错误响应如果无权限
+    """
+    user = session.exec(select(User).where(User.id == user_id)).first()
+    if not user:
+        return ResponseModel.error(code=404, message="用户不存在")
+    if not user.ai_enabled:
+        return ResponseModel.error(
+            code=403, message="您没有使用 AI 对话的权限，请联系管理员开通"
+        )
+    return None
 
 
 # ============ 对话管理接口 ============
@@ -44,6 +65,11 @@ async def create_conversation(
     Returns:
         ResponseModel: 包含创建的对话信息
     """
+    # 检查 AI 权限
+    error = check_ai_permission(session, current_user.user_id)
+    if error:
+        return error
+
     conversation = chat_service.create_conversation(
         session=session,
         user_id=current_user.user_id,
@@ -264,6 +290,11 @@ async def send_message(
     Returns:
         ResponseModel: 包含用户消息和 AI 回复
     """
+    # 检查 AI 权限
+    error = check_ai_permission(session, current_user.user_id)
+    if error:
+        return error
+
     try:
         user_message, assistant_message = await chat_service.send_message(
             session=session,
@@ -311,6 +342,24 @@ async def send_message_stream(
     Returns:
         StreamingResponse: SSE 流式响应
     """
+    # 检查 AI 权限
+    user = session.exec(select(User).where(User.id == current_user.user_id)).first()
+    if not user or not user.ai_enabled:
+        # 对于流式响应，返回错误事件
+        async def error_generator():
+            error_msg = "您没有使用 AI 对话的权限，请联系管理员开通"
+            event = {"type": "error", "error": error_msg}
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            error_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
 
     async def event_generator():
         """生成 SSE 事件流"""
