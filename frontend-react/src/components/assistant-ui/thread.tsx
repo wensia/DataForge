@@ -17,6 +17,7 @@ import {
   CheckIcon,
   CopyIcon,
   DownloadIcon,
+  PencilIcon,
   SquareIcon,
   UserIcon,
 } from "lucide-react";
@@ -260,10 +261,36 @@ const AssistantActionBar: FC = () => {
   );
 };
 
+const UserActionBar: FC = () => {
+  return (
+    <ActionBarPrimitive.Root
+      hideWhenRunning
+      autohide="not-last"
+      className="aui-user-action-bar-root mt-1 flex gap-1 justify-end text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+    >
+      <ActionBarPrimitive.Copy asChild>
+        <TooltipIconButton tooltip="复制">
+          <MessagePrimitive.If copied>
+            <CheckIcon />
+          </MessagePrimitive.If>
+          <MessagePrimitive.If copied={false}>
+            <CopyIcon />
+          </MessagePrimitive.If>
+        </TooltipIconButton>
+      </ActionBarPrimitive.Copy>
+      <ActionBarPrimitive.Edit asChild>
+        <TooltipIconButton tooltip="重写">
+          <PencilIcon />
+        </TooltipIconButton>
+      </ActionBarPrimitive.Edit>
+    </ActionBarPrimitive.Root>
+  );
+};
+
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
-      className="aui-user-message-root fade-in slide-in-from-bottom-1 mx-auto flex w-full max-w-(--thread-max-width) animate-in justify-end px-2 py-3 duration-150"
+      className="aui-user-message-root group fade-in slide-in-from-bottom-1 mx-auto flex w-full max-w-(--thread-max-width) animate-in justify-end px-2 py-3 duration-150"
       data-role="user"
     >
       <div className="flex min-w-0 flex-row-reverse items-start gap-3">
@@ -274,6 +301,7 @@ const UserMessage: FC = () => {
           <div className="aui-user-message-content wrap-break-word inline-block max-w-full rounded-2xl bg-primary px-4 py-2.5 text-primary-foreground">
             <MessagePrimitive.Parts />
           </div>
+          <UserActionBar />
         </div>
       </div>
     </MessagePrimitive.Root>
