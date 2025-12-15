@@ -18,7 +18,6 @@ import {
   MessageCircle,
   Send,
   Zap,
-  FileText,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -140,14 +139,9 @@ export const sidebarData: SidebarData = {
           icon: Mic,
         },
         {
-          title: '极致了配置',
+          title: '公众号采集',
           url: '/dajiala',
           icon: Zap,
-        },
-        {
-          title: '公众号文章',
-          url: '/dajiala/articles',
-          icon: FileText,
         },
         {
           title: '机器人配置',

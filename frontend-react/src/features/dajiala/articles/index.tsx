@@ -227,7 +227,12 @@ function getColumns(): ColumnDef<WechatArticle>[] {
   ]
 }
 
-export function WechatArticles() {
+interface WechatArticlesProps {
+  /** 嵌入模式 - 不显示 Header 和 Main 包装器 */
+  embedded?: boolean
+}
+
+export function WechatArticles({ embedded = false }: WechatArticlesProps) {
   // 筛选状态
   const [filters, setFilters] = useState<ArticleParams>({
     page: 1,
@@ -343,17 +348,10 @@ export function WechatArticles() {
     }
   }
 
-  return (
-    <>
-      <Header fixed>
-        <div className='flex items-center gap-4'>
-          <h1 className='text-xl font-semibold'>公众号文章</h1>
-        </div>
-      </Header>
-
-      <Main fixed className='min-h-0'>
-        <DataPageContent
-          toolbar={
+  // 内容部分
+  const content = (
+    <DataPageContent
+      toolbar={
             <div className='flex w-full flex-col gap-3'>
               {/* 筛选区标题栏 */}
               <div className='flex items-center justify-between'>
@@ -547,35 +545,62 @@ export function WechatArticles() {
               )}
             </tbody>
           </table>
-        </DataPageContent>
+    </DataPageContent>
+  )
+
+  // 删除确认对话框
+  const deleteDialog = (
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>确认删除</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定要删除选中的 {selectedRowCount} 篇文章吗？此操作无法撤销。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteMutation.isPending}>
+            取消
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={deleteMutation.isPending}
+            className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : null}
+            确认删除
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
+  // 嵌入模式 - 不显示 Header 和 Main 包装器
+  if (embedded) {
+    return (
+      <>
+        {content}
+        {deleteDialog}
+      </>
+    )
+  }
+
+  // 独立页面模式
+  return (
+    <>
+      <Header fixed>
+        <div className='flex items-center gap-4'>
+          <h1 className='text-xl font-semibold'>公众号文章</h1>
+        </div>
+      </Header>
+
+      <Main fixed className='min-h-0'>
+        {content}
       </Main>
 
-      {/* 删除确认对话框 */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除选中的 {selectedRowCount} 篇文章吗？此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
-            >
-              {deleteMutation.isPending ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : null}
-              确认删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteDialog}
     </>
   )
 }

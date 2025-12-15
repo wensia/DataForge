@@ -1,3 +1,9 @@
+/**
+ * 极致了配置页面 - Tab 布局
+ * Tab 1: 公众号管理 - 分组、采集设置、增删改查
+ * Tab 2: 文章列表 - 公众号文章展示
+ * Tab 3: 采集配置 - API 密钥配置
+ */
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
@@ -28,6 +34,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Card,
   CardContent,
@@ -61,6 +68,8 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ConfigDrawer } from '@/components/config-drawer'
+import { AccountManagement } from './components/account-management'
+import { WechatArticles } from '@/features/dajiala/articles'
 
 /** 极致了配置类型 */
 interface DajialaConfig {
@@ -281,7 +290,8 @@ function CredentialDisplay({
   )
 }
 
-export function DajialaSettings() {
+/** 采集配置列表组件 */
+function DajialaConfigList() {
   const {
     data: configs = [],
     isLoading,
@@ -500,194 +510,173 @@ export function DajialaSettings() {
 
   return (
     <>
-      <Header fixed>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main>
-        <div className='mb-2 flex flex-wrap items-end justify-between gap-4'>
-          <div>
-            <h2 className='text-2xl font-bold tracking-tight'>极致了配置</h2>
-            <p className='text-muted-foreground'>
-              管理极致了微信公众号数据采集服务的 API 密钥配置。
-            </p>
+      <div className='flex flex-col gap-4'>
+        <div className='flex items-center justify-between'>
+          <div />
+          <div className='flex gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => refetch()}
+              disabled={isRefetching}
+            >
+              <RefreshCw
+                className={cn('mr-2 h-4 w-4', isRefetching && 'animate-spin')}
+              />
+              刷新
+            </Button>
+            <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
+              <Plus className='mr-2 h-4 w-4' />
+              添加配置
+            </Button>
           </div>
         </div>
-        <Separator className='my-4' />
 
-        <div className='flex flex-col gap-4'>
-          <div className='flex items-center justify-between'>
-            <div />
-            <div className='flex gap-2'>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => refetch()}
-                disabled={isRefetching}
-              >
-                <RefreshCw
-                  className={cn('mr-2 h-4 w-4', isRefetching && 'animate-spin')}
-                />
-                刷新
-              </Button>
-              <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-                <Plus className='mr-2 h-4 w-4' />
-                添加配置
-              </Button>
-            </div>
+        {isLoading ? (
+          <div className='space-y-3'>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className='h-40 w-full' />
+            ))}
           </div>
-
-          {isLoading ? (
-            <div className='space-y-3'>
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Skeleton key={i} className='h-40 w-full' />
-              ))}
-            </div>
-          ) : configs.length === 0 ? (
-            <Card>
-              <CardContent className='flex h-32 items-center justify-center'>
-                <p className='text-muted-foreground'>暂无极致了配置</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className='grid gap-4 md:grid-cols-2'>
-              {configs.map((config) => (
-                <Card key={config.id}>
-                  <CardHeader className='pb-2'>
-                    <div className='flex items-center justify-between'>
-                      <div className='flex items-center gap-2'>
-                        <Zap className='text-muted-foreground h-5 w-5' />
-                        <CardTitle className='text-base'>
-                          {config.name}
-                        </CardTitle>
-                        {config.is_default && (
-                          <Badge variant='secondary' className='text-xs'>
-                            <Star className='mr-1 h-3 w-3' />
-                            默认
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge
-                        variant={config.is_active ? 'default' : 'secondary'}
-                      >
-                        {config.is_active ? (
-                          <CheckCircle className='mr-1 h-3 w-3' />
-                        ) : (
-                          <XCircle className='mr-1 h-3 w-3' />
-                        )}
-                        {config.is_active ? '启用' : '禁用'}
-                      </Badge>
-                    </div>
-                    <CardDescription className='flex items-center gap-2'>
-                      <span className='text-muted-foreground/70'>
-                        #{config.id}
-                      </span>
-                      {config.remain_money !== null && (
-                        <>
-                          <span className='text-muted-foreground/50'>·</span>
-                          <span className='flex items-center gap-1 text-green-600'>
-                            <Wallet className='h-3 w-3' />¥
-                            {config.remain_money.toFixed(2)}
-                          </span>
-                        </>
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className='space-y-3'>
-                    <div className='space-y-1'>
-                      <CredentialDisplay
-                        label='API Key'
-                        value={config.api_key_masked}
-                      />
-                      <CredentialDisplay
-                        label='附加码'
-                        value={config.verify_code_masked}
-                      />
-                      {config.test_biz && (
-                        <div className='flex items-center justify-between'>
-                          <span className='text-muted-foreground text-xs'>
-                            测试 Biz:
-                          </span>
-                          <code className='bg-muted rounded px-2 py-0.5 font-mono text-xs'>
-                            {config.test_biz}
-                          </code>
-                        </div>
+        ) : configs.length === 0 ? (
+          <Card>
+            <CardContent className='flex h-32 items-center justify-center'>
+              <p className='text-muted-foreground'>暂无极致了配置</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className='grid gap-4 md:grid-cols-2'>
+            {configs.map((config) => (
+              <Card key={config.id}>
+                <CardHeader className='pb-2'>
+                  <div className='flex items-center justify-between'>
+                    <div className='flex items-center gap-2'>
+                      <Zap className='text-muted-foreground h-5 w-5' />
+                      <CardTitle className='text-base'>
+                        {config.name}
+                      </CardTitle>
+                      {config.is_default && (
+                        <Badge variant='secondary' className='text-xs'>
+                          <Star className='mr-1 h-3 w-3' />
+                          默认
+                        </Badge>
                       )}
                     </div>
-                    <div className='text-muted-foreground text-xs'>
-                      上次验证: {formatDateTime(config.last_verified_at)}
-                    </div>
-                    {config.notes && (
-                      <div className='text-muted-foreground text-xs'>
-                        备注: {config.notes}
+                    <Badge
+                      variant={config.is_active ? 'default' : 'secondary'}
+                    >
+                      {config.is_active ? (
+                        <CheckCircle className='mr-1 h-3 w-3' />
+                      ) : (
+                        <XCircle className='mr-1 h-3 w-3' />
+                      )}
+                      {config.is_active ? '启用' : '禁用'}
+                    </Badge>
+                  </div>
+                  <CardDescription className='flex items-center gap-2'>
+                    <span className='text-muted-foreground/70'>
+                      #{config.id}
+                    </span>
+                    {config.remain_money !== null && (
+                      <>
+                        <span className='text-muted-foreground/50'>·</span>
+                        <span className='flex items-center gap-1 text-green-600'>
+                          <Wallet className='h-3 w-3' />¥
+                          {config.remain_money.toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  <div className='space-y-1'>
+                    <CredentialDisplay
+                      label='API Key'
+                      value={config.api_key_masked}
+                    />
+                    <CredentialDisplay
+                      label='附加码'
+                      value={config.verify_code_masked}
+                    />
+                    {config.test_biz && (
+                      <div className='flex items-center justify-between'>
+                        <span className='text-muted-foreground text-xs'>
+                          测试 Biz:
+                        </span>
+                        <code className='bg-muted rounded px-2 py-0.5 font-mono text-xs'>
+                          {config.test_biz}
+                        </code>
                       </div>
                     )}
-                    <div className='flex flex-wrap gap-2'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => handleVerify(config)}
-                        disabled={verifyingId === config.id}
-                      >
-                        <TestTube
-                          className={cn(
-                            'mr-1 h-3 w-3',
-                            verifyingId === config.id && 'animate-pulse'
-                          )}
-                        />
-                        验证密钥
-                      </Button>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => handleOpenFetchDialog(config)}
-                      >
-                        <Download className='mr-1 h-3 w-3' />
-                        采集文章
-                      </Button>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => handleOpenEditDialog(config)}
-                      >
-                        <Pencil className='mr-1 h-3 w-3' />
-                        编辑
-                      </Button>
-                      {!config.is_default && (
-                        <Button
-                          variant='outline'
-                          size='sm'
-                          onClick={() => handleSetDefault(config)}
-                        >
-                          <Star className='mr-1 h-3 w-3' />
-                          设为默认
-                        </Button>
-                      )}
-                      <Button
-                        variant='ghost'
-                        size='sm'
-                        className='text-destructive hover:text-destructive'
-                        onClick={() => {
-                          setSelectedConfig(config)
-                          setDeleteDialogOpen(true)
-                        }}
-                      >
-                        <Trash2 className='mr-1 h-3 w-3' />
-                        删除
-                      </Button>
+                  </div>
+                  <div className='text-muted-foreground text-xs'>
+                    上次验证: {formatDateTime(config.last_verified_at)}
+                  </div>
+                  {config.notes && (
+                    <div className='text-muted-foreground text-xs'>
+                      备注: {config.notes}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </Main>
+                  )}
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleVerify(config)}
+                      disabled={verifyingId === config.id}
+                    >
+                      <TestTube
+                        className={cn(
+                          'mr-1 h-3 w-3',
+                          verifyingId === config.id && 'animate-pulse'
+                        )}
+                      />
+                      验证密钥
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleOpenFetchDialog(config)}
+                    >
+                      <Download className='mr-1 h-3 w-3' />
+                      采集文章
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => handleOpenEditDialog(config)}
+                    >
+                      <Pencil className='mr-1 h-3 w-3' />
+                      编辑
+                    </Button>
+                    {!config.is_default && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => handleSetDefault(config)}
+                      >
+                        <Star className='mr-1 h-3 w-3' />
+                        设为默认
+                      </Button>
+                    )}
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='text-destructive hover:text-destructive'
+                      onClick={() => {
+                        setSelectedConfig(config)
+                        setDeleteDialogOpen(true)
+                      }}
+                    >
+                      <Trash2 className='mr-1 h-3 w-3' />
+                      删除
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 创建配置对话框 */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -1140,6 +1129,54 @@ export function DajialaSettings() {
           </Form>
         </DialogContent>
       </Dialog>
+    </>
+  )
+}
+
+/** 主页面组件 */
+export function DajialaSettings() {
+  return (
+    <>
+      <Header fixed>
+        <Search />
+        <div className='ms-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ConfigDrawer />
+          <ProfileDropdown />
+        </div>
+      </Header>
+
+      <Main>
+        <div className='mb-2 flex flex-wrap items-end justify-between gap-4'>
+          <div>
+            <h2 className='text-2xl font-bold tracking-tight'>公众号采集</h2>
+            <p className='text-muted-foreground'>
+              管理公众号账号、查看文章列表、配置采集服务。
+            </p>
+          </div>
+        </div>
+        <Separator className='my-4' />
+
+        <Tabs defaultValue='accounts' className='space-y-4'>
+          <TabsList>
+            <TabsTrigger value='accounts'>公众号管理</TabsTrigger>
+            <TabsTrigger value='articles'>文章列表</TabsTrigger>
+            <TabsTrigger value='config'>采集配置</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value='accounts'>
+            <AccountManagement />
+          </TabsContent>
+
+          <TabsContent value='articles'>
+            <WechatArticles embedded />
+          </TabsContent>
+
+          <TabsContent value='config'>
+            <DajialaConfigList />
+          </TabsContent>
+        </Tabs>
+      </Main>
     </>
   )
 }

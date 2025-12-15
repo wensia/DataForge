@@ -48,7 +48,6 @@ import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
-import { Route as AuthenticatedDajialaArticlesRouteImport } from './routes/_authenticated/dajiala/articles'
 import { Route as AuthenticatedAnalysisStaffMappingRouteImport } from './routes/_authenticated/analysis/staff-mapping'
 import { Route as AuthenticatedAnalysisChatRouteImport } from './routes/_authenticated/analysis/chat'
 import { Route as AuthenticatedAnalysisAiRouteImport } from './routes/_authenticated/analysis/ai'
@@ -267,12 +266,6 @@ const AuthenticatedErrorsErrorRoute =
     path: '/errors/$error',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedDajialaArticlesRoute =
-  AuthenticatedDajialaArticlesRouteImport.update({
-    id: '/dajiala/articles',
-    path: '/dajiala/articles',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedAnalysisStaffMappingRoute =
   AuthenticatedAnalysisStaffMappingRouteImport.update({
     id: '/analysis/staff-mapping',
@@ -317,7 +310,6 @@ export interface FileRoutesByFullPath {
   '/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
-  '/dajiala/articles': typeof AuthenticatedDajialaArticlesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -361,7 +353,6 @@ export interface FileRoutesByTo {
   '/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
-  '/dajiala/articles': typeof AuthenticatedDajialaArticlesRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -408,7 +399,6 @@ export interface FileRoutesById {
   '/_authenticated/analysis/ai': typeof AuthenticatedAnalysisAiRoute
   '/_authenticated/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/_authenticated/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
-  '/_authenticated/dajiala/articles': typeof AuthenticatedDajialaArticlesRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
@@ -455,7 +445,6 @@ export interface FileRouteTypes {
     | '/analysis/ai'
     | '/analysis/chat'
     | '/analysis/staff-mapping'
-    | '/dajiala/articles'
     | '/errors/$error'
     | '/settings/account'
     | '/settings/ai'
@@ -499,7 +488,6 @@ export interface FileRouteTypes {
     | '/analysis/ai'
     | '/analysis/chat'
     | '/analysis/staff-mapping'
-    | '/dajiala/articles'
     | '/errors/$error'
     | '/settings/account'
     | '/settings/ai'
@@ -545,7 +533,6 @@ export interface FileRouteTypes {
     | '/_authenticated/analysis/ai'
     | '/_authenticated/analysis/chat'
     | '/_authenticated/analysis/staff-mapping'
-    | '/_authenticated/dajiala/articles'
     | '/_authenticated/errors/$error'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/ai'
@@ -861,13 +848,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/dajiala/articles': {
-      id: '/_authenticated/dajiala/articles'
-      path: '/dajiala/articles'
-      fullPath: '/dajiala/articles'
-      preLoaderRoute: typeof AuthenticatedDajialaArticlesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/analysis/staff-mapping': {
       id: '/_authenticated/analysis/staff-mapping'
       path: '/analysis/staff-mapping'
@@ -945,7 +925,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalysisAiRoute: typeof AuthenticatedAnalysisAiRoute
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
-  AuthenticatedDajialaArticlesRoute: typeof AuthenticatedDajialaArticlesRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedAiChatTestIndexRoute: typeof AuthenticatedAiChatTestIndexRoute
   AuthenticatedAiChatIndexRoute: typeof AuthenticatedAiChatIndexRoute
@@ -968,7 +947,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalysisChatRoute: AuthenticatedAnalysisChatRoute,
   AuthenticatedAnalysisStaffMappingRoute:
     AuthenticatedAnalysisStaffMappingRoute,
-  AuthenticatedDajialaArticlesRoute: AuthenticatedDajialaArticlesRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedAiChatTestIndexRoute: AuthenticatedAiChatTestIndexRoute,
   AuthenticatedAiChatIndexRoute: AuthenticatedAiChatIndexRoute,
