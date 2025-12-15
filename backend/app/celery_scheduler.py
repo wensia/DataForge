@@ -25,41 +25,57 @@ from app.models.task import ScheduledTask, TaskStatus, TaskType
 class DatabaseScheduleEntry(ScheduleEntry):
     """数据库任务调度项"""
 
-    def __init__(self, task: ScheduledTask, app: Any = None) -> None:
-        self.task_model = task
+    def __init__(
+        self,
+        task: ScheduledTask | None = None,
+        app: Any = None,
+        **entry_kwargs: Any,
+    ) -> None:
+        # 支持两种初始化方式：
+        # 1. 从数据库任务创建（task 参数）
+        # 2. 从 _next_instance 复制（entry_kwargs 参数）
 
-        # 构建 Celery 任务参数
-        name = f"task_{task.id}_{task.name}"
-        celery_task = "dataforge.execute_task"
+        if task is not None:
+            # 从数据库任务创建
+            self.task_model = task
 
-        # 解析 handler_kwargs
-        handler_kwargs: dict[str, Any] = {}
-        if task.handler_kwargs:
-            try:
-                handler_kwargs = json.loads(task.handler_kwargs)
-            except json.JSONDecodeError:
-                pass
+            # 构建 Celery 任务参数
+            name = f"task_{task.id}_{task.name}"
+            celery_task = "dataforge.execute_task"
 
-        # 任务参数
-        kwargs = {
-            "task_id": task.id,
-            "handler_path": task.handler_path,
-            "handler_kwargs": handler_kwargs,
-            "trigger_type": "scheduled",
-        }
+            # 解析 handler_kwargs
+            handler_kwargs: dict[str, Any] = {}
+            if task.handler_kwargs:
+                try:
+                    handler_kwargs = json.loads(task.handler_kwargs)
+                except json.JSONDecodeError:
+                    pass
 
-        # 创建调度器
-        sched = self._make_schedule(task)
+            # 任务参数
+            kwargs = {
+                "task_id": task.id,
+                "handler_path": task.handler_path,
+                "handler_kwargs": handler_kwargs,
+                "trigger_type": "scheduled",
+            }
 
-        super().__init__(
-            name=name,
-            task=celery_task,
-            schedule=sched,
-            kwargs=kwargs,
-            options={},
-            app=app or current_app,
-            last_run_at=task.last_run_at,  # 关键：传递上次执行时间给 is_due()
-        )
+            # 创建调度器
+            sched = self._make_schedule(task)
+
+            super().__init__(
+                name=name,
+                task=celery_task,
+                schedule=sched,
+                kwargs=kwargs,
+                options={},
+                app=app or current_app,
+                last_run_at=task.last_run_at,  # 关键：传递上次执行时间给 is_due()
+            )
+        else:
+            # 从 _next_instance 复制（Celery 内部调用）
+            # 提取并保存 task_model，然后传递其余参数给父类
+            self.task_model = entry_kwargs.pop("task_model", None)
+            super().__init__(app=app, **entry_kwargs)
 
     def _make_schedule(self, task: ScheduledTask) -> schedule:
         """根据任务类型创建 Celery schedule"""
