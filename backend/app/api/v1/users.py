@@ -74,9 +74,40 @@ async def list_users(
             department_id=department_id,
         )
 
+        # 获取所有 CRM 用户的 crm_id
+        crm_ids = [u.id for u in crm_users]
+
+        # 查询本地已存在的用户记录
+        with Session(engine) as session:
+            existing_users = session.exec(
+                select(User).where(User.crm_id.in_(crm_ids))
+            ).all()
+            local_user_map = {u.crm_id: u for u in existing_users}
+
         # 转换为响应格式
         items = []
         for u in crm_users:
+            # 查找或创建本地用户记录
+            local_user = local_user_map.get(u.id)
+            if not local_user:
+                # 创建本地用户记录
+                with Session(engine) as session:
+                    local_user = User(
+                        email=u.email if u.email else None,  # 空字符串转为 None 避免唯一性冲突
+                        username=u.username,
+                        crm_id=u.id,
+                        name=u.name,
+                        phone=u.phone,
+                        role=UserRole.ADMIN if u.is_superuser else UserRole.USER,
+                        is_active=u.is_active,
+                        ai_enabled=False,
+                        created_at=u.joined_at or datetime.utcnow(),
+                    )
+                    session.add(local_user)
+                    session.commit()
+                    session.refresh(local_user)
+                    local_user_map[u.id] = local_user
+
             identities = [
                 UserIdentity(
                     identity_id=i.identity_id,
@@ -93,17 +124,17 @@ async def list_users(
             ]
             items.append(
                 UserWithIdentities(
-                    id=0,  # CRM 用户没有本地 ID
+                    id=local_user.id,  # 使用本地用户 ID
                     email=u.email,
                     username=u.username,
                     crm_id=u.id,
                     name=u.name,
                     phone=u.phone,
-                    role=UserRole.ADMIN if u.is_superuser else UserRole.USER,
-                    is_active=u.is_active,
-                    ai_enabled=False,  # CRM 用户默认禁用 AI
+                    role=local_user.role,  # 使用本地角色设置
+                    is_active=local_user.is_active,  # 使用本地启用状态
+                    ai_enabled=local_user.ai_enabled,  # 使用本地 AI 设置
                     created_at=u.joined_at or datetime.utcnow(),
-                    last_login_at=None,
+                    last_login_at=local_user.last_login_at,
                     identities=identities,
                 )
             )

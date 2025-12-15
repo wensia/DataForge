@@ -69,13 +69,16 @@ async def _login_via_crm(
     statement = select(User).where(User.crm_id == crm_user.id)
     user = session.exec(statement).first()
 
+    # 空字符串转为 None，避免唯一性约束冲突
+    email = crm_user.email if crm_user.email else None
+
     if not user:
         # 创建新用户
         user = User(
             crm_id=crm_user.id,
             username=crm_user.username,
             name=crm_user.name,
-            email=crm_user.email,
+            email=email,
             phone=crm_user.phone,
             role=UserRole.ADMIN if crm_user.is_superuser else UserRole.USER,
             is_active=crm_user.is_active,
@@ -89,7 +92,7 @@ async def _login_via_crm(
         # 更新用户信息
         user.username = crm_user.username
         user.name = crm_user.name
-        user.email = crm_user.email
+        user.email = email
         user.phone = crm_user.phone
         user.role = UserRole.ADMIN if crm_user.is_superuser else UserRole.USER
         user.is_active = crm_user.is_active
@@ -147,7 +150,8 @@ async def login(data: LoginRequest):
             logger.warning(f"CRM 登录失败: {e.message}")
             return ResponseModel.error(code=e.status_code, message=e.message)
         except Exception as e:
-            logger.error(f"CRM 登录异常: {e}")
+            import traceback
+            logger.error(f"CRM 登录异常: {e}\n{traceback.format_exc()}")
             return ResponseModel.error(code=500, message="登录服务异常，请稍后重试")
 
         if not user:
