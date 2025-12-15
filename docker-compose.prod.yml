@@ -71,6 +71,48 @@ services:
       start_period: 10s
       retries: 3
 
+  # ===== Celery Worker（任务执行器）=====
+  celery-worker:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    container_name: dataforge-celery-worker
+    command: celery -A app.celery_app worker --loglevel=info --pool=gevent --concurrency=4
+    environment:
+      - TZ=Asia/Shanghai
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    volumes:
+      - celery-logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ===== Celery Beat（任务调度器）=====
+  celery-beat:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    container_name: dataforge-celery-beat
+    command: celery -A app.celery_app beat --loglevel=info --scheduler app.celery_scheduler:DatabaseScheduler
+    environment:
+      - TZ=Asia/Shanghai
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dataforge-network
+    restart: unless-stopped
+    volumes:
+      - celery-logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
 networks:
   dataforge-network:
     driver: bridge
@@ -78,3 +120,5 @@ networks:
 volumes:
   backend-logs:
     name: dataforge-backend-logs
+  celery-logs:
+    name: dataforge-celery-logs
