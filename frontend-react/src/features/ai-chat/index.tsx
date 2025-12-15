@@ -604,10 +604,12 @@ function ConversationItem({
 function MessageItem({
   message,
   onCopy,
+  onEdit,
   isStreaming,
 }: {
   message: Message | { role: string; content: string; status?: string }
   onCopy?: () => void
+  onEdit?: (content: string) => void
   isStreaming?: boolean
 }) {
   const isUser = message.role === 'user'
@@ -622,6 +624,10 @@ function MessageItem({
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     onCopy?.()
+  }
+
+  const handleEdit = () => {
+    onEdit?.(message.content)
   }
 
   return (

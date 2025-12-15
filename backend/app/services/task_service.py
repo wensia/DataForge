@@ -134,6 +134,9 @@ def delete_task(task_id: int) -> bool:
         for execution in executions:
             session.delete(execution)
 
+        # 先提交执行记录的删除，确保外键约束满足
+        session.flush()
+
         session.delete(task)
         session.commit()
 
