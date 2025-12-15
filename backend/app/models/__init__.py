@@ -50,6 +50,12 @@ from app.models.dajiala_config import (
     DajialaConfigResponse,
     DajialaConfigUpdate,
 )
+from app.models.wechat_article import (
+    WechatArticle,
+    WechatArticleCreate,
+    WechatArticleParams,
+    WechatArticleResponse,
+)
 from app.models.conversation import (
     Conversation,
     ConversationCreate,
@@ -267,4 +273,8 @@ __all__ = [
     "DajialaConfigCreate",
     "DajialaConfigResponse",
     "DajialaConfigUpdate",
+    "WechatArticle",
+    "WechatArticleCreate",
+    "WechatArticleParams",
+    "WechatArticleResponse",
 ]

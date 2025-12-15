@@ -17,6 +17,8 @@ import {
   Star,
   Pencil,
   Wallet,
+  Download,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -183,6 +185,40 @@ function useVerifyDajialaConfig() {
   })
 }
 
+// 采集文章结果
+interface FetchArticlesResult {
+  total_fetched: number
+  total_saved: number
+  total_skipped: number
+  account_name: string | null
+  account_biz: string | null
+  remain_money: number | null
+}
+
+// 采集公众号文章
+function useFetchArticles() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      configId,
+      data,
+    }: {
+      configId: number
+      data: { biz?: string; url?: string; name?: string; pages: number }
+    }) => {
+      const response = await apiClient.post<ApiResponse<FetchArticlesResult>>(
+        `/wechat-articles/fetch`,
+        data,
+        { params: { config_id: configId } }
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: dajialaKeys.all })
+    },
+  })
+}
+
 const formSchema = z.object({
   name: z.string().min(1, '名称不能为空'),
   api_key: z.string().min(1, 'API 密钥不能为空'),
@@ -194,6 +230,18 @@ const formSchema = z.object({
 })
 
 type DajialaConfigForm = z.infer<typeof formSchema>
+
+const fetchFormSchema = z.object({
+  biz: z.string().optional(),
+  url: z.string().optional(),
+  name: z.string().optional(),
+  pages: z.coerce.number().min(1, '至少采集 1 页').max(100, '最多采集 100 页'),
+}).refine((data) => data.biz || data.url || data.name, {
+  message: '请填写公众号 biz、文章链接或公众号名称中的任意一项',
+  path: ['biz'],
+})
+
+type FetchForm = z.infer<typeof fetchFormSchema>
 
 /** 密钥显示组件 */
 function CredentialDisplay({
@@ -245,14 +293,17 @@ export function DajialaSettings() {
   const updateConfig = useUpdateDajialaConfig()
   const deleteConfig = useDeleteDajialaConfig()
   const verifyConfig = useVerifyDajialaConfig()
+  const fetchArticlesMutation = useFetchArticles()
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [fetchDialogOpen, setFetchDialogOpen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<DajialaConfig | null>(
     null
   )
   const [editingConfig, setEditingConfig] = useState<DajialaConfig | null>(null)
+  const [fetchingConfig, setFetchingConfig] = useState<DajialaConfig | null>(null)
   const [verifyingId, setVerifyingId] = useState<number | null>(null)
 
   const form = useForm<DajialaConfigForm>({
@@ -278,6 +329,16 @@ export function DajialaSettings() {
       is_active: true,
       is_default: false,
       notes: '',
+    },
+  })
+
+  const fetchForm = useForm<FetchForm>({
+    resolver: zodResolver(fetchFormSchema),
+    defaultValues: {
+      biz: '',
+      url: '',
+      name: '',
+      pages: 1,
     },
   })
 
@@ -360,6 +421,43 @@ export function DajialaSettings() {
       notes: config.notes || '',
     })
     setEditDialogOpen(true)
+  }
+
+  const handleOpenFetchDialog = (config: DajialaConfig) => {
+    setFetchingConfig(config)
+    fetchForm.reset({
+      biz: '',
+      url: '',
+      name: '',
+      pages: 1,
+    })
+    setFetchDialogOpen(true)
+  }
+
+  const onFetchSubmit = async (data: FetchForm) => {
+    if (!fetchingConfig) return
+    try {
+      const result = await fetchArticlesMutation.mutateAsync({
+        configId: fetchingConfig.id,
+        data: {
+          biz: data.biz || undefined,
+          url: data.url || undefined,
+          name: data.name || undefined,
+          pages: data.pages,
+        },
+      })
+      if (result.data) {
+        toast.success(
+          `采集完成：获取 ${result.data.total_fetched} 篇，保存 ${result.data.total_saved} 篇，跳过 ${result.data.total_skipped} 篇`
+        )
+      }
+      setFetchDialogOpen(false)
+      setFetchingConfig(null)
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : '采集失败，请重试'
+      toast.error(message)
+    }
   }
 
   const onEditSubmit = async (data: DajialaConfigForm) => {
@@ -543,6 +641,14 @@ export function DajialaSettings() {
                           )}
                         />
                         验证密钥
+                      </Button>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() => handleOpenFetchDialog(config)}
+                      >
+                        <Download className='mr-1 h-3 w-3' />
+                        采集文章
                       </Button>
                       <Button
                         variant='outline'
@@ -914,6 +1020,126 @@ export function DajialaSettings() {
         }
         confirmText='删除'
       />
+
+      {/* 采集文章对话框 */}
+      <Dialog open={fetchDialogOpen} onOpenChange={setFetchDialogOpen}>
+        <DialogContent className='max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>采集公众号文章</DialogTitle>
+            <DialogDescription>
+              使用配置 "{fetchingConfig?.name}" 采集公众号历史文章。
+              请填写公众号 biz、文章链接或公众号名称中的任意一项。
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...fetchForm}>
+            <form
+              onSubmit={fetchForm.handleSubmit(onFetchSubmit)}
+              className='space-y-4'
+            >
+              <FormField
+                control={fetchForm.control}
+                name='biz'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>公众号 Biz</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder='例如：MjM5MjAxNjM0MA=='
+                        className='font-mono'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      公众号的唯一标识，可从公众号文章链接中获取
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={fetchForm.control}
+                name='url'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>文章链接</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder='粘贴公众号文章链接' />
+                    </FormControl>
+                    <FormDescription>
+                      任意一篇该公众号的文章链接，系统会自动提取公众号信息
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={fetchForm.control}
+                name='name'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>公众号名称</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder='例如：人民日报' />
+                    </FormControl>
+                    <FormDescription>
+                      公众号的名称，需要精确匹配
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={fetchForm.control}
+                name='pages'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>采集页数</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type='number'
+                        min={1}
+                        max={100}
+                        className='w-24'
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      每页约 10 篇文章，建议先采集 1-2 页测试
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button
+                  variant='outline'
+                  type='button'
+                  onClick={() => setFetchDialogOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button type='submit' disabled={fetchArticlesMutation.isPending}>
+                  {fetchArticlesMutation.isPending ? (
+                    <>
+                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                      采集中...
+                    </>
+                  ) : (
+                    <>
+                      <Download className='mr-2 h-4 w-4' />
+                      开始采集
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
