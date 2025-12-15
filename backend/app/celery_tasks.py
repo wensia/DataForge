@@ -208,16 +208,15 @@ def execute_scheduled_task(
                 execution_id = execution.id
 
         # ========== 4. 使用 gevent 超时控制执行任务 ==========
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         try:
             # 使用 gevent.Timeout 实现超时控制
             # 因为 soft_time_limit 在 gevent 池中不生效
             with gevent.Timeout(
                 task_timeout, TaskTimeoutError(f"任务执行超过 {task_timeout} 秒")
             ):
-                result = loop.run_until_complete(
+                # 使用 asyncio.run() 来正确管理事件循环
+                # nest_asyncio.apply() 在模块加载时已调用，允许嵌套
+                result = asyncio.run(
                     execute_task_with_execution(
                         task_id=task_id,
                         handler=handler,
@@ -243,9 +242,6 @@ def execute_scheduled_task(
                 "error": str(e),
                 "execution_id": execution_id,
             }
-
-        finally:
-            loop.close()
 
     except Exception as e:
         # ========== 5. 异常处理与重试 ==========
