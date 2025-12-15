@@ -438,8 +438,8 @@ export function AIChat() {
                 {isStreaming && streamingContent && !streamingMessageId && (
                   <MessageItem message={{ role: 'assistant', content: streamingContent } as Message} isStreaming />
                 )}
-                {/* 加载指示器 */}
-                {isStreaming && !streamingContent && !streamingReasoning && (
+                {/* 加载指示器（仅在消息记录未创建时显示） */}
+                {isStreaming && !streamingContent && !streamingReasoning && !streamingMessageId && (
                   <div className="flex gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary">
                       <Bot className="h-4 w-4 text-primary-foreground" />
