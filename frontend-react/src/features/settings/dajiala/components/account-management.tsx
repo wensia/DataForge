@@ -49,7 +49,6 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
-  accountKeys,
   useCreateAccount,
   useCreateGroup,
   useDeleteAccount,
@@ -67,12 +66,9 @@ import type {
   UpdateAccountRequest,
   UpdateGroupRequest,
   WechatAccount,
-  WechatAccountGroup,
 } from '../types/account'
-import { useQueryClient } from '@tanstack/react-query'
 
 export function AccountManagement() {
-  const queryClient = useQueryClient()
   const { data: groupedData, isLoading, refetch, isRefetching } = useGroupedAccounts()
 
   // 对话框状态
@@ -276,7 +272,7 @@ export function AccountManagement() {
         handleConfirm={handleDeleteGroup}
         isLoading={deleteGroup.isPending}
         title={`删除分组: ${selectedGroup?.name}?`}
-        desc="删除分组后，该分组下的公众号将变为"未分组"状态。此操作无法撤销。"
+        desc="删除分组后，该分组下的公众号将变为「未分组」状态。此操作无法撤销。"
         confirmText="删除"
       />
 

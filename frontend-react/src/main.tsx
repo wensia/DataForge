@@ -64,10 +64,14 @@ const queryClient = new QueryClient({
     onError: (error) => {
       if (error instanceof AxiosError) {
         if (error.response?.status === 401) {
-          toast.error('登录已过期，请重新登录')
-          useAuthStore.getState().auth.reset()
-          const redirect = `${router.history.location.href}`
-          router.navigate({ to: '/sign-in', search: { redirect } })
+          // 避免在登录页重复导航
+          const currentPath = window.location.pathname
+          if (currentPath !== '/sign-in') {
+            toast.error('登录已过期，请重新登录')
+            useAuthStore.getState().auth.reset()
+            const redirect = `${router.history.location.href}`
+            router.navigate({ to: '/sign-in', search: { redirect } })
+          }
         }
         if (error.response?.status === 500) {
           toast.error('服务器内部错误')
