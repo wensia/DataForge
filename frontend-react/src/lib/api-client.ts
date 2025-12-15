@@ -37,11 +37,13 @@ apiClient.interceptors.response.use(
     if (data.code !== 200) {
       const error = new AxiosError(
         data.message || '请求失败',
-        String(data.code),
+        String(data.code), // 业务错误码存储在 error.code 中
         response.config,
         response.request,
         response
       )
+      // 添加业务状态码属性，便于 retry 配置识别
+      ;(error as AxiosError & { businessCode: number }).businessCode = data.code
       return Promise.reject(error)
     }
     return response

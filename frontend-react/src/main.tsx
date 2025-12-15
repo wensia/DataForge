@@ -25,13 +25,25 @@ const queryClient = new QueryClient({
         // eslint-disable-next-line no-console
         if (import.meta.env.DEV) console.log({ failureCount, error })
 
-        if (failureCount >= 0 && import.meta.env.DEV) return false
-        if (failureCount > 3 && import.meta.env.PROD) return false
+        // 开发环境不重试
+        if (import.meta.env.DEV) return false
 
-        return !(
-          error instanceof AxiosError &&
-          [401, 403].includes(error.response?.status ?? 0)
-        )
+        // 生产环境最多重试 3 次
+        if (failureCount > 3) return false
+
+        // 不重试的情况
+        if (error instanceof AxiosError) {
+          const httpStatus = error.response?.status ?? 0
+          // 业务错误码存储在 error.code 中（由 api-client 设置）
+          const businessCode = error.code ? parseInt(error.code, 10) : 0
+
+          // 不重试认证错误
+          if ([401, 403].includes(httpStatus)) return false
+          // 不重试业务错误（400=请求错误, 404=资源不存在）
+          if ([400, 404].includes(businessCode)) return false
+        }
+
+        return true
       },
       refetchOnWindowFocus: import.meta.env.PROD,
       staleTime: 10 * 1000, // 10s

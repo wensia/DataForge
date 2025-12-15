@@ -116,7 +116,32 @@ import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 ## TanStack Query 规范
 
-### Query Keys 组织
+### Query Keys 组织（重要）
+
+**禁止**将整个对象直接作为 Query Key 的一部分，这可能导致无限循环请求：
+
+```typescript
+// ❌ 错误：直接传递整个 params 对象
+list: (params?: ArticleParams) => [...keys.all, 'list', params] as const
+
+// ✅ 正确：扁平化参数
+list: (params?: ArticleParams) => [
+  ...keys.all,
+  'list',
+  params?.page,
+  params?.page_size,
+  params?.search,
+] as const
+
+// ✅ 或者使用 JSON 序列化（确保稳定）
+list: (params?: ArticleParams) => [
+  ...keys.all,
+  'list',
+  JSON.stringify(params),
+] as const
+```
+
+**推荐示例**：
 
 ```typescript
 // features/analysis/api/index.ts
@@ -126,6 +151,55 @@ export const analysisKeys = {
   stats: (params?: StatsParams) => [...analysisKeys.all, 'stats', params] as const,
   providers: () => [...analysisKeys.all, 'providers'] as const,
 }
+```
+
+### 错误重试配置
+
+业务错误码（如 400、404）不应触发自动重试。全局配置已在 `main.tsx` 中设置：
+
+```typescript
+// main.tsx 中的 retry 配置
+retry: (failureCount, error) => {
+  // 开发环境不重试
+  if (import.meta.env.DEV) return false
+
+  // 生产环境最多重试 3 次
+  if (failureCount > 3) return false
+
+  // 不重试业务错误
+  if (error instanceof AxiosError) {
+    const httpStatus = error.response?.status ?? 0
+    const businessCode = error.code ? parseInt(error.code, 10) : 0
+
+    if ([401, 403].includes(httpStatus)) return false
+    if ([400, 404].includes(businessCode)) return false
+  }
+
+  return true
+},
+```
+
+### 避免循环渲染
+
+使用 `useMemo` 稳定化传递给 Query 的参数：
+
+```typescript
+// ✅ 正确：使用 useMemo 稳定化参数
+const stableParams = useMemo(() => ({
+  page: filters.page,
+  page_size: filters.page_size,
+}), [filters.page, filters.page_size])
+
+const { data } = useQuery({
+  queryKey: ['items', stableParams],
+  queryFn: () => fetchItems(stableParams),
+})
+
+// ✅ 或者直接使用原始值
+const { data } = useQuery({
+  queryKey: ['items', 'list', filters.page, filters.page_size],
+  queryFn: () => fetchItems(filters),
+})
 ```
 
 ### useQuery Hook
