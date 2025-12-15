@@ -7,6 +7,7 @@
 """
 
 import json
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -98,7 +99,7 @@ class DatabaseScheduler(Scheduler):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._schedule: dict[str, DatabaseScheduleEntry] = {}
-        self._last_sync: datetime | None = None
+        self._last_sync: float = 0.0  # 使用 time.monotonic() 的浮点数
         super().__init__(*args, **kwargs)
 
     def setup_schedule(self) -> None:
@@ -129,7 +130,7 @@ class DatabaseScheduler(Scheduler):
 
                 # 原子替换调度配置
                 self._schedule = new_schedule
-                self._last_sync = datetime.now()
+                self._last_sync = time.monotonic()
 
                 logger.info(f"从数据库加载了 {len(self._schedule)} 个定时任务")
 
@@ -141,8 +142,8 @@ class DatabaseScheduler(Scheduler):
         """返回当前调度配置"""
         # 定期刷新
         if (
-            self._last_sync is None
-            or (datetime.now() - self._last_sync).total_seconds() > self.sync_every
+            self._last_sync == 0.0
+            or (time.monotonic() - self._last_sync) > self.sync_every
         ):
             self._load_tasks_from_db()
         return self._schedule
