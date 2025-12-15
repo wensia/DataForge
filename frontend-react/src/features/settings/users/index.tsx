@@ -189,14 +189,14 @@ const roleOptions = [
 ]
 
 const formSchema = z.object({
-  email: z.string().email('请输入有效的邮箱').optional().or(z.literal('')),
+  email: z.string().optional().or(z.literal('')),
   password: z.string().min(6, '密码至少 6 个字符'),
   name: z.string().min(1, '名称不能为空'),
   role: z.string().min(1, '请选择角色'),
 })
 
 const editFormSchema = z.object({
-  email: z.string().email('请输入有效的邮箱').optional().or(z.literal('')),
+  email: z.string().optional().or(z.literal('')),
   password: z.string().min(6, '密码至少 6 个字符').optional().or(z.literal('')),
   role: z.string().min(1, '请选择角色'),
   is_active: z.boolean(),
@@ -262,7 +262,7 @@ export function UsersSettings() {
     {
       accessorKey: 'email',
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title='邮箱' />
+        <DataTableColumnHeader column={column} title='账号' />
       ),
       cell: ({ row }) => {
         return (
@@ -568,7 +568,7 @@ export function UsersSettings() {
             <div className='flex items-center gap-4'>
               <h1 className='text-lg font-semibold'>用户管理</h1>
               <Input
-                placeholder='搜索用户名或邮箱...'
+                placeholder='搜索用户名或账号...'
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 className='w-64'
@@ -708,13 +708,13 @@ export function UsersSettings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      邮箱 <span className='text-muted-foreground'>(可选)</span>
+                      账号 <span className='text-muted-foreground'>(可选)</span>
                     </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        type='email'
-                        placeholder='user@example.com'
+                        type='text'
+                        placeholder='用户名或邮箱'
                       />
                     </FormControl>
                     <FormMessage />
@@ -839,12 +839,12 @@ export function UsersSettings() {
                 name='email'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>邮箱</FormLabel>
+                    <FormLabel>账号</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        type='email'
-                        placeholder='user@example.com'
+                        type='text'
+                        placeholder='用户名或邮箱'
                       />
                     </FormControl>
                     <FormMessage />
@@ -969,7 +969,8 @@ export function UsersSettings() {
         title={`删除用户: ${selectedUser?.name}?`}
         desc={
           <>
-            您即将删除用户 <strong>{selectedUser?.email}</strong>。
+            您即将删除用户 <strong>{selectedUser?.name}</strong>
+            {selectedUser?.email && ` (${selectedUser.email})`}。
             <br />
             此操作无法撤销。
           </>
