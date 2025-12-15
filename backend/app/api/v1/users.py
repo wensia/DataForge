@@ -103,6 +103,7 @@ async def list_users(
                     phone=u.phone,
                     role=UserRole.ADMIN if u.is_superuser else UserRole.USER,
                     is_active=u.is_active,
+                    ai_enabled=False,  # CRM 用户默认禁用 AI
                     created_at=u.joined_at or datetime.utcnow(),
                     last_login_at=None,
                     identities=identities,
