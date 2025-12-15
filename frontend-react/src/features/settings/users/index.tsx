@@ -30,8 +30,6 @@ import {
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
 import type { ApiResponse } from '@/lib/types'
-import { Header } from '@/components/layout/header'
-import { Main } from '@/components/layout/main'
 import { DataPageContent } from '@/components/layout/data-page-layout'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
@@ -554,42 +552,39 @@ export function UsersSettings() {
 
   return (
     <>
-      <Header fixed>
-        <div className='flex items-center gap-4'>
-          <h1 className='text-xl font-semibold'>用户管理</h1>
-        </div>
-      </Header>
-
-      <Main fixed className='min-h-0'>
-        <DataPageContent
-          toolbar={
-            <div className='flex w-full items-center justify-between'>
+      <DataPageContent
+        className='h-full'
+        toolbar={
+          <div className='flex w-full items-center justify-between'>
+            <div className='flex items-center gap-4'>
+              <h1 className='text-lg font-semibold'>用户管理</h1>
               <Input
                 placeholder='搜索用户名或邮箱...'
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className='max-w-sm'
+                className='w-64'
               />
-              <div className='flex gap-2'>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => refetch()}
-                  disabled={isRefetching}
-                >
-                  <RefreshCw
-                    className={cn('h-4 w-4', isRefetching && 'animate-spin')}
-                  />
-                </Button>
-                <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className='mr-2 h-4 w-4' />
-                  添加用户
-                </Button>
-              </div>
             </div>
-          }
-          pagination={<DataTablePagination table={table} />}
-        >
+            <div className='flex gap-2'>
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => refetch()}
+                disabled={isRefetching}
+              >
+                <RefreshCw
+                  className={cn('h-4 w-4', isRefetching && 'animate-spin')}
+                />
+              </Button>
+              <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
+                <Plus className='mr-2 h-4 w-4' />
+                添加用户
+              </Button>
+            </div>
+          </div>
+        }
+        pagination={<DataTablePagination table={table} />}
+      >
           {isLoading ? (
             <div className='space-y-2 p-4'>
               {Array.from({ length: 5 }).map((_, i) => (
@@ -641,8 +636,7 @@ export function UsersSettings() {
               </TableBody>
             </Table>
           )}
-        </DataPageContent>
-      </Main>
+      </DataPageContent>
 
       {/* 创建用户对话框 */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
