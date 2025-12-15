@@ -70,7 +70,7 @@ const defaultComponents = memoizeMarkdownComponents({
   h1: ({ className, ...props }) => (
     <h1
       className={cn(
-        "aui-md-h1 mb-8 scroll-m-20 font-extrabold text-4xl tracking-tight last:mb-0",
+        "aui-md-h1 mt-8 mb-8 scroll-m-20 font-extrabold text-4xl tracking-tight first:mt-0 last:mb-0",
         className,
       )}
       {...props}

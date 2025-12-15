@@ -19,8 +19,6 @@ import { Thread } from '@/components/assistant-ui/thread'
 import { ThreadList } from '@/components/assistant-ui/thread-list'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -384,8 +382,6 @@ export function AIChat() {
             sidebarOpen ? 'w-72' : 'w-0 overflow-hidden border-r-0'
           )}
         >
-          <SidebarHeader selectedProvider={selectedProvider} onSelectProvider={setSelectedProvider} />
-          <Separator />
           <ScrollArea className="flex-1">
             <div className="p-2">
               <ThreadList />
@@ -400,8 +396,6 @@ export function AIChat() {
               <SheetTitle>对话列表</SheetTitle>
             </SheetHeader>
             <div className="flex h-full flex-col">
-              <SidebarHeader selectedProvider={selectedProvider} onSelectProvider={setSelectedProvider} />
-              <Separator />
               <ScrollArea className="flex-1">
                 <div className="p-2">
                   <ThreadList />
@@ -467,35 +461,6 @@ export function AIChat() {
         </div>
       </div>
     </AssistantRuntimeProvider>
-  )
-}
-
-function SidebarHeader({
-  selectedProvider,
-  onSelectProvider,
-}: {
-  selectedProvider: string
-  onSelectProvider: (providerId: string) => void
-}) {
-  const { data: providers } = useProviders()
-
-  return (
-    <div className="p-2 space-y-2">
-      {providers && providers.length > 0 && (
-        <Select value={selectedProvider} onValueChange={onSelectProvider}>
-          <SelectTrigger className="h-9 text-xs">
-            <SelectValue placeholder="选择 AI" />
-          </SelectTrigger>
-          <SelectContent>
-            {providers.map((provider) => (
-              <SelectItem key={provider.id} value={provider.id}>
-                {provider.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </div>
   )
 }
 
