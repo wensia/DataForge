@@ -74,11 +74,8 @@ export function UserAuthForm({
 
       // 使用 window.location.href 确保跳转生效
       window.location.href = targetPath
-    } catch (error) {
-      // 显示 API 返回的错误消息
-      const message =
-        error instanceof Error ? error.message : '登录失败，请稍后重试'
-      toast.error(message)
+    } catch {
+      // 错误由全局 mutations.onError 处理，会自动显示 toast
     }
   }
 

@@ -50,6 +50,21 @@ from app.models.dajiala_config import (
     DajialaConfigResponse,
     DajialaConfigUpdate,
 )
+from app.models.wechat_account import (
+    BatchMoveGroupRequest,
+    MoveGroupRequest,
+    WechatAccount,
+    WechatAccountCreate,
+    WechatAccountParams,
+    WechatAccountResponse,
+    WechatAccountUpdate,
+)
+from app.models.wechat_account_group import (
+    WechatAccountGroup,
+    WechatAccountGroupCreate,
+    WechatAccountGroupResponse,
+    WechatAccountGroupUpdate,
+)
 from app.models.wechat_article import (
     WechatArticle,
     WechatArticleCreate,
@@ -277,4 +292,15 @@ __all__ = [
     "WechatArticleCreate",
     "WechatArticleParams",
     "WechatArticleResponse",
+    "WechatAccount",
+    "WechatAccountCreate",
+    "WechatAccountParams",
+    "WechatAccountResponse",
+    "WechatAccountUpdate",
+    "MoveGroupRequest",
+    "BatchMoveGroupRequest",
+    "WechatAccountGroup",
+    "WechatAccountGroupCreate",
+    "WechatAccountGroupResponse",
+    "WechatAccountGroupUpdate",
 ]
