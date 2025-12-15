@@ -38,9 +38,17 @@ backend/
 └── .python-version
 ```
 
-## 统一响应模型
+## 统一响应模型（强制）
 
-所有 API 接口必须使用统一的响应模型：
+**⚠️ 重要：所有 API 接口必须使用统一的响应模型，禁止使用 HTTPException！**
+
+### 规则
+
+1. **所有响应必须使用 `ResponseModel`**
+2. **禁止使用 `HTTPException`** - 它会返回 `{"detail": "..."}` 格式，破坏统一性
+3. **错误响应使用 `ResponseModel.error()`**
+
+### 正确示例 ✅
 
 ```python
 from app.schemas.response import ResponseModel
@@ -54,9 +62,39 @@ async def get_items():
 async def get_item(item_id: int):
     item = await ItemService.get_by_id(item_id)
     if not item:
-        return ResponseModel(code=404, message="项目不存在")
+        # ✅ 使用 ResponseModel.error()
+        return ResponseModel.error(code=404, message="项目不存在")
     return ResponseModel(data=item)
+
+@router.post("/items", response_model=ResponseModel)
+async def create_item(data: ItemCreate):
+    if not data.name:
+        # ✅ 使用 ResponseModel.error()
+        return ResponseModel.error(code=400, message="名称不能为空")
+    item = await ItemService.create(data)
+    return ResponseModel(message="创建成功", data=item)
 ```
+
+### 错误示例 ❌
+
+```python
+from fastapi import HTTPException
+
+@router.get("/items/{item_id}")
+async def get_item(item_id: int):
+    item = await ItemService.get_by_id(item_id)
+    if not item:
+        # ❌ 错误！HTTPException 返回 {"detail": "..."} 格式
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return item
+```
+
+### 响应格式对比
+
+| 方式 | 返回格式 | 是否统一 |
+|------|---------|---------|
+| `ResponseModel.error(code=404, message="不存在")` | `{"code": 404, "message": "不存在", "data": null}` | ✅ |
+| `raise HTTPException(status_code=404, detail="不存在")` | `{"detail": "不存在"}` | ❌ |
 
 ## SQLModel 模型规范
 

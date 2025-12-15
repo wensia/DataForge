@@ -37,14 +37,24 @@ frontend-react/src/   # React 应用 (端口 3692)
 
 ## 核心规范
 
-### 1. 统一响应格式
+### 1. 统一响应格式（强制）
 
-所有 API 返回:
+**所有 API 必须使用 `ResponseModel`，禁止使用 `HTTPException`！**
+
 ```python
-ResponseModel(code=200, message="success", data={...})
+# 成功响应
+ResponseModel(data={...})
+ResponseModel(message="创建成功", data={...})
+
+# 错误响应 - 必须使用 ResponseModel.error()
+ResponseModel.error(code=400, message="参数错误")
+ResponseModel.error(code=404, message="资源不存在")
+
+# 禁止使用 HTTPException！它返回 {"detail": "..."} 格式
+# raise HTTPException(status_code=404, detail="不存在")  # 错误！
 ```
 
-错误码: 200=成功, 401=无密钥, 403=密钥无效, 404=不存在, 500=服务器错误
+错误码: 200=成功, 400=请求错误, 401=无密钥, 403=密钥无效, 404=不存在, 500=服务器错误
 
 ### 2. API 密钥验证
 
@@ -93,6 +103,7 @@ cd frontend-react && pnpm dev --port 3692
 ## 重要提醒
 
 - 代码风格由工具保证,不需要手动检查格式
-- 所有 API 必须使用 `ResponseModel`
+- **所有 API 必须使用 `ResponseModel`，禁止使用 `HTTPException`**
+- 错误响应使用 `ResponseModel.error(code=xxx, message="...")`
 - 不要把 `.env` 提交到 Git
 - 生产环境必须使用 HTTPS

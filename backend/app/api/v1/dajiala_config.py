@@ -5,7 +5,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from app.database import get_session
@@ -57,9 +57,9 @@ async def create_dajiala_config(
     )
 
     if not verify_result["success"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"密钥验证失败: {verify_result['message']}",
+        return ResponseModel.error(
+            code=400,
+            message=f"密钥验证失败: {verify_result['message']}",
         )
 
     # 如果设置为默认，取消其他默认配置
@@ -87,7 +87,9 @@ async def create_dajiala_config(
     session.commit()
     session.refresh(config)
 
-    return ResponseModel(message="创建成功", data=DajialaConfigResponse.from_model(config))
+    return ResponseModel(
+        message="创建成功", data=DajialaConfigResponse.from_model(config)
+    )
 
 
 @router.get("/{config_id}", response_model=ResponseModel)
@@ -98,7 +100,7 @@ def get_dajiala_config(
     """获取单个极致了API配置"""
     config = session.get(DajialaConfig, config_id)
     if not config:
-        raise HTTPException(status_code=404, detail="配置不存在")
+        return ResponseModel.error(code=404, message="配置不存在")
 
     return ResponseModel(data=DajialaConfigResponse.from_model(config))
 
@@ -115,7 +117,7 @@ async def update_dajiala_config(
     """
     config = session.get(DajialaConfig, config_id)
     if not config:
-        raise HTTPException(status_code=404, detail="配置不存在")
+        return ResponseModel.error(code=404, message="配置不存在")
 
     update_data = data.model_dump(exclude_unset=True)
 
@@ -127,9 +129,9 @@ async def update_dajiala_config(
             test_biz=update_data.get("test_biz", config.test_biz),
         )
         if not verify_result["success"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"密钥验证失败: {verify_result['message']}",
+            return ResponseModel.error(
+                code=400,
+                message=f"密钥验证失败: {verify_result['message']}",
             )
         update_data["last_verified_at"] = datetime.now()
         update_data["remain_money"] = verify_result.get("remain_money")
@@ -154,7 +156,9 @@ async def update_dajiala_config(
     session.commit()
     session.refresh(config)
 
-    return ResponseModel(message="更新成功", data=DajialaConfigResponse.from_model(config))
+    return ResponseModel(
+        message="更新成功", data=DajialaConfigResponse.from_model(config)
+    )
 
 
 @router.delete("/{config_id}", response_model=ResponseModel)
@@ -165,7 +169,7 @@ def delete_dajiala_config(
     """删除极致了API配置"""
     config = session.get(DajialaConfig, config_id)
     if not config:
-        raise HTTPException(status_code=404, detail="配置不存在")
+        return ResponseModel.error(code=404, message="配置不存在")
 
     session.delete(config)
     session.commit()
@@ -181,7 +185,7 @@ async def verify_dajiala_config(
     """验证极致了API配置并刷新余额"""
     config = session.get(DajialaConfig, config_id)
     if not config:
-        raise HTTPException(status_code=404, detail="配置不存在")
+        return ResponseModel.error(code=404, message="配置不存在")
 
     # 验证密钥
     verify_result = await verify_dajiala_credentials(
