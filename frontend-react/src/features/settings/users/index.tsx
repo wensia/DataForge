@@ -30,7 +30,9 @@ import {
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
 import type { ApiResponse } from '@/lib/types'
-import { Separator } from '@/components/ui/separator'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { DataPageContent } from '@/components/layout/data-page-layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -550,99 +552,96 @@ export function UsersSettings() {
   }
 
   return (
-    <div className='flex flex-1 flex-col'>
-      <div className='flex-none'>
-        <h3 className='text-lg font-medium'>用户管理</h3>
-        <p className='text-muted-foreground text-sm'>
-          管理系统用户账号和权限。
-        </p>
-      </div>
-      <Separator className='my-4 flex-none' />
-
-      <div className='flex flex-col gap-4'>
-        <div className='flex items-center justify-between'>
-          <Input
-            placeholder='搜索用户名或邮箱...'
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className='max-w-sm'
-          />
-          <div className='flex gap-2'>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => refetch()}
-              disabled={isRefetching}
-            >
-              <RefreshCw
-                className={cn('mr-2 h-4 w-4', isRefetching && 'animate-spin')}
-              />
-              刷新
-            </Button>
-            <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
-              <Plus className='mr-2 h-4 w-4' />
-              添加用户
-            </Button>
-          </div>
+    <>
+      <Header fixed>
+        <div className='flex items-center gap-4'>
+          <h1 className='text-xl font-semibold'>用户管理</h1>
         </div>
+      </Header>
 
-        {isLoading ? (
-          <div className='space-y-2'>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className='h-12 w-full' />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className='overflow-hidden rounded-md border'>
-              <Table>
-                <TableHeader>
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <TableRow key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
+      <Main fixed className='min-h-0'>
+        <DataPageContent
+          toolbar={
+            <div className='flex w-full items-center justify-between'>
+              <Input
+                placeholder='搜索用户名或邮箱...'
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className='max-w-sm'
+              />
+              <div className='flex gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => refetch()}
+                  disabled={isRefetching}
+                >
+                  <RefreshCw
+                    className={cn('h-4 w-4', isRefetching && 'animate-spin')}
+                  />
+                </Button>
+                <Button size='sm' onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className='mr-2 h-4 w-4' />
+                  添加用户
+                </Button>
+              </div>
+            </div>
+          }
+          pagination={<DataTablePagination table={table} />}
+        >
+          {isLoading ? (
+            <div className='space-y-2 p-4'>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className='h-12 w-full' />
+              ))}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
                       ))}
                     </TableRow>
-                  ))}
-                </TableHeader>
-                <TableBody>
-                  {table.getRowModel().rows?.length ? (
-                    table.getRowModel().rows.map((row) => (
-                      <TableRow key={row.id}>
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell key={cell.id}>
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={columns.length}
-                        className='h-24 text-center'
-                      >
-                        暂无用户数据
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <DataTablePagination table={table} />
-          </>
-        )}
-      </div>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length}
+                      className='h-24 text-center'
+                    >
+                      暂无用户数据
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </DataPageContent>
+      </Main>
 
       {/* 创建用户对话框 */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -1052,6 +1051,6 @@ export function UsersSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
