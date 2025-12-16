@@ -3,9 +3,11 @@
 使用替换词本对已转录的通话记录进行错别字纠正。
 """
 
+from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.database import engine
@@ -33,7 +35,7 @@ def load_replacement_dict() -> dict[str, str]:
         task_log(f"替换词本不存在: {REPLACEMENT_DICT_PATH}")
         return replacements
 
-    with open(REPLACEMENT_DICT_PATH, "r", encoding="utf-8") as f:
+    with open(REPLACEMENT_DICT_PATH, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line and "|" in line:
@@ -58,6 +60,66 @@ def replace_text(text: str, replacements: dict[str, str]) -> str:
     for wrong, correct in replacements.items():
         text = text.replace(wrong, correct)
     return text
+
+
+def _build_base_query(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+):
+    """构建基础查询语句"""
+    statement = select(CallRecord).where(CallRecord.transcript.isnot(None))
+
+    if start_time:
+        start_time = normalize_time_param(start_time, default_time="00:00")
+        statement = statement.where(CallRecord.call_time >= start_time)
+    if end_time:
+        end_time = normalize_time_param(end_time, default_time="23:59")
+        statement = statement.where(CallRecord.call_time <= end_time)
+
+    return statement
+
+
+def _count_records(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> int:
+    """统计需要处理的记录总数（不加载数据到内存）"""
+    with Session(engine) as session:
+        base_query = _build_base_query(start_time, end_time)
+        count_query = select(func.count()).select_from(base_query.subquery())
+        return session.exec(count_query).one()
+
+
+def _get_records_paged(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    page_size: int = 500,
+) -> Generator[list[CallRecord], None, None]:
+    """分页获取记录（生成器模式）
+
+    每次从数据库获取 page_size 条记录，避免一次性加载全量数据到内存。
+
+    Yields:
+        list[CallRecord]: 每页的通话记录列表
+    """
+    offset = 0
+
+    while True:
+        with Session(engine) as session:
+            statement = _build_base_query(start_time, end_time)
+            statement = statement.order_by(CallRecord.call_time.desc())
+            statement = statement.limit(page_size).offset(offset)
+
+            records = list(session.exec(statement).all())
+
+            if not records:
+                break
+
+            yield records
+            offset += page_size
+
+            if len(records) < page_size:
+                break
 
 
 async def run(
@@ -89,40 +151,45 @@ async def run(
             "updated": 0,
         }
 
+    # 统计需要处理的记录总数（不加载数据到内存）
+    total = _count_records(start_time, end_time)
+    task_log(f"找到 {total} 条待处理记录")
+
+    if total == 0:
+        return {
+            "status": "completed",
+            "message": "没有需要处理的记录",
+            "total": 0,
+            "updated": 0,
+            "skipped": 0,
+        }
+
     # 统计
-    total = 0
     updated = 0
     skipped = 0
+    processed = 0
     examples = []  # 记录替换示例
 
-    with Session(engine) as session:
-        # 构建查询
-        statement = select(CallRecord).where(CallRecord.transcript.isnot(None))
+    # 使用分页查询，避免一次性加载全量数据到内存
+    db_page_size = 500
+    task_log(f"使用分页查询，每页 {db_page_size} 条记录")
 
-        if start_time:
-            start_time = normalize_time_param(start_time, default_time="00:00")
-            statement = statement.where(CallRecord.call_time >= start_time)
-        if end_time:
-            end_time = normalize_time_param(end_time, default_time="23:59")
-            statement = statement.where(CallRecord.call_time <= end_time)
-
-        records = session.exec(statement).all()
-        total = len(records)
-        task_log(f"找到 {total} 条待处理记录")
-
-        # 分批处理
-        for i in range(0, total, batch_size):
-            batch = records[i : i + batch_size]
-
-            for record in batch:
-                if not record.transcript:
+    for page_records in _get_records_paged(
+        start_time, end_time, page_size=db_page_size
+    ):
+        # 每页记录单独开启事务处理
+        with Session(engine) as session:
+            for record in page_records:
+                # 重新从当前 session 获取记录（避免 detached 状态）
+                db_record = session.get(CallRecord, record.id)
+                if not db_record or not db_record.transcript:
                     skipped += 1
                     continue
 
                 # 对每个 segment 的 text 进行替换
                 modified = False
                 new_transcript = []
-                for segment in record.transcript:
+                for segment in db_record.transcript:
                     new_segment = segment.copy()
                     if "text" in segment and segment["text"]:
                         original_text = segment["text"]
@@ -134,7 +201,7 @@ async def run(
                             if len(examples) < 5:
                                 examples.append(
                                     {
-                                        "record_id": record.id,
+                                        "record_id": db_record.id,
                                         "original": original_text[:50],
                                         "replaced": new_text[:50],
                                     }
@@ -143,20 +210,23 @@ async def run(
 
                 if modified:
                     if not dry_run:
-                        record.transcript = new_transcript
-                        session.add(record)
+                        db_record.transcript = new_transcript
+                        session.add(db_record)
                     updated += 1
 
             if not dry_run:
                 session.commit()
 
-            task_log(f"已处理 {min(i + batch_size, total)}/{total} 条记录")
+        processed += len(page_records)
+        task_log(f"已处理 {processed}/{total} 条记录")
 
     # 打印替换示例
     if examples:
         task_log("替换示例:")
         for ex in examples:
-            task_log(f"  记录 {ex['record_id']}: '{ex['original']}' -> '{ex['replaced']}'")
+            task_log(
+                f"  记录 {ex['record_id']}: '{ex['original']}' -> '{ex['replaced']}'"
+            )
 
     result = {
         "status": "completed",

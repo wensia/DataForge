@@ -71,6 +71,127 @@ TASK_INFO = {
 }
 
 
+def _build_base_query(
+    start_time: datetime,
+    end_time: datetime,
+    skip_existing: bool = True,
+    min_duration: int = 0,
+):
+    """构建基础查询语句
+
+    Args:
+        start_time: 开始时间
+        end_time: 结束时间
+        skip_existing: 是否跳过已有转写结果的记录
+        min_duration: 最小通话时长（秒）
+
+    Returns:
+        SQLAlchemy Select 语句
+    """
+    statement = select(CallRecord).where(
+        CallRecord.call_time >= start_time,
+        CallRecord.call_time <= end_time,
+    )
+
+    if skip_existing:
+        # 跳过已完成和空内容的记录
+        statement = statement.where(
+            or_(
+                CallRecord.transcript_status.is_(None),
+                CallRecord.transcript_status == TranscriptStatus.PENDING,
+            )
+        )
+
+    if min_duration > 0:
+        statement = statement.where(CallRecord.duration >= min_duration)
+
+    # 过滤有录音 URL 的记录
+    statement = statement.where(
+        or_(
+            text("raw_data->>'录音地址' IS NOT NULL AND raw_data->>'录音地址' != ''"),
+            text("raw_data->>'voiceUrl' IS NOT NULL AND raw_data->>'voiceUrl' != ''"),
+            text("raw_data->>'voice_url' IS NOT NULL AND raw_data->>'voice_url' != ''"),
+            text("raw_data->>'recordUrl' IS NOT NULL AND raw_data->>'recordUrl' != ''"),
+            text(
+                "raw_data->>'record_url' IS NOT NULL AND raw_data->>'record_url' != ''"
+            ),
+        )
+    )
+
+    return statement
+
+
+def _count_records_to_transcribe(
+    start_time: datetime,
+    end_time: datetime,
+    skip_existing: bool = True,
+    min_duration: int = 0,
+) -> int:
+    """统计需要转写的记录总数（不加载数据到内存）
+
+    Args:
+        start_time: 开始时间
+        end_time: 结束时间
+        skip_existing: 是否跳过已有转写结果的记录
+        min_duration: 最小通话时长（秒）
+
+    Returns:
+        int: 记录总数
+    """
+    from sqlalchemy import func
+
+    with Session(engine) as session:
+        base_query = _build_base_query(
+            start_time, end_time, skip_existing, min_duration
+        )
+        count_query = select(func.count()).select_from(base_query.subquery())
+        return session.exec(count_query).one()
+
+
+def _get_records_paged(
+    start_time: datetime,
+    end_time: datetime,
+    skip_existing: bool = True,
+    min_duration: int = 0,
+    page_size: int = 500,
+) -> list[CallRecord]:
+    """分页获取需要转写的通话记录（生成器模式）
+
+    每次从数据库获取 page_size 条记录，避免一次性加载全量数据到内存。
+
+    Args:
+        start_time: 开始时间
+        end_time: 结束时间
+        skip_existing: 是否跳过已有转写结果的记录
+        min_duration: 最小通话时长（秒）
+        page_size: 每页记录数，默认 500
+
+    Yields:
+        list[CallRecord]: 每页的通话记录列表
+    """
+    offset = 0
+
+    while True:
+        with Session(engine) as session:
+            statement = _build_base_query(
+                start_time, end_time, skip_existing, min_duration
+            )
+            statement = statement.order_by(CallRecord.call_time.desc())
+            statement = statement.limit(page_size).offset(offset)
+
+            records = list(session.exec(statement).all())
+
+            if not records:
+                break
+
+            yield records
+            offset += page_size
+
+            # 如果本页记录数小于 page_size，说明已经是最后一页
+            if len(records) < page_size:
+                break
+
+
 def _get_records_to_transcribe(
     start_time: datetime,
     end_time: datetime,
@@ -78,59 +199,25 @@ def _get_records_to_transcribe(
     min_duration: int = 0,
     limit: int | None = None,
 ) -> list[CallRecord]:
-    """获取需要转写的通话记录
+    """获取需要转写的通话记录（兼容旧接口，仅用于小数据量场景）
+
+    警告：此函数会一次性加载所有数据到内存，仅适用于小数据量场景。
+    对于大数据量，请使用 _get_records_paged 分页查询。
 
     Args:
         start_time: 开始时间
         end_time: 结束时间
         skip_existing: 是否跳过已有转写结果的记录
-        min_duration: 最小通话时长（秒），过滤掉时长小于此值的记录
+        min_duration: 最小通话时长（秒）
         limit: 最大记录数
 
     Returns:
         list[CallRecord]: 通话记录列表
     """
     with Session(engine) as session:
-        statement = select(CallRecord).where(
-            CallRecord.call_time >= start_time,
-            CallRecord.call_time <= end_time,
+        statement = _build_base_query(
+            start_time, end_time, skip_existing, min_duration
         )
-
-        if skip_existing:
-            # 跳过已完成和空内容的记录
-            # - transcript_status 为 None 或 pending：待处理
-            # - transcript_status 为 completed：已完成，跳过
-            # - transcript_status 为 empty：空音频，跳过
-            statement = statement.where(
-                or_(
-                    CallRecord.transcript_status == None,
-                    CallRecord.transcript_status == TranscriptStatus.PENDING,
-                )
-            )
-
-        if min_duration > 0:
-            # 过滤通话时长
-            statement = statement.where(CallRecord.duration >= min_duration)
-
-        # 过滤有录音 URL 的记录（在 SQL 层面过滤，避免获取无录音的记录）
-        statement = statement.where(
-            or_(
-                text(
-                    "raw_data->>'录音地址' IS NOT NULL AND raw_data->>'录音地址' != ''"
-                ),
-                text("raw_data->>'voiceUrl' IS NOT NULL AND raw_data->>'voiceUrl' != ''"),
-                text(
-                    "raw_data->>'voice_url' IS NOT NULL AND raw_data->>'voice_url' != ''"
-                ),
-                text(
-                    "raw_data->>'recordUrl' IS NOT NULL AND raw_data->>'recordUrl' != ''"
-                ),
-                text(
-                    "raw_data->>'record_url' IS NOT NULL AND raw_data->>'record_url' != ''"
-                ),
-            )
-        )
-
         statement = statement.order_by(CallRecord.call_time.desc())
 
         if limit:
@@ -256,7 +343,7 @@ async def run(
         batch_size: 每批处理数量，默认 10
         max_records: 最大识别成功数量，达到此数量后停止处理，0 表示不限制
         concurrency: 并发数，0 表示自动（默认）
-        correct_table_name: 替换词本名称（仅火山引擎有效），在火山引擎控制台自学习平台创建
+        correct_table_name: 替换词本名称（仅火山引擎有效）
         qps: 每秒请求数限制（仅火山引擎有效），默认 20
 
     Returns:
@@ -309,12 +396,10 @@ async def run(
     else:
         task_log(f"并发数: {concurrency}")
 
-    # 获取需要转写的记录（不限制数量，由 max_records 控制成功数量）
-    records = _get_records_to_transcribe(
-        start_time, end_time, skip_existing, min_duration, limit=None
+    # 统计需要转写的记录总数（不加载数据到内存）
+    total_count = _count_records_to_transcribe(
+        start_time, end_time, skip_existing, min_duration
     )
-
-    total_count = len(records)
     task_log(f"找到 {total_count} 条待转写记录")
 
     if total_count == 0:
@@ -327,52 +412,69 @@ async def run(
             "skipped": 0,
         }
 
+    # 分页大小：每次从数据库获取的记录数
+    # 设置为 500，平衡内存使用和查询效率
+    db_page_size = 500
+    task_log(f"使用分页查询，每页 {db_page_size} 条记录")
+
     # batch_size 至少覆盖并发数，否则会被批次顺序限制吞吐
     effective_batch_size = max(batch_size, concurrency)
     # 创建并发控制和统计
     semaphore = asyncio.Semaphore(concurrency)
     stats = ConcurrentStats()
 
-    # 分批处理
-    for i in range(0, total_count, effective_batch_size):
-        # 检查是否已达到 max_records
-        if max_records > 0 and await stats.get_success_count() >= max_records:
-            task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
+    # 使用分页查询，避免一次性加载全量数据到内存
+    batch_num = 0
+    should_stop = False
+
+    for page_records in _get_records_paged(
+        start_time, end_time, skip_existing, min_duration, page_size=db_page_size
+    ):
+        if should_stop:
             break
 
-        batch = records[i : i + effective_batch_size]
-        batch_num = i // effective_batch_size + 1
-        task_log(
-            f"处理第 {batch_num} 批（{len(batch)} 条，并发 {concurrency}）"
-        )
+        # 将数据库分页的记录再分成处理批次
+        for i in range(0, len(page_records), effective_batch_size):
+            # 检查是否已达到 max_records
+            if max_records > 0 and await stats.get_success_count() >= max_records:
+                task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
+                should_stop = True
+                break
 
-        # 并发执行本批次所有任务
-        tasks = [
-            _process_single_record(
-                record=record,
-                asr_config_id=asr_config_id,
-                stats=stats,
-                max_records=max_records,
-                semaphore=semaphore,
-                correct_table_name=correct_table_name,
-                qps=qps,
+            batch = page_records[i : i + effective_batch_size]
+            batch_num += 1
+            task_log(
+                f"处理第 {batch_num} 批（{len(batch)} 条，并发 {concurrency}）"
             )
-            for record in batch
-        ]
 
-        # 等待本批次完成
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+            # 并发执行本批次所有任务
+            tasks = [
+                _process_single_record(
+                    record=record,
+                    asr_config_id=asr_config_id,
+                    stats=stats,
+                    max_records=max_records,
+                    semaphore=semaphore,
+                    correct_table_name=correct_table_name,
+                    qps=qps,
+                )
+                for record in batch
+            ]
 
-        # 检查是否有任务返回 False (达到 max_records)
-        if False in results:
-            task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
-            break
+            # 等待本批次完成
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 批次间日志
-        task_log(
-            f"批次完成: {stats.success_count} 成功, "
-            f"{stats.failed_count} 失败, {stats.skipped_count} 跳过"
-        )
+            # 检查是否有任务返回 False (达到 max_records)
+            if False in results:
+                task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
+                should_stop = True
+                break
+
+            # 批次间日志
+            task_log(
+                f"批次完成: {stats.success_count} 成功, "
+                f"{stats.failed_count} 失败, {stats.skipped_count} 跳过"
+            )
 
     # 最终统计
     msg = (

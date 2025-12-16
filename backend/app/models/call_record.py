@@ -41,6 +41,8 @@ class CallRecord(BaseTable, table=True):
     __table_args__ = (
         Index("ix_call_records_call_time", "call_time"),
         Index("ix_call_records_source_record_id", "source", "record_id", unique=True),
+        # 复合索引：优化按时间范围+转写状态的查询（ASR任务常用）
+        Index("ix_call_records_time_status", "call_time", "transcript_status"),
     )
 
     # 数据来源标识
@@ -59,6 +61,9 @@ class CallRecord(BaseTable, table=True):
     customer_name: str | None = Field(default=None, description="客户名称")
     staff_name: str | None = Field(default=None, description="员工名称")
     department: str | None = Field(default=None, description="部门")
+    has_recording: bool = Field(
+        default=False, index=True, description="是否有录音文件（优化查询性能）"
+    )
     transcript: list[dict[str, Any]] | None = Field(
         default=None,
         sa_column=Column(JSON),
