@@ -70,9 +70,6 @@ class VolcengineASRClient(ASRClient):
         self._rate_lock = threading.Lock()
         # 保存最后一次请求的 logid，用于查询时链路追踪
         self._last_logid: str | None = None
-        # HTTP 客户端（懒加载，避免跨事件循环问题）
-        self._client: httpx.AsyncClient | None = None
-        self._client_loop: asyncio.AbstractEventLoop | None = None
 
     def set_qps(self, qps: int) -> None:
         """动态调整 QPS 限制。
@@ -96,28 +93,6 @@ class VolcengineASRClient(ASRClient):
     def get_last_logid(self) -> str | None:
         """获取最后一次请求的 logid，用于问题追踪"""
         return self._last_logid
-
-    def _get_client(self) -> httpx.AsyncClient:
-        """获取或创建 httpx 客户端（确保在当前事件循环中）
-
-        解决跨事件循环使用 httpx.AsyncClient 导致的
-        'is bound to a different event loop' 错误。
-        """
-        try:
-            current_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            current_loop = None
-
-        # 如果事件循环变化或客户端不存在，重新创建
-        if self._client is None or self._client_loop != current_loop:
-            # 注意：不能在这里关闭旧客户端，因为它绑定到不同的事件循环
-            self._client = httpx.AsyncClient(timeout=30.0)
-            self._client_loop = current_loop
-            logger.debug(
-                f"[volcengine] 创建新的 httpx.AsyncClient (loop={id(current_loop)})"
-            )
-
-        return self._client
 
     async def _rate_limited_request(self):
         """实例级别的请求限流（线程安全）"""
@@ -222,19 +197,22 @@ class VolcengineASRClient(ASRClient):
                 await self._rate_limited_request()
                 logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
-                response = await self._get_client().post(
-                    self.SUBMIT_URL,
-                    json=payload,
-                    headers=self._build_headers(request_id),
-                )
-                response.raise_for_status()
+                # 每次请求创建独立客户端，避免跨 asyncio 任务共享导致的
+                # anyio cancel scope 错误
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        self.SUBMIT_URL,
+                        json=payload,
+                        headers=self._build_headers(request_id),
+                    )
+                    response.raise_for_status()
 
-                # 保存 logid 用于查询
-                self._last_logid = response.headers.get("X-Tt-Logid")
+                    # 保存 logid 用于查询
+                    self._last_logid = response.headers.get("X-Tt-Logid")
 
-                # v3 API: 状态码在 response headers 中
-                status_code = response.headers.get("X-Api-Status-Code", "")
-                message = response.headers.get("X-Api-Message", "")
+                    # v3 API: 状态码在 response headers 中
+                    status_code = response.headers.get("X-Api-Status-Code", "")
+                    message = response.headers.get("X-Api-Message", "")
 
                 logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
 
@@ -282,21 +260,24 @@ class VolcengineASRClient(ASRClient):
                 # 请求前限流
                 await self._rate_limited_request()
 
-                response = await self._get_client().post(
-                    self.QUERY_URL,
-                    json={},  # v3 API 查询时请求体为空
-                    headers=self._build_headers(request_id),
-                )
-                response.raise_for_status()
+                # 每次请求创建独立客户端，避免跨 asyncio 任务共享导致的
+                # anyio cancel scope 错误
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        self.QUERY_URL,
+                        json={},  # v3 API 查询时请求体为空
+                        headers=self._build_headers(request_id),
+                    )
+                    response.raise_for_status()
 
-                # 更新 logid
-                if response.headers.get("X-Tt-Logid"):
-                    self._last_logid = response.headers.get("X-Tt-Logid")
+                    # 更新 logid
+                    if response.headers.get("X-Tt-Logid"):
+                        self._last_logid = response.headers.get("X-Tt-Logid")
 
-                # v3 API: 状态码在 response headers 中
-                status_code = response.headers.get("X-Api-Status-Code", "")
-                message = response.headers.get("X-Api-Message", "")
-                body = response.json()
+                    # v3 API: 状态码在 response headers 中
+                    status_code = response.headers.get("X-Api-Status-Code", "")
+                    message = response.headers.get("X-Api-Message", "")
+                    body = response.json()
 
                 logger.debug(
                     f"火山引擎查询: status={status_code}, msg={message or '(empty)'}"
