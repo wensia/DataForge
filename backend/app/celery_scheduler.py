@@ -4,11 +4,16 @@
 - 动态添加/修改/删除任务
 - CRON、INTERVAL、DATE 三种调度类型
 - 与现有数据模型完全兼容
+
+时区修复说明：
+当 TZ 环境变量设置为 Asia/Shanghai 时，Python 的 ZoneInfo('UTC') 会返回错误的
+偏移量（+08:00 而非 +00:00）。这导致 Celery 的 schedule.now() 返回错误的时间，
+从而导致任务调度计算错误。我们通过自定义 schedule 类重写 now() 方法来修复此问题。
 """
 
 import json
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from typing import Any
 
 from celery import current_app
@@ -20,6 +25,37 @@ from sqlmodel import Session, select
 from app.config import settings
 from app.database import engine
 from app.models.task import ScheduledTask, TaskStatus, TaskType
+
+
+# ============================================================================
+# 时区修复：自定义 schedule 类
+# ============================================================================
+
+
+class FixedTimezoneSchedule(schedule):
+    """修复时区问题的 schedule 类
+
+    问题：当 TZ=Asia/Shanghai 时，ZoneInfo('UTC') 返回错误的偏移量，
+    导致 Celery 的 schedule.now() 返回 UTC 时间但带有 +08:00 标记。
+
+    修复：重写 now() 方法，使用 datetime.now() 获取本地时间。
+    """
+
+    def now(self) -> datetime:
+        """返回当前本地时间（naive datetime）
+
+        Celery Beat 的 remaining_estimate 会用 now() - last_run_at 计算剩余时间。
+        只要 now() 和 last_run_at 使用相同的时区（都是本地时间），计算就是正确的。
+        """
+        return datetime.now()
+
+
+class FixedTimezoneCrontab(crontab):
+    """修复时区问题的 crontab 类"""
+
+    def now(self) -> datetime:
+        """返回当前本地时间"""
+        return datetime.now()
 
 
 class DatabaseScheduleEntry(ScheduleEntry):
@@ -104,12 +140,15 @@ class DatabaseScheduleEntry(ScheduleEntry):
 
     @staticmethod
     def _make_schedule_static(task: ScheduledTask) -> schedule:
-        """根据任务类型创建 Celery schedule"""
+        """根据任务类型创建 Celery schedule
+
+        使用自定义的 FixedTimezoneSchedule/FixedTimezoneCrontab 来修复时区问题。
+        """
         if task.task_type == TaskType.CRON and task.cron_expression:
             # 解析 cron 表达式 (分 时 日 月 周)
             parts = task.cron_expression.split()
             if len(parts) >= 5:
-                return crontab(
+                return FixedTimezoneCrontab(
                     minute=parts[0],
                     hour=parts[1],
                     day_of_month=parts[2],
@@ -119,19 +158,19 @@ class DatabaseScheduleEntry(ScheduleEntry):
             logger.warning(f"无效的 cron 表达式: {task.cron_expression}")
 
         elif task.task_type == TaskType.INTERVAL and task.interval_seconds:
-            return schedule(timedelta(seconds=task.interval_seconds))
+            return FixedTimezoneSchedule(timedelta(seconds=task.interval_seconds))
 
         elif task.task_type == TaskType.DATE and task.run_date:
             # DATE 类型：计算距离执行时间的秒数
             now = datetime.now()
             if task.run_date > now:
                 delta = (task.run_date - now).total_seconds()
-                return schedule(timedelta(seconds=delta))
+                return FixedTimezoneSchedule(timedelta(seconds=delta))
             # 已过期的一次性任务，设置为永不执行
             logger.info(f"一次性任务已过期: {task.name}")
 
         # 默认返回一个很长的间隔（相当于永不执行）
-        return schedule(timedelta(days=36500))
+        return FixedTimezoneSchedule(timedelta(days=36500))
 
     def _next_instance(self, last_run_at: datetime | None = None, only_update_last_run_at: bool = False) -> "DatabaseScheduleEntry":
         """创建下一个实例，保留 task_model_id"""
