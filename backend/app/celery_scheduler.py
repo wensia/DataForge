@@ -148,19 +148,47 @@ class DatabaseScheduleEntry(ScheduleEntry):
         )
 
 class DatabaseScheduler(Scheduler):
-    """从数据库加载任务的调度器"""
+    """从数据库加载任务的调度器
+
+    继承自 Celery Scheduler 基类，实现从数据库动态加载定时任务。
+
+    重要：
+    - _last_sync 必须是 float 或 None，否则 Celery 基类的 should_sync() 会报错
+    - _tasks_since_sync 需要初始化，与基类保持一致
+    """
 
     # 同步间隔（秒）- 定期从数据库刷新任务
     sync_every = settings.celery_beat_sync_every
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._schedule: dict[str, DatabaseScheduleEntry] = {}
-        self._last_sync: float = 0.0  # 使用 time.monotonic() 的浮点数
+        # 使用 None 与 Celery 基类保持一致（基类默认值是 None）
+        self._last_sync: float | None = None
+        # 添加 _tasks_since_sync 初始化，与基类保持一致
+        self._tasks_since_sync: int = 0
         super().__init__(*args, **kwargs)
 
     def setup_schedule(self) -> None:
         """初始化加载所有激活的任务"""
         self._load_tasks_from_db()
+
+    def should_sync(self) -> bool:
+        """重写 should_sync，添加类型安全检查
+
+        Celery 基类的实现假设 _last_sync 是 float 或 None，
+        如果类型不对会导致 TypeError。我们在这里添加保护。
+        """
+        # 确保 _last_sync 是正确的类型
+        if self._last_sync is not None and not isinstance(
+            self._last_sync, (int, float)
+        ):
+            logger.warning(
+                f"_last_sync 类型异常: {type(self._last_sync)}，重置为 None"
+            )
+            self._last_sync = None
+
+        # 调用父类实现
+        return super().should_sync()
 
     def _load_tasks_from_db(self) -> None:
         """从数据库加载激活状态的任务"""
@@ -186,22 +214,28 @@ class DatabaseScheduler(Scheduler):
 
                 # 原子替换调度配置
                 self._schedule = new_schedule
-                self._last_sync = time.monotonic()
+                # 确保使用 float 类型
+                self._last_sync = float(time.monotonic())
 
                 logger.info(f"从数据库加载了 {len(self._schedule)} 个定时任务")
 
         except Exception as e:
             logger.error(f"从数据库加载任务失败: {e}")
+            # 出错时不更新 _last_sync，下次会重试
 
     @property
     def schedule(self) -> dict[str, DatabaseScheduleEntry]:
         """返回当前调度配置"""
-        # 定期刷新
-        if (
-            self._last_sync == 0.0
+        # 使用更健壮的条件检查
+        should_reload = (
+            self._last_sync is None
+            or not isinstance(self._last_sync, (int, float))
             or (time.monotonic() - self._last_sync) > self.sync_every
-        ):
+        )
+
+        if should_reload:
             self._load_tasks_from_db()
+
         return self._schedule
 
     @schedule.setter
@@ -211,6 +245,7 @@ class DatabaseScheduler(Scheduler):
 
     def sync(self) -> None:
         """同步任务状态（Beat 定期调用）"""
+        logger.debug("Beat 触发同步...")
         self._load_tasks_from_db()
 
     def get_schedule(self) -> dict[str, DatabaseScheduleEntry]:
