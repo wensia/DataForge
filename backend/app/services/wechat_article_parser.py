@@ -144,16 +144,24 @@ def _extract_name_from_html(html: str) -> str | None:
 
 
 def _extract_avatar_from_html(html: str) -> str | None:
-    """从 HTML 中提取头像 URL"""
+    """从 HTML 中提取公众号头像 URL
+
+    优先从文章底部的打赏区域提取头像，这是公众号的真实头像
+    """
     patterns = [
-        # og:image meta 标签（通常是文章封面，但可作为备选）
-        r'<meta\s+property="og:image"\s+content="([^"]+)"',
-        r'<meta\s+content="([^"]+)"\s+property="og:image"',
-        # 公众号头像
+        # 打赏区域头像（优先级最高，这是公众号真实头像）
+        r'class="reward-avatar"[^>]*>\s*<img[^>]+src="([^"]+)"',
+        r'class="reward_avatar"[^>]*>\s*<img[^>]+src="([^"]+)"',
+        r'reward-avatar[^>]*>.*?<img[^>]+src="([^"]+)"',
+        # JavaScript 变量 - round_head_img（公众号头像）
+        r'var\s+round_head_img\s*=\s*["\']([^"\']+)["\']',
+        r'"round_head_img"\s*:\s*"([^"]+)"',
+        # 公众号头像元素
         r'class="profile_avatar"[^>]*>\s*<img[^>]+src="([^"]+)"',
         r'id="js_profile_avatar_img"[^>]+src="([^"]+)"',
-        # round_head_img 变量
-        r'var\s+round_head_img\s*=\s*["\']([^"\']+)["\']',
+        # ori_head_img_url（原始头像）
+        r'var\s+ori_head_img_url\s*=\s*["\']([^"\']+)["\']',
+        r'"ori_head_img_url"\s*:\s*"([^"]+)"',
     ]
 
     for pattern in patterns:
