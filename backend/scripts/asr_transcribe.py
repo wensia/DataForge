@@ -36,32 +36,35 @@ from scripts._utils import normalize_time_param
 
 @dataclass
 class ConcurrentStats:
-    """线程安全的统计计数器"""
+    """统计计数器
+
+    在 asyncio 单线程模型中，简单的整数操作是原子的，
+    因此不需要 asyncio.Lock（且 Lock 是不可重入的，容易导致死锁）。
+    """
 
     success_count: int = 0
     failed_count: int = 0
     skipped_count: int = 0
     error_records: list = field(default_factory=list)
-    _lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
-    async def inc_success(self) -> int:
-        async with self._lock:
-            self.success_count += 1
-            return self.success_count
+    def inc_success(self) -> int:
+        """增加成功计数并返回当前值"""
+        self.success_count += 1
+        return self.success_count
 
-    async def inc_failed(self, error_info: dict | None = None) -> None:
-        async with self._lock:
-            self.failed_count += 1
-            if error_info:
-                self.error_records.append(error_info)
+    def inc_failed(self, error_info: dict | None = None) -> None:
+        """增加失败计数"""
+        self.failed_count += 1
+        if error_info:
+            self.error_records.append(error_info)
 
-    async def inc_skipped(self) -> None:
-        async with self._lock:
-            self.skipped_count += 1
+    def inc_skipped(self) -> None:
+        """增加跳过计数"""
+        self.skipped_count += 1
 
-    async def get_success_count(self) -> int:
-        async with self._lock:
-            return self.success_count
+    def get_success_count(self) -> int:
+        """获取成功计数"""
+        return self.success_count
 
 
 # 任务元信息
@@ -252,7 +255,7 @@ async def _process_single_record(
     async with semaphore:
         # 检查是否已达到最大成功数量
         if max_records > 0:
-            current_success = await stats.get_success_count()
+            current_success = stats.get_success_count()
             if current_success >= max_records:
                 return False
 
@@ -261,7 +264,7 @@ async def _process_single_record(
             record_url = asr_service.extract_record_url(record.raw_data)
             if not record_url:
                 task_log(f"[Record {record.id}] 无录音，跳过")
-                await stats.inc_skipped()
+                stats.inc_skipped()
                 return True
 
             # 2. 执行转写
@@ -284,7 +287,7 @@ async def _process_single_record(
                     transcript,
                     TranscriptStatus.COMPLETED,
                 )
-                current = await stats.inc_success()
+                current = stats.inc_success()
                 max_display = max_records if max_records > 0 else "∞"
                 task_log(f"[Record {record.id}] ✓ 转写成功 ({current}/{max_display})")
             else:
@@ -294,7 +297,7 @@ async def _process_single_record(
                     record.id,
                     TranscriptStatus.EMPTY,
                 )
-                await stats.inc_failed(
+                stats.inc_failed(
                     {
                         "id": record.id,
                         "caller": record.caller,
@@ -306,7 +309,7 @@ async def _process_single_record(
                 task_log(f"[Record {record.id}] ✗ 空音频，已标记跳过")
 
         except Exception as e:
-            await stats.inc_failed(
+            stats.inc_failed(
                 {
                     "id": record.id,
                     "caller": record.caller,
@@ -436,7 +439,7 @@ async def run(
         # 将数据库分页的记录再分成处理批次
         for i in range(0, len(page_records), effective_batch_size):
             # 检查是否已达到 max_records
-            if max_records > 0 and await stats.get_success_count() >= max_records:
+            if max_records > 0 and stats.get_success_count() >= max_records:
                 task_log(f"已达到最大识别成功数量 {max_records}，停止处理")
                 should_stop = True
                 break
