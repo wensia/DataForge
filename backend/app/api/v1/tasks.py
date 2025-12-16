@@ -132,6 +132,28 @@ async def cancel_execution(execution_id: int):
     return ResponseModel.error(code=400, message=result["message"])
 
 
+# ============================================================================
+# 任务锁管理 API（必须放在 /{task_id} 路由之前，否则会被路径参数拦截）
+# ============================================================================
+
+
+@router.get("/locks", response_model=ResponseModel[list[dict]])
+async def get_all_locks():
+    """获取所有任务锁
+
+    返回当前 Redis 中所有任务锁的列表，包括：
+    - task_id: 任务 ID
+    - holder: 锁持有者（Worker ID）
+    - ttl: 剩余过期时间（秒）
+
+    用于监控和调试锁状态。
+    """
+    from app.utils.task_lock import list_all_task_locks
+
+    locks = list_all_task_locks()
+    return ResponseModel.success(data=locks)
+
+
 @router.get("/{task_id}", response_model=ResponseModel[ScheduledTaskResponse])
 async def get_task(task_id: int):
     """获取单个任务详情"""
@@ -436,28 +458,6 @@ async def stream_execution_logs(execution_id: int):
             "X-Accel-Buffering": "no",
         },
     )
-
-
-# ============================================================================
-# 任务锁管理 API
-# ============================================================================
-
-
-@router.get("/locks", response_model=ResponseModel[list[dict]])
-async def get_all_locks():
-    """获取所有任务锁
-
-    返回当前 Redis 中所有任务锁的列表，包括：
-    - task_id: 任务 ID
-    - holder: 锁持有者（Worker ID）
-    - ttl: 剩余过期时间（秒）
-
-    用于监控和调试锁状态。
-    """
-    from app.utils.task_lock import list_all_task_locks
-
-    locks = list_all_task_locks()
-    return ResponseModel.success(data=locks)
 
 
 @router.get("/{task_id}/lock", response_model=ResponseModel[dict])
