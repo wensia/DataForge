@@ -26,11 +26,13 @@ from sqlmodel import Session
 # 注意: nest_asyncio 不兼容 uvloop，需要捕获异常
 try:
     nest_asyncio.apply()
-except ValueError as e:
+except Exception as e:
+    # nest_asyncio 不兼容 uvloop，在 FastAPI/uvicorn 环境中会失败
+    # 这是预期行为，因为只有 Celery Worker 需要 nest_asyncio
     if "uvloop" in str(e).lower() or "can't patch" in str(e).lower():
-        logger.warning(f"nest_asyncio 无法应用于当前事件循环: {e}")
+        logger.debug(f"nest_asyncio 跳过（uvloop 环境）: {e}")
     else:
-        raise
+        logger.warning(f"nest_asyncio 无法应用: {e}")
 
 from app.celery_app import celery_app
 from app.config import settings
