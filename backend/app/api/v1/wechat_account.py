@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, func, or_, select
 
 from app.database import get_session
+from pydantic import BaseModel
+
 from app.models.wechat_account import (
     BatchMoveGroupRequest,
     MoveGroupRequest,
@@ -19,8 +21,51 @@ from app.models.wechat_account import (
 )
 from app.models.wechat_account_group import WechatAccountGroup
 from app.schemas.response import ResponseModel
+from app.services.wechat_article_parser import (
+    WechatArticleParseError,
+    parse_wechat_article_url,
+)
+
+
+class ParseUrlRequest(BaseModel):
+    """解析 URL 请求"""
+
+    url: str
+
+
+class ParseUrlResponse(BaseModel):
+    """解析 URL 响应"""
+
+    biz: str
+    name: str
+    avatar_url: str | None = None
+    user_name: str | None = None
 
 router = APIRouter(prefix="/wechat-accounts", tags=["公众号账号"])
+
+
+@router.post("/parse-url", response_model=ResponseModel)
+async def parse_article_url(data: ParseUrlRequest):
+    """从微信公众号文章链接解析公众号信息
+
+    支持的 URL 格式:
+    - 长链接: https://mp.weixin.qq.com/s?__biz=xxx&mid=...
+    - 短链接: https://mp.weixin.qq.com/s/xxx
+    """
+    try:
+        result = await parse_wechat_article_url(data.url)
+        return ResponseModel(
+            data=ParseUrlResponse(
+                biz=result.biz,
+                name=result.name,
+                avatar_url=result.avatar_url,
+                user_name=result.user_name,
+            )
+        )
+    except WechatArticleParseError as e:
+        return ResponseModel.error(code=400, message=str(e))
+    except Exception as e:
+        return ResponseModel.error(code=500, message=f"解析失败: {e}")
 
 
 def _get_account_with_group_name(

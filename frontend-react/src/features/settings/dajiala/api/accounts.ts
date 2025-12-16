@@ -261,3 +261,26 @@ export function useBatchMoveToGroup() {
     },
   })
 }
+
+// ============ URL 解析 API ============
+
+/** 解析结果类型 */
+export interface ParseUrlResponse {
+  biz: string
+  name: string
+  avatar_url: string | null
+  user_name: string | null
+}
+
+/** 从文章链接解析公众号信息 */
+export function useParseArticleUrl() {
+  return useMutation({
+    mutationFn: async (url: string) => {
+      const response = await apiClient.post<ApiResponse<ParseUrlResponse>>(
+        '/wechat-accounts/parse-url',
+        { url }
+      )
+      return response.data.data
+    },
+  })
+}

@@ -9,12 +9,14 @@ import {
   ChevronRight,
   Edit,
   FolderPlus,
+  Link,
   Loader2,
   MoreHorizontal,
   Pause,
   Play,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   UserPlus,
 } from 'lucide-react'
@@ -54,6 +56,7 @@ import {
   useDeleteAccount,
   useDeleteGroup,
   useGroupedAccounts,
+  useParseArticleUrl,
   useToggleAccountCollection,
   useToggleGroupCollection,
   useUpdateAccount,
@@ -685,11 +688,36 @@ interface CreateAccountDialogProps {
 }
 
 function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending }: CreateAccountDialogProps) {
+  // 表单字段
   const [biz, setBiz] = useState('')
   const [name, setName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [notes, setNotes] = useState('')
   const [isCollectionEnabled, setIsCollectionEnabled] = useState(true)
+
+  // URL 解析
+  const [articleUrl, setArticleUrl] = useState('')
+  const parseUrl = useParseArticleUrl()
+
+  const handleParseUrl = async () => {
+    if (!articleUrl.trim()) {
+      toast.error('请输入公众号文章链接')
+      return
+    }
+    try {
+      const result = await parseUrl.mutateAsync(articleUrl.trim())
+      // 自动填充表单
+      setBiz(result.biz)
+      setName(result.name)
+      if (result.avatar_url) {
+        setAvatarUrl(result.avatar_url)
+      }
+      toast.success('解析成功')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '解析失败'
+      toast.error(message)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -715,20 +743,75 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
       setName('')
       setAvatarUrl('')
       setNotes('')
+      setArticleUrl('')
       setIsCollectionEnabled(true)
     } catch {
       toast.error('添加失败')
     }
   }
 
+  // 对话框关闭时重置
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setBiz('')
+      setName('')
+      setAvatarUrl('')
+      setNotes('')
+      setArticleUrl('')
+      setIsCollectionEnabled(true)
+    }
+    onOpenChange(newOpen)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>添加公众号</DialogTitle>
           <DialogDescription>添加新的微信公众号到管理列表。</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* URL 解析区域 */}
+          <div className="bg-muted/50 space-y-2 rounded-lg border p-3">
+            <Label className="flex items-center gap-1.5 text-sm font-medium">
+              <Link className="h-4 w-4" />
+              从文章链接解析（可选）
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                value={articleUrl}
+                onChange={(e) => setArticleUrl(e.target.value)}
+                placeholder="粘贴公众号文章链接..."
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleParseUrl}
+                disabled={parseUrl.isPending || !articleUrl.trim()}
+              >
+                {parseUrl.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                <span className="ml-1.5">解析</span>
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              支持微信公众号文章链接，自动提取 Biz、名称和头像
+            </p>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background text-muted-foreground px-2">或手动填写</span>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="account-biz">
               公众号 Biz <span className="text-destructive">*</span>
@@ -740,7 +823,6 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
               placeholder="例如：MjM5MjAxNjM0MA=="
               className="font-mono"
             />
-            <p className="text-muted-foreground text-xs">公众号的唯一标识，可从公众号文章链接中获取</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="account-name">
@@ -781,7 +863,7 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
             <Label htmlFor="account-collection">启用采集</Label>
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" type="button" onClick={() => handleOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" disabled={isPending}>
