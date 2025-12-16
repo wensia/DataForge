@@ -136,12 +136,17 @@ services:
 
 ## SSH 连接
 
+**SSH 密钥绝对路径**: `/Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem`
+
 ```bash
-# 基本连接（在项目根目录执行）
+# 使用绝对路径连接（推荐）
+ssh -i /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem ubuntu@124.220.15.80
+
+# 或在项目根目录执行
 ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
 # 确保密钥权限正确
-chmod 600 ./claudeCode.pem
+chmod 600 /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
 ```
 
 ### SSH 别名配置（可选）

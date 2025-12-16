@@ -98,7 +98,15 @@ cd frontend-react && pnpm dev --port 3692
 - `docs/rules/ai-integration.md` - AI 集成规范（Kimi/DeepSeek）
 - `docs/rules/ai-tools.md` - AI 工具调用规范（Function Calling）
 - `docs/rules/auth.md` - 用户认证规范
-- `docs/rules/deploy.md` - 服务器部署和运维
+- `docs/rules/deploy.md` - **服务器部署和运维（涉及部署必读！）**
+
+### 部署相关（强制）
+
+**涉及服务器部署时，必须先阅读 `docs/rules/deploy.md`！**
+
+- SSH 密钥路径: `/Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem`
+- 服务器: `ubuntu@124.220.15.80`
+- 项目目录: `/www/wwwroot/yunke-transit`
 
 ## 重要提醒
 
