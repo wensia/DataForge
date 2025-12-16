@@ -23,7 +23,14 @@ from loguru import logger
 from sqlmodel import Session
 
 # 允许嵌套事件循环（解决 gevent + asyncio 冲突）
-nest_asyncio.apply()
+# 注意: nest_asyncio 不兼容 uvloop，需要捕获异常
+try:
+    nest_asyncio.apply()
+except ValueError as e:
+    if "uvloop" in str(e).lower() or "can't patch" in str(e).lower():
+        logger.warning(f"nest_asyncio 无法应用于当前事件循环: {e}")
+    else:
+        raise
 
 from app.celery_app import celery_app
 from app.config import settings
