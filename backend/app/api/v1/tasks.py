@@ -436,3 +436,87 @@ async def stream_execution_logs(execution_id: int):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ============================================================================
+# 任务锁管理 API
+# ============================================================================
+
+
+@router.get("/locks", response_model=ResponseModel[list[dict]])
+async def get_all_locks():
+    """获取所有任务锁
+
+    返回当前 Redis 中所有任务锁的列表，包括：
+    - task_id: 任务 ID
+    - holder: 锁持有者（Worker ID）
+    - ttl: 剩余过期时间（秒）
+
+    用于监控和调试锁状态。
+    """
+    from app.utils.task_lock import list_all_task_locks
+
+    locks = list_all_task_locks()
+    return ResponseModel.success(data=locks)
+
+
+@router.get("/{task_id}/lock", response_model=ResponseModel[dict])
+async def get_task_lock(task_id: int):
+    """获取指定任务的锁信息
+
+    Args:
+        task_id: 任务 ID
+
+    Returns:
+        锁信息，包括是否存在、持有者、TTL
+    """
+    from app.utils.task_lock import get_lock_info
+
+    lock_key = f"task_lock:{task_id}"
+    lock_info = get_lock_info(lock_key)
+
+    if lock_info is None:
+        return ResponseModel.error(code=500, message="无法获取锁信息（Redis 不可用）")
+
+    return ResponseModel.success(data=lock_info)
+
+
+@router.post("/{task_id}/release-lock", response_model=ResponseModel)
+async def release_task_lock(task_id: int):
+    """强制释放任务锁（管理员操作）
+
+    当任务因异常卡住而锁未释放时，管理员可使用此接口强制释放锁。
+
+    注意：
+    - 此操作会直接删除锁，不验证持有者
+    - 仅用于清理异常情况，正常情况锁会自动过期
+    - 强制释放锁可能导致任务并发执行，请谨慎使用
+
+    Args:
+        task_id: 任务 ID
+
+    Returns:
+        释放结果
+    """
+    from app.utils.task_lock import force_release_task_lock, get_lock_info
+
+    lock_key = f"task_lock:{task_id}"
+
+    # 先检查锁是否存在
+    lock_info = get_lock_info(lock_key)
+    if lock_info is None:
+        return ResponseModel.error(code=500, message="无法获取锁信息（Redis 不可用）")
+
+    if not lock_info.get("exists"):
+        return ResponseModel.error(code=404, message="锁不存在或已过期")
+
+    # 强制释放锁
+    success = force_release_task_lock(lock_key)
+    if success:
+        logger.warning(f"管理员强制释放了任务 #{task_id} 的锁")
+        return ResponseModel.success(
+            message=f"已强制释放任务 #{task_id} 的锁",
+            data={"task_id": task_id, "released": True},
+        )
+    else:
+        return ResponseModel.error(code=500, message="释放锁失败")

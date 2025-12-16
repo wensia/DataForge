@@ -474,6 +474,29 @@ scheduler_log_buffer_max_lines: int = 20000      # 单次执行内存日志上�
 scripts_path: str = "scripts"            # 脚本文件夹路径
 ```
 
+## 分布式任务锁
+
+为防止同一任务并发执行，项目使用 Redis 分布式锁。详见 [Celery 分布式任务锁规范](./celery-lock.md)。
+
+### 快速参考
+
+```python
+from app.utils.task_lock import task_lock_context, TaskLockAcquireError
+
+# 使用上下文管理器（推荐）
+with task_lock_context(f"task_lock:{task_id}"):
+    # 执行任务，锁会自动释放
+    do_work()
+```
+
+### 锁管理 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/tasks/locks` | 获取所有任务锁 |
+| GET | `/api/v1/tasks/{id}/lock` | 获取指定任务锁信息 |
+| POST | `/api/v1/tasks/{id}/release-lock` | 强制释放任务锁（管理员） |
+
 ## 默认系统任务
 
 | 任务名 | 类型 | 调度 | 说明 |

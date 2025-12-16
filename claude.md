@@ -92,6 +92,7 @@ cd frontend-react && pnpm dev --port 3692
 - `docs/rules/backend.md` - 后端详细开发规范
 - `docs/rules/frontend.md` - 前端详细开发规范 (React + shadcn/ui)
 - `docs/rules/scheduler.md` - 定时任务系统规范
+- `docs/rules/celery-lock.md` - Celery 分布式任务锁规范
 - `docs/rules/yunke-api.md` - 云客 API 集成规范
 - `docs/rules/feishu.md` - 飞书多维表格集成规范
 - `docs/rules/data-sync.md` - 数据同步规范（飞书→本地数据库）
