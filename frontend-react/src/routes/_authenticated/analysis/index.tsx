@@ -3,18 +3,18 @@ import { createFileRoute } from '@tanstack/react-router'
 import { DataAnalysis } from '@/features/analysis'
 
 const analysisSearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(20),
-  source: z.array(z.string()).optional().catch([]),
-  callType: z.array(z.string()).optional().catch([]),
-  callResult: z.array(z.string()).optional().catch([]),
-  startDate: z.string().optional().catch(undefined),
-  endDate: z.string().optional().catch(undefined),
-  staffName: z.string().optional().catch(undefined),
-  department: z.string().optional().catch(undefined),
-  callee: z.string().optional().catch(undefined),
-  durationMin: z.number().optional().catch(undefined),
-  durationMax: z.number().optional().catch(undefined),
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
+  source: z.array(z.string()).optional(),
+  callType: z.array(z.string()).optional(),
+  callResult: z.array(z.string()).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  staffName: z.string().optional(),
+  department: z.string().optional(),
+  callee: z.string().optional(),
+  durationMin: z.number().optional(),
+  durationMax: z.number().optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/analysis/')({
