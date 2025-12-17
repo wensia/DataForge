@@ -1,6 +1,6 @@
 """公众号账号数据模型
 
-用于管理微信公众号账号，支持分组和采集控制。
+用于管理微信公众号账号，支持标签分类和采集控制。
 """
 
 from datetime import datetime
@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlmodel import Field, SQLModel
 
 from app.models.base import BaseTable
+from app.models.wechat_account_tag import WechatAccountTagBrief
 
 
 class WechatAccount(BaseTable, table=True):
@@ -20,11 +21,6 @@ class WechatAccount(BaseTable, table=True):
     avatar_url: str | None = Field(default=None, description="头像 URL（原始外链）")
     local_avatar: str | None = Field(default=None, description="本地头像路径")
 
-    group_id: int | None = Field(
-        default=None,
-        foreign_key="wechat_account_groups.id",
-        description="所属分组 ID",
-    )
     is_collection_enabled: bool = Field(default=True, description="是否启用采集")
     collection_frequency: str | None = Field(
         default=None, description="采集频率（daily/weekly/manual）"
@@ -41,7 +37,7 @@ class WechatAccountCreate(SQLModel):
     biz: str
     name: str
     avatar_url: str | None = None
-    group_id: int | None = None
+    tag_ids: list[int] = []
     is_collection_enabled: bool = True
     collection_frequency: str | None = None
     notes: str | None = None
@@ -52,7 +48,7 @@ class WechatAccountUpdate(SQLModel):
 
     name: str | None = None
     avatar_url: str | None = None
-    group_id: int | None = None
+    tag_ids: list[int] | None = None
     is_collection_enabled: bool | None = None
     collection_frequency: str | None = None
     notes: str | None = None
@@ -65,9 +61,8 @@ class WechatAccountResponse(SQLModel):
     biz: str
     name: str
     avatar_url: str | None
-    local_avatar: str | None = None  # 本地头像路径
-    group_id: int | None
-    group_name: str | None = None  # 分组名称（用于显示）
+    local_avatar: str | None = None
+    tags: list[WechatAccountTagBrief] = []
     is_collection_enabled: bool
     collection_frequency: str | None
     last_collection_at: str | None
@@ -78,7 +73,9 @@ class WechatAccountResponse(SQLModel):
 
     @classmethod
     def from_model(
-        cls, account: "WechatAccount", group_name: str | None = None
+        cls,
+        account: "WechatAccount",
+        tags: list[WechatAccountTagBrief] | None = None,
     ) -> "WechatAccountResponse":
         return cls(
             id=account.id,
@@ -86,8 +83,7 @@ class WechatAccountResponse(SQLModel):
             name=account.name,
             avatar_url=account.avatar_url,
             local_avatar=account.local_avatar,
-            group_id=account.group_id,
-            group_name=group_name,
+            tags=tags or [],
             is_collection_enabled=account.is_collection_enabled,
             collection_frequency=account.collection_frequency,
             last_collection_at=(
@@ -107,19 +103,6 @@ class WechatAccountParams(SQLModel):
 
     page: int = 1
     page_size: int = 50
-    group_id: int | None = None
+    tag_ids: list[int] | None = None
     is_collection_enabled: bool | None = None
-    search: str | None = None  # 搜索名称或 biz
-
-
-class MoveGroupRequest(SQLModel):
-    """移动分组请求"""
-
-    group_id: int | None = None  # None 表示移到未分组
-
-
-class BatchMoveGroupRequest(SQLModel):
-    """批量移动分组请求"""
-
-    account_ids: list[int]
-    group_id: int | None = None
+    search: str | None = None

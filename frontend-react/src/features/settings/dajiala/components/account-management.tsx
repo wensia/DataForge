@@ -1,14 +1,12 @@
 /**
  * 公众号管理组件
- * 支持分组管理、采集状态控制、增删改查
+ * 支持标签筛选、采集状态控制、增删改查
  */
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-  ChevronRight,
   Download,
   Edit,
-  FolderPlus,
   Link,
   Loader2,
   MoreHorizontal,
@@ -17,17 +15,16 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
+  Tag,
   Trash2,
   UserPlus,
+  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getTagColorClass, getTagColorNames, type TagColorName } from '@/lib/colors'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
@@ -50,85 +47,65 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
+  useAccounts,
   useCreateAccount,
-  useCreateGroup,
+  useCreateTag,
   useDeleteAccount,
-  useDeleteGroup,
-  useGroupedAccounts,
+  useDeleteTag,
   useParseArticleUrl,
   useSyncAvatars,
+  useTags,
   useToggleAccountCollection,
-  useToggleGroupCollection,
   useUpdateAccount,
-  useUpdateGroup,
+  useUpdateTag,
 } from '../api/accounts'
 import type {
   CreateAccountRequest,
-  CreateGroupRequest,
-  GroupedAccounts,
+  CreateTagRequest,
   UpdateAccountRequest,
-  UpdateGroupRequest,
+  UpdateTagRequest,
   WechatAccount,
+  WechatAccountTag,
 } from '../types/account'
 
 export function AccountManagement() {
-  const { data: groupedData, isLoading, refetch, isRefetching } = useGroupedAccounts()
+  // 标签筛选状态
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
+
+  // 获取数据
+  const { data: tags, isLoading: isTagsLoading } = useTags()
+  const { data: accountsData, isLoading: isAccountsLoading, refetch, isRefetching } = useAccounts({
+    tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+    page_size: 100,
+  })
 
   // 对话框状态
-  const [createGroupOpen, setCreateGroupOpen] = useState(false)
-  const [editGroupOpen, setEditGroupOpen] = useState(false)
-  const [deleteGroupOpen, setDeleteGroupOpen] = useState(false)
+  const [tagManagerOpen, setTagManagerOpen] = useState(false)
   const [createAccountOpen, setCreateAccountOpen] = useState(false)
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
 
   // 当前选中项
-  const [selectedGroup, setSelectedGroup] = useState<GroupedAccounts['group'] | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<WechatAccount | null>(null)
 
-  // 展开状态
-  const [expandedGroups, setExpandedGroups] = useState<Set<number | null>>(new Set())
-
   // Mutations
-  const createGroup = useCreateGroup()
-  const updateGroup = useUpdateGroup()
-  const deleteGroup = useDeleteGroup()
-  const toggleGroupCollection = useToggleGroupCollection()
   const createAccount = useCreateAccount()
   const updateAccount = useUpdateAccount()
   const deleteAccount = useDeleteAccount()
   const toggleAccountCollection = useToggleAccountCollection()
   const syncAvatars = useSyncAvatars()
 
-  const toggleExpand = (groupId: number | null) => {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(groupId)) {
-        next.delete(groupId)
-      } else {
-        next.add(groupId)
+  const handleToggleTag = (tagId: number) => {
+    setSelectedTagIds((prev) => {
+      if (prev.includes(tagId)) {
+        return prev.filter((id) => id !== tagId)
       }
-      return next
+      return [...prev, tagId]
     })
   }
 
-  const handleOpenCreateGroup = () => {
-    setCreateGroupOpen(true)
-  }
-
-  const handleOpenEditGroup = (group: GroupedAccounts['group']) => {
-    setSelectedGroup(group)
-    setEditGroupOpen(true)
-  }
-
-  const handleOpenDeleteGroup = (group: GroupedAccounts['group']) => {
-    setSelectedGroup(group)
-    setDeleteGroupOpen(true)
-  }
-
-  const handleOpenCreateAccount = (groupId: number | null = null) => {
-    setSelectedGroup(groupId !== null ? { id: groupId, name: '', description: null, is_collection_enabled: true, sort_order: 0 } : null)
-    setCreateAccountOpen(true)
+  const handleClearTagFilter = () => {
+    setSelectedTagIds([])
   }
 
   const handleOpenEditAccount = (account: WechatAccount) => {
@@ -141,32 +118,12 @@ export function AccountManagement() {
     setDeleteAccountOpen(true)
   }
 
-  const handleToggleGroupCollection = async (groupId: number) => {
-    try {
-      await toggleGroupCollection.mutateAsync(groupId)
-      toast.success('采集状态已更新')
-    } catch {
-      toast.error('更新失败')
-    }
-  }
-
   const handleToggleAccountCollection = async (accountId: number) => {
     try {
       await toggleAccountCollection.mutateAsync(accountId)
       toast.success('采集状态已更新')
     } catch {
       toast.error('更新失败')
-    }
-  }
-
-  const handleDeleteGroup = async () => {
-    if (!selectedGroup?.id) return
-    try {
-      await deleteGroup.mutateAsync(selectedGroup.id)
-      toast.success('分组已删除')
-      setDeleteGroupOpen(false)
-    } catch {
-      toast.error('删除失败')
     }
   }
 
@@ -190,22 +147,35 @@ export function AccountManagement() {
     }
   }
 
+  const isLoading = isTagsLoading || isAccountsLoading
+
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full" />
-        ))}
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
       </div>
     )
   }
+
+  const accounts = accountsData?.items || []
+  const totalCount = accountsData?.total || 0
 
   return (
     <div className="space-y-4">
       {/* 工具栏 */}
       <div className="flex items-center justify-between">
         <div className="text-muted-foreground text-sm">
-          共 {groupedData?.reduce((sum, g) => sum + g.accounts.length, 0) || 0} 个公众号
+          共 {totalCount} 个公众号
+          {selectedTagIds.length > 0 && (
+            <span className="ml-2">
+              (已筛选 {selectedTagIds.length} 个标签)
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
@@ -216,86 +186,89 @@ export function AccountManagement() {
             <Download className={cn('mr-2 h-4 w-4', syncAvatars.isPending && 'animate-pulse')} />
             {syncAvatars.isPending ? '同步中...' : '同步头像'}
           </Button>
-          <Button variant="outline" size="sm" onClick={handleOpenCreateGroup}>
-            <FolderPlus className="mr-2 h-4 w-4" />
-            添加分组
+          <Button variant="outline" size="sm" onClick={() => setTagManagerOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            管理标签
           </Button>
-          <Button size="sm" onClick={() => handleOpenCreateAccount()}>
+          <Button size="sm" onClick={() => setCreateAccountOpen(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             添加公众号
           </Button>
         </div>
       </div>
 
-      {/* 分组列表 */}
-      {!groupedData || groupedData.length === 0 ? (
+      {/* 标签筛选栏 */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+        <Tag className="text-muted-foreground h-4 w-4" />
+        <button
+          onClick={handleClearTagFilter}
+          className={cn(
+            'rounded-full px-3 py-1 text-sm transition-colors',
+            selectedTagIds.length === 0
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted hover:bg-muted/80'
+          )}
+        >
+          全部
+        </button>
+        {tags?.map((tag) => (
+          <button
+            key={tag.id}
+            onClick={() => handleToggleTag(tag.id)}
+            className={cn(
+              'flex items-center gap-1 rounded-full px-3 py-1 text-sm transition-colors',
+              selectedTagIds.includes(tag.id)
+                ? getTagColorClass(tag.color, 'solid')
+                : getTagColorClass(tag.color, 'soft')
+            )}
+          >
+            {tag.name}
+            <span className="text-xs opacity-70">({tag.account_count})</span>
+          </button>
+        ))}
+        {selectedTagIds.length > 0 && (
+          <button
+            onClick={handleClearTagFilter}
+            className="text-muted-foreground hover:text-foreground ml-2 flex items-center gap-1 text-sm"
+          >
+            <X className="h-3 w-3" />
+            清除筛选
+          </button>
+        )}
+      </div>
+
+      {/* 公众号卡片网格 */}
+      {accounts.length === 0 ? (
         <div className="flex h-32 items-center justify-center rounded-lg border border-dashed">
-          <p className="text-muted-foreground text-sm">暂无公众号，点击上方按钮添加</p>
+          <p className="text-muted-foreground text-sm">
+            {selectedTagIds.length > 0 ? '没有符合筛选条件的公众号' : '暂无公众号，点击上方按钮添加'}
+          </p>
         </div>
       ) : (
-        <div className="divide-y">
-          {groupedData.map((item) => (
-            <GroupItem
-              key={item.group.id ?? 'ungrouped'}
-              group={item.group}
-              accounts={item.accounts}
-              isExpanded={expandedGroups.has(item.group.id)}
-              onToggleExpand={() => toggleExpand(item.group.id)}
-              onEditGroup={() => handleOpenEditGroup(item.group)}
-              onDeleteGroup={() => handleOpenDeleteGroup(item.group)}
-              onToggleGroupCollection={() => item.group.id && handleToggleGroupCollection(item.group.id)}
-              onAddAccount={() => handleOpenCreateAccount(item.group.id)}
-              onEditAccount={handleOpenEditAccount}
-              onDeleteAccount={handleOpenDeleteAccount}
-              onToggleAccountCollection={handleToggleAccountCollection}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {accounts.map((account) => (
+            <AccountItem
+              key={account.id}
+              account={account}
+              onEdit={() => handleOpenEditAccount(account)}
+              onDelete={() => handleOpenDeleteAccount(account)}
+              onToggleCollection={() => handleToggleAccountCollection(account.id)}
             />
           ))}
         </div>
       )}
 
-      {/* 创建分组对话框 */}
-      <CreateGroupDialog
-        open={createGroupOpen}
-        onOpenChange={setCreateGroupOpen}
-        onSubmit={async (data) => {
-          await createGroup.mutateAsync(data)
-          toast.success('分组创建成功')
-          setCreateGroupOpen(false)
-        }}
-        isPending={createGroup.isPending}
-      />
-
-      {/* 编辑分组对话框 */}
-      <EditGroupDialog
-        open={editGroupOpen}
-        onOpenChange={setEditGroupOpen}
-        group={selectedGroup}
-        onSubmit={async (data) => {
-          if (!selectedGroup?.id) return
-          await updateGroup.mutateAsync({ id: selectedGroup.id, data })
-          toast.success('分组更新成功')
-          setEditGroupOpen(false)
-        }}
-        isPending={updateGroup.isPending}
-      />
-
-      {/* 删除分组确认 */}
-      <ConfirmDialog
-        destructive
-        open={deleteGroupOpen}
-        onOpenChange={setDeleteGroupOpen}
-        handleConfirm={handleDeleteGroup}
-        isLoading={deleteGroup.isPending}
-        title={`删除分组: ${selectedGroup?.name}?`}
-        desc="删除分组后，该分组下的公众号将变为「未分组」状态。此操作无法撤销。"
-        confirmText="删除"
+      {/* 标签管理对话框 */}
+      <TagManagerDialog
+        open={tagManagerOpen}
+        onOpenChange={setTagManagerOpen}
       />
 
       {/* 创建公众号对话框 */}
       <CreateAccountDialog
         open={createAccountOpen}
         onOpenChange={setCreateAccountOpen}
-        groupId={selectedGroup?.id ?? null}
+        tags={tags || []}
         onSubmit={async (data) => {
           await createAccount.mutateAsync(data)
           toast.success('公众号添加成功')
@@ -309,6 +282,7 @@ export function AccountManagement() {
         open={editAccountOpen}
         onOpenChange={setEditAccountOpen}
         account={selectedAccount}
+        tags={tags || []}
         onSubmit={async (data) => {
           if (!selectedAccount) return
           await updateAccount.mutateAsync({ id: selectedAccount.id, data })
@@ -333,122 +307,7 @@ export function AccountManagement() {
   )
 }
 
-/** 分组项 */
-interface GroupItemProps {
-  group: GroupedAccounts['group']
-  accounts: WechatAccount[]
-  isExpanded: boolean
-  onToggleExpand: () => void
-  onEditGroup: () => void
-  onDeleteGroup: () => void
-  onToggleGroupCollection: () => void
-  onAddAccount: () => void
-  onEditAccount: (account: WechatAccount) => void
-  onDeleteAccount: (account: WechatAccount) => void
-  onToggleAccountCollection: (id: number) => void
-}
-
-function GroupItem({
-  group,
-  accounts,
-  isExpanded,
-  onToggleExpand,
-  onEditGroup,
-  onDeleteGroup,
-  onToggleGroupCollection,
-  onAddAccount,
-  onEditAccount,
-  onDeleteAccount,
-  onToggleAccountCollection,
-}: GroupItemProps) {
-  const isUngrouped = group.id === null
-
-  return (
-    <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-      {/* 分组标题栏 */}
-      <div className="group flex items-center gap-2 py-2">
-        <CollapsibleTrigger asChild>
-          <button className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
-            <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
-          </button>
-        </CollapsibleTrigger>
-
-        <div className="flex flex-1 items-center gap-2">
-          <span className="text-sm font-medium">{group.name}</span>
-          <span className="text-muted-foreground text-xs">{accounts.length}</span>
-          {!isUngrouped && (
-            <span className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              group.is_collection_enabled ? 'bg-green-500' : 'bg-muted-foreground/50'
-            )} title={group.is_collection_enabled ? '采集中' : '已暂停'} />
-          )}
-        </div>
-
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onAddAccount} title="添加公众号">
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          {!isUngrouped && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onToggleGroupCollection}>
-                  {group.is_collection_enabled ? (
-                    <>
-                      <Pause className="mr-2 h-4 w-4" />
-                      暂停采集
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      启用采集
-                    </>
-                  )}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onEditGroup}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  编辑分组
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDeleteGroup} className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  删除分组
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
-
-      {/* 公众号卡片网格 */}
-      <CollapsibleContent>
-        {accounts.length === 0 ? (
-          <div className="text-muted-foreground py-6 text-center text-sm">
-            该分组暂无公众号
-          </div>
-        ) : (
-          <div className="grid gap-3 pb-4 pl-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {accounts.map((account) => (
-              <AccountItem
-                key={account.id}
-                account={account}
-                onEdit={() => onEditAccount(account)}
-                onDelete={() => onDeleteAccount(account)}
-                onToggleCollection={() => onToggleAccountCollection(account.id)}
-              />
-            ))}
-          </div>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
-
-/** 公众号项 */
+/** 公众号卡片 */
 interface AccountItemProps {
   account: WechatAccount
   onEdit: () => void
@@ -457,7 +316,6 @@ interface AccountItemProps {
 }
 
 function AccountItem({ account, onEdit, onDelete, onToggleCollection }: AccountItemProps) {
-  // 优先使用本地头像（解决微信防盗链问题）
   const avatarSrc = account.local_avatar || account.avatar_url
 
   return (
@@ -522,178 +380,251 @@ function AccountItem({ account, onEdit, onDelete, onToggleCollection }: AccountI
           {account.biz}
         </div>
       </div>
+
+      {/* 标签 */}
+      {account.tags && account.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {account.tags.map((tag) => (
+            <span
+              key={tag.id}
+              className={cn('rounded px-1.5 py-0.5 text-xs', getTagColorClass(tag.color, 'soft'))}
+            >
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-/** 创建分组对话框 */
-interface CreateGroupDialogProps {
+/** 标签管理对话框 */
+interface TagManagerDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (data: CreateGroupRequest) => Promise<void>
-  isPending: boolean
 }
 
-function CreateGroupDialog({ open, onOpenChange, onSubmit, isPending }: CreateGroupDialogProps) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [isCollectionEnabled, setIsCollectionEnabled] = useState(true)
+function TagManagerDialog({ open, onOpenChange }: TagManagerDialogProps) {
+  const { data: tags, refetch } = useTags()
+  const createTag = useCreateTag()
+  const updateTag = useUpdateTag()
+  const deleteTag = useDeleteTag()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) {
-      toast.error('请输入分组名称')
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState<TagColorName>('gray')
+  const [editingTag, setEditingTag] = useState<WechatAccountTag | null>(null)
+  const [deleteTagOpen, setDeleteTagOpen] = useState(false)
+  const [tagToDelete, setTagToDelete] = useState<WechatAccountTag | null>(null)
+
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) {
+      toast.error('请输入标签名称')
       return
     }
     try {
-      await onSubmit({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        is_collection_enabled: isCollectionEnabled,
+      await createTag.mutateAsync({
+        name: newTagName.trim(),
+        color: newTagColor,
       })
-      setName('')
-      setDescription('')
-      setIsCollectionEnabled(true)
+      toast.success('标签创建成功')
+      setNewTagName('')
+      setNewTagColor('gray')
     } catch {
       toast.error('创建失败')
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>添加分组</DialogTitle>
-          <DialogDescription>创建新的公众号分组，用于组织和批量管理采集行为。</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="group-name">分组名称</Label>
-            <Input
-              id="group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例如：科技媒体"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="group-description">描述（可选）</Label>
-            <Textarea
-              id="group-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="分组描述"
-              rows={2}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="group-collection"
-              checked={isCollectionEnabled}
-              onCheckedChange={setIsCollectionEnabled}
-            />
-            <Label htmlFor="group-collection">启用采集</Label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              取消
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              创建
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** 编辑分组对话框 */
-interface EditGroupDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  group: GroupedAccounts['group'] | null
-  onSubmit: (data: UpdateGroupRequest) => Promise<void>
-  isPending: boolean
-}
-
-function EditGroupDialog({ open, onOpenChange, group, onSubmit, isPending }: EditGroupDialogProps) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-
-  // 当 group 变化时更新表单
-  useState(() => {
-    if (group) {
-      setName(group.name)
-      setDescription(group.description || '')
-    }
-  })
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) {
-      toast.error('请输入分组名称')
-      return
-    }
+  const handleUpdateTag = async (tag: WechatAccountTag, data: UpdateTagRequest) => {
     try {
-      await onSubmit({
-        name: name.trim(),
-        description: description.trim() || undefined,
-      })
+      await updateTag.mutateAsync({ id: tag.id, data })
+      toast.success('标签更新成功')
+      setEditingTag(null)
     } catch {
       toast.error('更新失败')
     }
   }
 
-  // 对话框打开时重置表单
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && group) {
-      setName(group.name)
-      setDescription(group.description || '')
+  const handleDeleteTag = async () => {
+    if (!tagToDelete) return
+    try {
+      await deleteTag.mutateAsync(tagToDelete.id)
+      toast.success('标签已删除')
+      setDeleteTagOpen(false)
+      setTagToDelete(null)
+    } catch {
+      toast.error('删除失败')
     }
-    onOpenChange(newOpen)
   }
 
+  const colorOptions = getTagColorNames()
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>编辑分组</DialogTitle>
-          <DialogDescription>修改分组信息。</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="edit-group-name">分组名称</Label>
-            <Input
-              id="edit-group-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例如：科技媒体"
-            />
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>管理标签</DialogTitle>
+            <DialogDescription>创建和管理公众号标签，用于分类筛选。</DialogDescription>
+          </DialogHeader>
+
+          {/* 创建新标签 */}
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+            <Label className="text-sm font-medium">添加新标签</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="标签名称"
+                className="flex-1"
+              />
+              <select
+                value={newTagColor}
+                onChange={(e) => setNewTagColor(e.target.value as TagColorName)}
+                className="rounded-md border bg-background px-2 py-1 text-sm"
+              >
+                {colorOptions.map((color) => (
+                  <option key={color} value={color}>
+                    {color}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                onClick={handleCreateTag}
+                disabled={createTag.isPending || !newTagName.trim()}
+              >
+                {createTag.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+            {/* 颜色预览 */}
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-xs">预览:</span>
+              <span className={cn('rounded px-2 py-0.5 text-xs', getTagColorClass(newTagColor, 'soft'))}>
+                {newTagName || '标签名称'}
+              </span>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-group-description">描述（可选）</Label>
-            <Textarea
-              id="edit-group-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="分组描述"
-              rows={2}
-            />
+
+          {/* 现有标签列表 */}
+          <div className="max-h-64 space-y-2 overflow-y-auto">
+            {!tags || tags.length === 0 ? (
+              <p className="text-muted-foreground py-4 text-center text-sm">暂无标签</p>
+            ) : (
+              tags.map((tag) => (
+                <div
+                  key={tag.id}
+                  className="flex items-center justify-between rounded-lg border bg-muted/20 px-3 py-2"
+                >
+                  {editingTag?.id === tag.id ? (
+                    <EditTagInline
+                      tag={tag}
+                      colorOptions={colorOptions}
+                      onSave={(data) => handleUpdateTag(tag, data)}
+                      onCancel={() => setEditingTag(null)}
+                      isPending={updateTag.isPending}
+                    />
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className={cn('rounded px-2 py-0.5 text-sm', getTagColorClass(tag.color, 'soft'))}>
+                          {tag.name}
+                        </span>
+                        <span className="text-muted-foreground text-xs">({tag.account_count})</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setEditingTag(tag)}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive h-7 w-7"
+                          onClick={() => {
+                            setTagToDelete(tag)
+                            setDeleteTagOpen(true)
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-              取消
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              保存
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              关闭
             </Button>
           </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除标签确认 */}
+      <ConfirmDialog
+        destructive
+        open={deleteTagOpen}
+        onOpenChange={setDeleteTagOpen}
+        handleConfirm={handleDeleteTag}
+        isLoading={deleteTag.isPending}
+        title={`删除标签: ${tagToDelete?.name}?`}
+        desc="删除标签后，关联的公众号将取消该标签。此操作无法撤销。"
+        confirmText="删除"
+      />
+    </>
+  )
+}
+
+/** 内联编辑标签 */
+interface EditTagInlineProps {
+  tag: WechatAccountTag
+  colorOptions: TagColorName[]
+  onSave: (data: UpdateTagRequest) => void
+  onCancel: () => void
+  isPending: boolean
+}
+
+function EditTagInline({ tag, colorOptions, onSave, onCancel, isPending }: EditTagInlineProps) {
+  const [name, setName] = useState(tag.name)
+  const [color, setColor] = useState<TagColorName>(tag.color as TagColorName)
+
+  return (
+    <div className="flex w-full items-center gap-2">
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="h-8 flex-1"
+      />
+      <select
+        value={color}
+        onChange={(e) => setColor(e.target.value as TagColorName)}
+        className="h-8 rounded-md border bg-background px-2 text-sm"
+      >
+        {colorOptions.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      <Button
+        size="sm"
+        className="h-8"
+        onClick={() => onSave({ name, color })}
+        disabled={isPending}
+      >
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : '保存'}
+      </Button>
+      <Button variant="ghost" size="sm" className="h-8" onClick={onCancel}>
+        取消
+      </Button>
+    </div>
   )
 }
 
@@ -701,20 +632,18 @@ function EditGroupDialog({ open, onOpenChange, group, onSubmit, isPending }: Edi
 interface CreateAccountDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  groupId: number | null
+  tags: WechatAccountTag[]
   onSubmit: (data: CreateAccountRequest) => Promise<void>
   isPending: boolean
 }
 
-function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending }: CreateAccountDialogProps) {
-  // 表单字段
+function CreateAccountDialog({ open, onOpenChange, tags, onSubmit, isPending }: CreateAccountDialogProps) {
   const [biz, setBiz] = useState('')
   const [name, setName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [notes, setNotes] = useState('')
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
   const [isCollectionEnabled, setIsCollectionEnabled] = useState(true)
-
-  // URL 解析
   const [articleUrl, setArticleUrl] = useState('')
   const parseUrl = useParseArticleUrl()
 
@@ -725,7 +654,6 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
     }
     try {
       const result = await parseUrl.mutateAsync(articleUrl.trim())
-      // 自动填充表单
       setBiz(result.biz)
       setName(result.name)
       if (result.avatar_url) {
@@ -736,6 +664,15 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
       const message = error instanceof Error ? error.message : '解析失败'
       toast.error(message)
     }
+  }
+
+  const handleToggleTag = (tagId: number) => {
+    setSelectedTagIds((prev) => {
+      if (prev.includes(tagId)) {
+        return prev.filter((id) => id !== tagId)
+      }
+      return [...prev, tagId]
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -753,31 +690,29 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
         biz: biz.trim(),
         name: name.trim(),
         avatar_url: avatarUrl.trim() || undefined,
-        group_id: groupId,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
         is_collection_enabled: isCollectionEnabled,
         notes: notes.trim() || undefined,
       })
-      // 重置表单
-      setBiz('')
-      setName('')
-      setAvatarUrl('')
-      setNotes('')
-      setArticleUrl('')
-      setIsCollectionEnabled(true)
+      resetForm()
     } catch {
       toast.error('添加失败')
     }
   }
 
-  // 对话框关闭时重置
+  const resetForm = () => {
+    setBiz('')
+    setName('')
+    setAvatarUrl('')
+    setNotes('')
+    setArticleUrl('')
+    setSelectedTagIds([])
+    setIsCollectionEnabled(true)
+  }
+
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setBiz('')
-      setName('')
-      setAvatarUrl('')
-      setNotes('')
-      setArticleUrl('')
-      setIsCollectionEnabled(true)
+      resetForm()
     }
     onOpenChange(newOpen)
   }
@@ -817,9 +752,6 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
                 <span className="ml-1.5">解析</span>
               </Button>
             </div>
-            <p className="text-muted-foreground text-xs">
-              支持微信公众号文章链接，自动提取 Biz、名称和头像
-            </p>
           </div>
 
           <div className="relative">
@@ -863,6 +795,31 @@ function CreateAccountDialog({ open, onOpenChange, groupId, onSubmit, isPending 
               placeholder="https://..."
             />
           </div>
+
+          {/* 标签选择 */}
+          {tags.length > 0 && (
+            <div className="space-y-2">
+              <Label>标签（可选）</Label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleToggleTag(tag.id)}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-sm transition-colors',
+                      selectedTagIds.includes(tag.id)
+                        ? getTagColorClass(tag.color, 'solid')
+                        : getTagColorClass(tag.color, 'soft')
+                    )}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="account-notes">备注（可选）</Label>
             <Textarea
@@ -901,23 +858,34 @@ interface EditAccountDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   account: WechatAccount | null
+  tags: WechatAccountTag[]
   onSubmit: (data: UpdateAccountRequest) => Promise<void>
   isPending: boolean
 }
 
-function EditAccountDialog({ open, onOpenChange, account, onSubmit, isPending }: EditAccountDialogProps) {
+function EditAccountDialog({ open, onOpenChange, account, tags, onSubmit, isPending }: EditAccountDialogProps) {
   const [name, setName] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [notes, setNotes] = useState('')
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([])
 
-  // 对话框打开时重置表单
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && account) {
       setName(account.name)
       setAvatarUrl(account.avatar_url || '')
       setNotes(account.notes || '')
+      setSelectedTagIds(account.tags?.map((t) => t.id) || [])
     }
     onOpenChange(newOpen)
+  }
+
+  const handleToggleTag = (tagId: number) => {
+    setSelectedTagIds((prev) => {
+      if (prev.includes(tagId)) {
+        return prev.filter((id) => id !== tagId)
+      }
+      return [...prev, tagId]
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -930,6 +898,7 @@ function EditAccountDialog({ open, onOpenChange, account, onSubmit, isPending }:
       await onSubmit({
         name: name.trim(),
         avatar_url: avatarUrl.trim() || undefined,
+        tag_ids: selectedTagIds,
         notes: notes.trim() || undefined,
       })
     } catch {
@@ -969,6 +938,31 @@ function EditAccountDialog({ open, onOpenChange, account, onSubmit, isPending }:
               placeholder="https://..."
             />
           </div>
+
+          {/* 标签选择 */}
+          {tags.length > 0 && (
+            <div className="space-y-2">
+              <Label>标签</Label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => handleToggleTag(tag.id)}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-sm transition-colors',
+                      selectedTagIds.includes(tag.id)
+                        ? getTagColorClass(tag.color, 'solid')
+                        : getTagColorClass(tag.color, 'soft')
+                    )}
+                  >
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="edit-account-notes">备注（可选）</Label>
             <Textarea

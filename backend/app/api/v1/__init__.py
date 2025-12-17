@@ -22,7 +22,7 @@ from app.api.v1 import (
     user_preferences,
     users,
     wechat_account,
-    wechat_account_group,
+    wechat_account_tag,
     wechat_article,
     yunke,
 )
@@ -49,6 +49,6 @@ router.include_router(staff_mapping.router)
 router.include_router(chat.router)
 router.include_router(prompts.router)
 router.include_router(robot.router)
-router.include_router(wechat_account_group.router)
+router.include_router(wechat_account_tag.router)
 router.include_router(wechat_account.router)
 router.include_router(wechat_article.router)

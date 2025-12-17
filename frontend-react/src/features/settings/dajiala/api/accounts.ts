@@ -6,108 +6,88 @@ import apiClient from '@/lib/api-client'
 import type { ApiResponse } from '@/lib/types'
 import type {
   AccountParams,
+  AssignTagsRequest,
   CreateAccountRequest,
-  CreateGroupRequest,
-  GroupedAccounts,
+  CreateTagRequest,
   PaginatedAccountResponse,
   UpdateAccountRequest,
-  UpdateGroupRequest,
+  UpdateTagRequest,
   WechatAccount,
-  WechatAccountGroup,
+  WechatAccountTag,
 } from '../types/account'
 
 // ============ Query Keys ============
 
-export const accountGroupKeys = {
-  all: ['wechat-account-groups'] as const,
-  list: () => [...accountGroupKeys.all, 'list'] as const,
+export const accountTagKeys = {
+  all: ['wechat-account-tags'] as const,
+  list: () => [...accountTagKeys.all, 'list'] as const,
 }
 
 export const accountKeys = {
   all: ['wechat-accounts'] as const,
   list: (params?: AccountParams) => [...accountKeys.all, 'list', params] as const,
-  grouped: () => [...accountKeys.all, 'grouped'] as const,
   detail: (id: number) => [...accountKeys.all, 'detail', id] as const,
 }
 
-// ============ 分组 API ============
+// ============ 标签 API ============
 
-/** 获取分组列表 */
-export function useAccountGroups() {
+/** 获取标签列表 */
+export function useTags() {
   return useQuery({
-    queryKey: accountGroupKeys.list(),
+    queryKey: accountTagKeys.list(),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<WechatAccountGroup[]>>(
-        '/wechat-account-groups'
+      const response = await apiClient.get<ApiResponse<WechatAccountTag[]>>(
+        '/wechat-account-tags'
       )
       return response.data.data
     },
   })
 }
 
-/** 创建分组 */
-export function useCreateGroup() {
+/** 创建标签 */
+export function useCreateTag() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: CreateGroupRequest) => {
-      const response = await apiClient.post<ApiResponse<WechatAccountGroup>>(
-        '/wechat-account-groups',
+    mutationFn: async (data: CreateTagRequest) => {
+      const response = await apiClient.post<ApiResponse<WechatAccountTag>>(
+        '/wechat-account-tags',
         data
       )
       return response.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountKeys.grouped() })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
 
-/** 更新分组 */
-export function useUpdateGroup() {
+/** 更新标签 */
+export function useUpdateTag() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: UpdateGroupRequest }) => {
-      const response = await apiClient.put<ApiResponse<WechatAccountGroup>>(
-        `/wechat-account-groups/${id}`,
+    mutationFn: async ({ id, data }: { id: number; data: UpdateTagRequest }) => {
+      const response = await apiClient.put<ApiResponse<WechatAccountTag>>(
+        `/wechat-account-tags/${id}`,
         data
       )
       return response.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountKeys.grouped() })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
 
-/** 删除分组 */
-export function useDeleteGroup() {
+/** 删除标签 */
+export function useDeleteTag() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiClient.delete(`/wechat-account-groups/${id}`)
+      await apiClient.delete(`/wechat-account-tags/${id}`)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
       queryClient.invalidateQueries({ queryKey: accountKeys.all })
-    },
-  })
-}
-
-/** 切换分组采集状态 */
-export function useToggleGroupCollection() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const response = await apiClient.put<ApiResponse<WechatAccountGroup>>(
-        `/wechat-account-groups/${id}/toggle-collection`
-      )
-      return response.data.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountKeys.grouped() })
     },
   })
 }
@@ -119,22 +99,16 @@ export function useAccounts(params: AccountParams = {}) {
   return useQuery({
     queryKey: accountKeys.list(params),
     queryFn: async () => {
+      // 将 tag_ids 数组转换为逗号分隔的字符串
+      const queryParams: Record<string, unknown> = { ...params }
+      if (params.tag_ids && params.tag_ids.length > 0) {
+        queryParams.tag_ids = params.tag_ids.join(',')
+      } else {
+        delete queryParams.tag_ids
+      }
       const response = await apiClient.get<ApiResponse<PaginatedAccountResponse>>(
         '/wechat-accounts',
-        { params }
-      )
-      return response.data.data
-    },
-  })
-}
-
-/** 获取按分组组织的公众号列表（树形） */
-export function useGroupedAccounts() {
-  return useQuery({
-    queryKey: accountKeys.grouped(),
-    queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<GroupedAccounts[]>>(
-        '/wechat-accounts/grouped'
+        { params: queryParams }
       )
       return response.data.data
     },
@@ -168,7 +142,7 @@ export function useCreateAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
@@ -186,6 +160,7 @@ export function useUpdateAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.all })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
@@ -199,7 +174,7 @@ export function useDeleteAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
@@ -220,44 +195,20 @@ export function useToggleAccountCollection() {
   })
 }
 
-/** 移动公众号到分组 */
-export function useMoveAccountToGroup() {
+/** 更新公众号标签 */
+export function useUpdateAccountTags() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, groupId }: { id: number; groupId: number | null }) => {
+    mutationFn: async ({ id, data }: { id: number; data: AssignTagsRequest }) => {
       const response = await apiClient.put<ApiResponse<WechatAccount>>(
-        `/wechat-accounts/${id}/move-group`,
-        { group_id: groupId }
+        `/wechat-accounts/${id}/tags`,
+        data
       )
       return response.data.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
-    },
-  })
-}
-
-/** 批量移动公众号到分组 */
-export function useBatchMoveToGroup() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      accountIds,
-      groupId,
-    }: {
-      accountIds: number[]
-      groupId: number | null
-    }) => {
-      const response = await apiClient.post<ApiResponse<{ message: string }>>(
-        '/wechat-accounts/batch-move-group',
-        { account_ids: accountIds, group_id: groupId }
-      )
-      return response.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: accountKeys.all })
-      queryClient.invalidateQueries({ queryKey: accountGroupKeys.all })
+      queryClient.invalidateQueries({ queryKey: accountTagKeys.all })
     },
   })
 }
