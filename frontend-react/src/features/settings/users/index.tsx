@@ -183,8 +183,8 @@ const CALL_TYPE_ALL = '__all__' // 特殊值表示不限制
 
 const callTypeFilterOptions = [
   { value: CALL_TYPE_ALL, label: '全部（不限制）' },
-  { value: '呼入', label: '仅呼入' },
-  { value: '外呼', label: '仅外呼' },
+  { value: 'inbound', label: '仅呼入' },
+  { value: 'outbound', label: '仅外呼' },
 ]
 
 const editFormSchema = z.object({
