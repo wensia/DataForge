@@ -95,7 +95,11 @@ class VolcengineASRClient(ASRClient):
         return self._last_logid
 
     async def _rate_limited_request(self):
-        """实例级别的请求限流（线程安全）"""
+        """实例级别的请求限流（线程安全）
+
+        注意：使用 time.sleep 而非 asyncio.sleep，
+        因为在 Celery gevent worker 中 asyncio.sleep 可能导致事件循环问题。
+        """
         with self._rate_lock:
             now = time.time()
             elapsed = now - self._last_request_time
@@ -106,8 +110,9 @@ class VolcengineASRClient(ASRClient):
             self._last_request_time = now + wait_time
 
         # 在锁外等待，避免阻塞其他线程
+        # 使用 time.sleep 而非 asyncio.sleep，兼容 gevent 环境
         if wait_time > 0:
-            await asyncio.sleep(wait_time)
+            time.sleep(wait_time)
 
     def _build_headers(self, request_id: str) -> dict[str, str]:
         """构建请求头"""
@@ -197,9 +202,8 @@ class VolcengineASRClient(ASRClient):
                 await self._rate_limited_request()
                 logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
-                # 使用同步客户端 + asyncio.to_thread 避免 gevent/asyncio 事件循环冲突
-                # 异步客户端的 anyio 后端在 Celery gevent worker 中会导致
-                # "no running event loop" 错误
+                # 使用同步客户端 + run_in_executor 避免 gevent/asyncio 事件循环冲突
+                # asyncio.to_thread 在 Celery gevent worker 中无法正确获取事件循环
                 def _sync_submit():
                     with httpx.Client(timeout=30.0) as client:
                         return client.post(
@@ -208,7 +212,8 @@ class VolcengineASRClient(ASRClient):
                             headers=self._build_headers(request_id),
                         )
 
-                response = await asyncio.to_thread(_sync_submit)
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(None, _sync_submit)
                 response.raise_for_status()
 
                 # 保存 logid 用于查询
@@ -237,7 +242,8 @@ class VolcengineASRClient(ASRClient):
                             f"火山引擎提交 429 限流，{wait_time:.1f}秒后重试 "
                             f"({attempt + 1}/{max_retries})"
                         )
-                        await asyncio.sleep(wait_time)
+                        # 使用 time.sleep 兼容 gevent 环境
+                        time.sleep(wait_time)
                         continue
                     else:
                         logger.error(f"火山引擎提交429限流，重试{max_retries}次仍失败")
@@ -264,7 +270,7 @@ class VolcengineASRClient(ASRClient):
                 # 请求前限流
                 await self._rate_limited_request()
 
-                # 使用同步客户端 + asyncio.to_thread 避免 gevent/asyncio 事件循环冲突
+                # 使用同步客户端 + run_in_executor 避免 gevent/asyncio 事件循环冲突
                 def _sync_query():
                     with httpx.Client(timeout=30.0) as client:
                         return client.post(
@@ -273,7 +279,8 @@ class VolcengineASRClient(ASRClient):
                             headers=self._build_headers(request_id),
                         )
 
-                response = await asyncio.to_thread(_sync_query)
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(None, _sync_query)
                 response.raise_for_status()
 
                 # 更新 logid
@@ -299,7 +306,8 @@ class VolcengineASRClient(ASRClient):
                             f"火山引擎 429 限流，{wait_time:.1f}秒后重试 "
                             f"({attempt + 1}/{max_retries})"
                         )
-                        await asyncio.sleep(wait_time)
+                        # 使用 time.sleep 兼容 gevent 环境
+                        time.sleep(wait_time)
                         continue
                     else:
                         logger.error(f"火山引擎 429 限流，重试{max_retries}次后仍失败")
@@ -335,8 +343,9 @@ class VolcengineASRClient(ASRClient):
         max_unknown_status_retries = 30  # 最多容忍 30 次未知状态（约 150 秒）
 
         # 添加随机初始延迟，避免多个任务同时轮询
+        # 使用 time.sleep 兼容 gevent 环境
         initial_delay = random.uniform(0, 2.0)
-        await asyncio.sleep(initial_delay)
+        time.sleep(initial_delay)
 
         while True:
             elapsed = int(time.time() - start_time)
@@ -397,7 +406,8 @@ class VolcengineASRClient(ASRClient):
             if progress_callback and poll_count % 6 == 0:
                 progress_callback(status_msg, elapsed)
 
-            await asyncio.sleep(poll_interval)
+            # 使用 time.sleep 兼容 gevent 环境
+            time.sleep(poll_interval)
 
     def _parse_result(
         self,

@@ -281,7 +281,10 @@ async def _process_single_record(
             if transcript:
                 # 同步 DB 写入放到线程，避免阻塞事件循环
                 # 转写成功，标记状态为 completed
-                await asyncio.to_thread(
+                # 使用 run_in_executor 兼容 gevent 环境（asyncio.to_thread 可能失败）
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
                     asr_service.update_record_transcript,
                     record.id,
                     transcript,
@@ -292,7 +295,9 @@ async def _process_single_record(
                 task_log(f"[Record {record.id}] ✓ 转写成功 ({current}/{max_display})")
             else:
                 # 空结果，标记为 empty（下次不再重试）
-                await asyncio.to_thread(
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
                     asr_service.update_record_transcript_status,
                     record.id,
                     TranscriptStatus.EMPTY,
