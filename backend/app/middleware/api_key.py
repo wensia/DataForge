@@ -42,6 +42,11 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/openapi.json",  # OpenAPI Schema
     ]
 
+    # 豁免验证的路径前缀
+    EXEMPT_PREFIXES = [
+        "/uploads/",  # 静态文件（头像等）
+    ]
+
     # 由 JWTAuthMiddleware 保护的路径前缀（豁免 API Key 检查）
     JWT_PROTECTED_PREFIXES = [
         "/api/v1/users",  # 用户管理（由 JWT 中间件保护）
@@ -63,6 +68,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         # 检查路径是否豁免验证
         request_path = request.url.path
         if request_path in self.EXEMPT_PATHS:
+            return await call_next(request)
+
+        # 检查是否匹配豁免前缀（如静态文件）
+        if any(request_path.startswith(prefix) for prefix in self.EXEMPT_PREFIXES):
             return await call_next(request)
 
         # 检查是否由 JWT 中间件保护（跳过 API Key 检查）
