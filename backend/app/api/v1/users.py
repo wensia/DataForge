@@ -133,6 +133,8 @@ async def list_users(
                     role=local_user.role,  # 使用本地角色设置
                     is_active=local_user.is_active,  # 使用本地启用状态
                     ai_enabled=local_user.ai_enabled,  # 使用本地 AI 设置
+                    analysis_enabled=local_user.analysis_enabled,  # 数据分析权限
+                    call_type_filter=local_user.call_type_filter,  # 通话类型过滤
                     created_at=u.joined_at or datetime.utcnow(),
                     last_login_at=local_user.last_login_at,
                     identities=identities,
@@ -183,6 +185,8 @@ async def get_user(request: Request, user_id: int):
                 role=user.role,
                 is_active=user.is_active,
                 ai_enabled=user.ai_enabled,
+                analysis_enabled=user.analysis_enabled,
+                call_type_filter=user.call_type_filter,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             )
@@ -221,6 +225,13 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
         if data.ai_enabled is not None:
             user.ai_enabled = data.ai_enabled
 
+        if data.analysis_enabled is not None:
+            user.analysis_enabled = data.analysis_enabled
+
+        if data.call_type_filter is not None:
+            # 空字符串转为 None 表示不限制
+            user.call_type_filter = data.call_type_filter if data.call_type_filter else None
+
         user.updated_at = datetime.utcnow()
 
         session.add(user)
@@ -240,6 +251,8 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
                 role=user.role,
                 is_active=user.is_active,
                 ai_enabled=user.ai_enabled,
+                analysis_enabled=user.analysis_enabled,
+                call_type_filter=user.call_type_filter,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),
