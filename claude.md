@@ -105,18 +105,18 @@ cd frontend-react && pnpm dev --port 3692
 
 **涉及服务器部署时，必须先阅读 `docs/rules/deploy.md`！**
 
-- SSH 密钥路径: `/Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem`
+- SSH 密钥路径: `~/.ssh/dataforge_key.pem`（从项目根目录 claudeCode.pem 复制）
 - 服务器: `root@124.220.15.80`
 - 项目目录: `/www/wwwroot/dataforge`
 
 **SSH 连接命令（必须使用密钥）:**
 ```bash
-ssh -i /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem root@124.220.15.80
+ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80
 ```
 
 **部署命令示例:**
 ```bash
-ssh -i /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem root@124.220.15.80 "cd /www/wwwroot/dataforge && git pull && docker compose restart"
+ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80 "cd /www/wwwroot/dataforge && git pull && docker compose restart"
 ```
 
 ## 重要提醒
