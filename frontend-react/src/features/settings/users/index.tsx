@@ -179,8 +179,10 @@ const roleOptions = [
   { value: 'user', label: '普通用户', icon: UserIcon },
 ]
 
+const CALL_TYPE_ALL = '__all__' // 特殊值表示不限制
+
 const callTypeFilterOptions = [
-  { value: '', label: '全部（不限制）' },
+  { value: CALL_TYPE_ALL, label: '全部（不限制）' },
   { value: '呼入', label: '仅呼入' },
   { value: '外呼', label: '仅外呼' },
 ]
@@ -776,7 +778,7 @@ function DataFiltersForm({
 }) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [callType, setCallType] = useState('')
+  const [callType, setCallType] = useState(CALL_TYPE_ALL)
   const [staffNames, setStaffNames] = useState<string[]>([])
 
   // 初始化表单数据
@@ -785,18 +787,21 @@ function DataFiltersForm({
       const filters = user.data_filters || {}
       setStartDate(filters.start_date || '')
       setEndDate(filters.end_date || '')
-      setCallType(filters.call_type || '')
+      // 将空值转换为特殊标记值
+      setCallType(filters.call_type || CALL_TYPE_ALL)
       setStaffNames(filters.staff_names || [])
     }
   }, [user])
 
   const handleSave = async () => {
-    const hasAnyFilter = startDate || endDate || callType || staffNames.length > 0
+    // 将特殊标记值转换回null
+    const actualCallType = callType === CALL_TYPE_ALL ? null : callType
+    const hasAnyFilter = startDate || endDate || actualCallType || staffNames.length > 0
     const filters: DataFilters | null = hasAnyFilter
       ? {
           start_date: startDate || null,
           end_date: endDate || null,
-          call_type: callType || null,
+          call_type: actualCallType || null,
           staff_names: staffNames.length > 0 ? staffNames : null,
         }
       : null
@@ -888,12 +893,12 @@ function DataFiltersForm({
       </div>
 
       {/* 当前配置摘要 */}
-      {(startDate || endDate || callType || staffNames.length > 0) && (
+      {(startDate || endDate || (callType && callType !== CALL_TYPE_ALL) || staffNames.length > 0) && (
         <div className='text-xs text-muted-foreground bg-muted/50 p-2 rounded'>
           <span className='font-medium'>当前限制: </span>
           {startDate && `从 ${startDate} 起`}
           {endDate && ` 到 ${endDate}`}
-          {callType && ` | ${callType}`}
+          {callType && callType !== CALL_TYPE_ALL && ` | ${callType}`}
           {staffNames.length > 0 && ` | ${staffNames.length}个员工`}
         </div>
       )}
