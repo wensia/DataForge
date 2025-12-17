@@ -388,110 +388,285 @@ export function DataAnalysis() {
 
               {/* 可折叠的筛选条件区 */}
               {filtersExpanded && (
-                <div className='flex flex-col gap-2 rounded-md border bg-muted/30 p-3'>
-                  {/* 第一排：基本筛选 */}
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                      <SelectTrigger className='w-[100px]'>
-                        <SelectValue placeholder='来源' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='all'>全部</SelectItem>
-                        <SelectItem value='feishu'>飞书</SelectItem>
-                        <SelectItem value='yunke'>云客</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
-                      <SelectTrigger className='w-[100px]'>
-                        <SelectValue placeholder='类型' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='all'>全部</SelectItem>
-                        {Object.entries(callTypeMap).map(([key, { label }]) => (
-                          <SelectItem key={key} value={key}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={callResultFilter}
-                      onValueChange={setCallResultFilter}
-                    >
-                      <SelectTrigger className='w-[100px]'>
-                        <SelectValue placeholder='结果' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value='all'>全部</SelectItem>
-                        {Object.entries(callResultMap).map(([key, { label }]) => (
-                          <SelectItem key={key} value={key}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <SearchableSelect
-                      value={staffNameFilter}
-                      onValueChange={setStaffNameFilter}
-                      options={[
-                        { value: 'all', label: '全部' },
-                        ...(filterOptions?.staff_names.map((name) => ({
-                          value: name,
-                          label: name,
-                        })) || []),
-                      ]}
-                      placeholder='员工'
-                      searchPlaceholder='搜索员工...'
-                      emptyText='未找到员工'
-                      className='w-[120px]'
-                    />
-                    <Input
-                      placeholder='部门'
-                      value={departmentFilter}
-                      onChange={(e) => setDepartmentFilter(e.target.value)}
-                      className='w-[120px]'
-                    />
-                    <Input
-                      placeholder='被叫号码'
-                      value={calleeFilter}
-                      onChange={(e) => setCalleeFilter(e.target.value)}
-                      className='w-[120px]'
-                    />
-                  </div>
-                  {/* 第二排：时间和时长 */}
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <FilterDatePicker
-                      selected={startTime}
-                      onSelect={setStartTime}
-                      placeholder='开始日期'
-                      className='w-[140px]'
-                    />
-                    <FilterDatePicker
-                      selected={endTime}
-                      onSelect={setEndTime}
-                      placeholder='结束日期'
-                      className='w-[140px]'
-                    />
-                    <div className='flex items-center gap-1'>
-                      <Input
-                        type='number'
-                        placeholder='最小时长(秒)'
-                        value={durationMin}
-                        onChange={(e) => setDurationMin(e.target.value)}
-                        className='w-[110px]'
-                        min={0}
-                      />
-                      <span className='text-muted-foreground'>-</span>
-                      <Input
-                        type='number'
-                        placeholder='最大时长(秒)'
-                        value={durationMax}
-                        onChange={(e) => setDurationMax(e.target.value)}
-                        className='w-[110px]'
-                        min={0}
+                <div className='rounded-lg border bg-card p-4 shadow-sm'>
+                  {/* 使用网格布局，响应式4列 */}
+                  <div className='grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'>
+                    {/* 时间范围 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        开始日期
+                      </label>
+                      <FilterDatePicker
+                        selected={startTime}
+                        onSelect={setStartTime}
+                        placeholder='选择日期'
+                        className='w-full'
                       />
                     </div>
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        结束日期
+                      </label>
+                      <FilterDatePicker
+                        selected={endTime}
+                        onSelect={setEndTime}
+                        placeholder='选择日期'
+                        className='w-full'
+                      />
+                    </div>
+
+                    {/* 通话类型 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        通话类型
+                      </label>
+                      <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
+                        <SelectTrigger className='w-full'>
+                          <SelectValue placeholder='全部' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='all'>全部</SelectItem>
+                          {Object.entries(callTypeMap).map(([key, { label }]) => (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 通话结果 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        通话结果
+                      </label>
+                      <Select
+                        value={callResultFilter}
+                        onValueChange={setCallResultFilter}
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue placeholder='全部' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='all'>全部</SelectItem>
+                          {Object.entries(callResultMap).map(([key, { label }]) => (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 员工 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        员工
+                      </label>
+                      <SearchableSelect
+                        value={staffNameFilter}
+                        onValueChange={setStaffNameFilter}
+                        options={[
+                          { value: 'all', label: '全部' },
+                          ...(filterOptions?.staff_names.map((name) => ({
+                            value: name,
+                            label: name,
+                          })) || []),
+                        ]}
+                        placeholder='全部'
+                        searchPlaceholder='搜索员工...'
+                        emptyText='未找到员工'
+                        className='w-full'
+                      />
+                    </div>
+
+                    {/* 数据来源 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        数据来源
+                      </label>
+                      <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                        <SelectTrigger className='w-full'>
+                          <SelectValue placeholder='全部' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='all'>全部</SelectItem>
+                          <SelectItem value='feishu'>飞书</SelectItem>
+                          <SelectItem value='yunke'>云客</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 部门 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        部门
+                      </label>
+                      <Input
+                        placeholder='输入部门名称'
+                        value={departmentFilter}
+                        onChange={(e) => setDepartmentFilter(e.target.value)}
+                        className='w-full'
+                      />
+                    </div>
+
+                    {/* 被叫号码 */}
+                    <div className='space-y-1.5'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        被叫号码
+                      </label>
+                      <Input
+                        placeholder='输入号码'
+                        value={calleeFilter}
+                        onChange={(e) => setCalleeFilter(e.target.value)}
+                        className='w-full'
+                      />
+                    </div>
+
+                    {/* 通话时长范围 */}
+                    <div className='space-y-1.5 col-span-2 md:col-span-1 lg:col-span-2'>
+                      <label className='text-muted-foreground text-xs font-medium'>
+                        通话时长（秒）
+                      </label>
+                      <div className='flex items-center gap-2'>
+                        <Input
+                          type='number'
+                          placeholder='最小'
+                          value={durationMin}
+                          onChange={(e) => setDurationMin(e.target.value)}
+                          className='w-full'
+                          min={0}
+                        />
+                        <span className='text-muted-foreground shrink-0'>至</span>
+                        <Input
+                          type='number'
+                          placeholder='最大'
+                          value={durationMax}
+                          onChange={(e) => setDurationMax(e.target.value)}
+                          className='w-full'
+                          min={0}
+                        />
+                      </div>
+                    </div>
                   </div>
+
+                  {/* 已激活的筛选标签 */}
+                  {(sourceFilter && sourceFilter !== 'all') ||
+                  (callTypeFilter && callTypeFilter !== 'all') ||
+                  (callResultFilter && callResultFilter !== 'all') ||
+                  (staffNameFilter && staffNameFilter !== 'all') ||
+                  departmentFilter ||
+                  calleeFilter ||
+                  startTime ||
+                  endTime ||
+                  durationMin ||
+                  durationMax ? (
+                    <div className='mt-3 flex flex-wrap items-center gap-2 border-t pt-3'>
+                      <span className='text-muted-foreground text-xs'>已选条件:</span>
+                      {startTime && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          开始: {format(startTime, 'MM-dd')}
+                          <button
+                            onClick={() => setStartTime(undefined)}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {endTime && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          结束: {format(endTime, 'MM-dd')}
+                          <button
+                            onClick={() => setEndTime(undefined)}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {callTypeFilter && callTypeFilter !== 'all' && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          类型: {callTypeMap[callTypeFilter as keyof typeof callTypeMap]?.label}
+                          <button
+                            onClick={() => setCallTypeFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {callResultFilter && callResultFilter !== 'all' && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          结果: {callResultMap[callResultFilter as keyof typeof callResultMap]?.label}
+                          <button
+                            onClick={() => setCallResultFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {staffNameFilter && staffNameFilter !== 'all' && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          员工: {staffNameFilter}
+                          <button
+                            onClick={() => setStaffNameFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {sourceFilter && sourceFilter !== 'all' && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          来源: {sourceFilter === 'feishu' ? '飞书' : '云客'}
+                          <button
+                            onClick={() => setSourceFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {departmentFilter && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          部门: {departmentFilter}
+                          <button
+                            onClick={() => setDepartmentFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {calleeFilter && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          被叫: {calleeFilter}
+                          <button
+                            onClick={() => setCalleeFilter('')}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                      {(durationMin || durationMax) && (
+                        <span className='inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary'>
+                          时长: {durationMin || '0'}-{durationMax || '∞'}秒
+                          <button
+                            onClick={() => {
+                              setDurationMin('')
+                              setDurationMax('')
+                            }}
+                            className='hover:text-primary/80'
+                          >
+                            ×
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               )}
 

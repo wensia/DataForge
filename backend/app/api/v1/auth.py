@@ -184,6 +184,8 @@ async def login(data: LoginRequest):
                     role=user.role,
                     is_active=user.is_active,
                     ai_enabled=user.ai_enabled,
+                    analysis_enabled=user.analysis_enabled,
+                    call_type_filter=user.call_type_filter,
                     created_at=user.created_at,
                     last_login_at=user.last_login_at,
                     identities=identities,
