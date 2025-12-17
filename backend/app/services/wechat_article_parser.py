@@ -62,7 +62,7 @@ async def parse_wechat_article_url(url: str) -> WechatAccountInfo:
 
     # 获取页面 HTML
     try:
-        client = await get_http_client(timeout=15.0)
+        client = await get_http_client(timeout=15.0, http2=False)
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

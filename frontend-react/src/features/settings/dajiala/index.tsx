@@ -349,7 +349,7 @@ function DajialaConfigList() {
     },
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const fetchForm = useForm<FetchForm>({
     resolver: zodResolver(fetchFormSchema) as any,
     defaultValues: {

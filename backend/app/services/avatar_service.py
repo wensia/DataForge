@@ -65,8 +65,8 @@ async def download_avatar(avatar_url: str, biz: str) -> str | None:
             logger.debug(f"头像已存在: {save_path}")
             return get_avatar_url(biz, ext)
 
-        # 下载头像
-        async with http_client(timeout=30.0) as client:
+        # 下载头像（禁用 HTTP/2 避免依赖 h2 包）
+        async with http_client(timeout=30.0, http2=False) as client:
             # 添加 Referer 头绕过部分防盗链
             headers = {
                 "Referer": "https://mp.weixin.qq.com/",
