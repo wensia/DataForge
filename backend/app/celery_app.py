@@ -114,6 +114,19 @@ def on_worker_init(sender=None, **kwargs):
     except Exception as e:
         logger.error(f"任务处理函数加载失败: {e}")
 
+    # 4. 清理孤立任务（Worker 重启后可能存在）
+    try:
+        from app.services.task_service import cleanup_stuck_tasks
+
+        # 启动时使用较短的阈值（10分钟），快速清理可能因容器重启而中断的任务
+        cleaned = cleanup_stuck_tasks(max_running_minutes=10)
+        if cleaned > 0:
+            logger.warning(f"启动清理: 发现并处理了 {cleaned} 个孤立任务")
+        else:
+            logger.debug("启动清理: 没有发现孤立任务")
+    except Exception as e:
+        logger.error(f"启动清理失败: {e}")
+
     logger.info("Celery Worker 初始化完成")
 
 

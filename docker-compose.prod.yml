@@ -85,6 +85,8 @@ services:
     networks:
       - dataforge-network
     restart: unless-stopped
+    # 优雅关闭：给 Celery 120 秒时间完成当前任务和清理
+    stop_grace_period: 120s
     volumes:
       - celery-logs:/app/logs
       - /etc/localtime:/etc/localtime:ro

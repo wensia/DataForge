@@ -500,16 +500,23 @@ async def cancel_execution_async(execution_id: int) -> dict:
 # ============================================================================
 
 
-def check_stuck_tasks(max_running_hours: int = 2) -> list[int]:
+def check_stuck_tasks(
+    max_running_hours: float = 0.5,
+    max_running_minutes: int | None = None,
+) -> list[int]:
     """检测运行超过指定时间的任务
 
     Args:
-        max_running_hours: 最大运行时间（小时），默认 2 小时
+        max_running_hours: 最大运行时间（小时），默认 0.5 小时（30分钟）
+        max_running_minutes: 最大运行时间（分钟），如果指定则覆盖 hours 参数
 
     Returns:
         卡住任务的执行记录 ID 列表
     """
-    cutoff = datetime.now() - timedelta(hours=max_running_hours)
+    if max_running_minutes is not None:
+        cutoff = datetime.now() - timedelta(minutes=max_running_minutes)
+    else:
+        cutoff = datetime.now() - timedelta(hours=max_running_hours)
 
     with Session(engine) as session:
         statement = (
@@ -578,12 +585,15 @@ def mark_task_as_stuck(execution_id: int) -> bool:
         return True
 
 
-async def check_stuck_tasks_async(max_running_hours: int = 2) -> list[int]:
+async def check_stuck_tasks_async(
+    max_running_hours: float = 0.5,
+    max_running_minutes: int | None = None,
+) -> list[int]:
     """异步检测卡住任务"""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         _db_executor,
-        partial(check_stuck_tasks, max_running_hours),
+        partial(check_stuck_tasks, max_running_hours, max_running_minutes),
     )
 
 
@@ -594,3 +604,26 @@ async def mark_task_as_stuck_async(execution_id: int) -> bool:
         _db_executor,
         partial(mark_task_as_stuck, execution_id),
     )
+
+
+def cleanup_stuck_tasks(max_running_minutes: int = 30) -> int:
+    """清理卡住的任务（检测 + 标记失败 + 释放锁）
+
+    Args:
+        max_running_minutes: 超过此时间的 RUNNING 任务视为卡住，默认 30 分钟
+
+    Returns:
+        清理的任务数量
+    """
+    stuck_ids = check_stuck_tasks(max_running_minutes=max_running_minutes)
+    cleaned_count = 0
+
+    for execution_id in stuck_ids:
+        if mark_task_as_stuck(execution_id):
+            cleaned_count += 1
+            logger.info(f"清理卡住任务: execution_id={execution_id}")
+
+    if cleaned_count > 0:
+        logger.warning(f"共清理 {cleaned_count} 个卡住任务")
+
+    return cleaned_count
