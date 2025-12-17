@@ -419,7 +419,7 @@ export function AnalysisTable() {
   )
 
   return (
-    <div className='flex h-full flex-1 flex-col gap-4 overflow-hidden'>
+    <div className='flex flex-1 flex-col gap-4'>
       {/* 工具栏 */}
       <div className='flex flex-shrink-0 flex-col gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
@@ -664,7 +664,7 @@ export function AnalysisTable() {
 
       {/* 分页 - 固定在底部 */}
       {recordsData && (
-        <div className='flex-shrink-0'>
+        <div className='mt-auto flex-shrink-0'>
           <SimplePagination
             page={filters.page || 1}
             pageSize={filters.page_size || 20}
