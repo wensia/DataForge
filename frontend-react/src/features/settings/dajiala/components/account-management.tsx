@@ -5,7 +5,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import {
-  ChevronDown,
   ChevronRight,
   Edit,
   FolderPlus,
@@ -23,7 +22,6 @@ import {
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Collapsible,
   CollapsibleContent,
@@ -215,13 +213,11 @@ export function AccountManagement() {
 
       {/* 分组列表 */}
       {!groupedData || groupedData.length === 0 ? (
-        <Card>
-          <CardContent className="flex h-32 items-center justify-center">
-            <p className="text-muted-foreground">暂无公众号，点击上方按钮添加</p>
-          </CardContent>
-        </Card>
+        <div className="flex h-32 items-center justify-center rounded-lg border border-dashed">
+          <p className="text-muted-foreground text-sm">暂无公众号，点击上方按钮添加</p>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y">
           {groupedData.map((item) => (
             <GroupItem
               key={item.group.id ?? 'ungrouped'}
@@ -352,89 +348,87 @@ function GroupItem({
   const isUngrouped = group.id === null
 
   return (
-    <Card>
-      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-        <div className="flex items-center justify-between p-3">
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 text-left">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-              <span className="font-medium">{group.name}</span>
-              <Badge variant="secondary" className="text-xs">
-                {accounts.length}
-              </Badge>
-              {!isUngrouped && (
-                <Badge variant={group.is_collection_enabled ? 'default' : 'outline'} className="text-xs">
-                  {group.is_collection_enabled ? '采集中' : '已暂停'}
-                </Badge>
-              )}
-            </button>
-          </CollapsibleTrigger>
+    <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+      {/* 分组标题栏 */}
+      <div className="group flex items-center gap-2 py-2">
+        <CollapsibleTrigger asChild>
+          <button className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors">
+            <ChevronRight className={cn('h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
+          </button>
+        </CollapsibleTrigger>
 
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAddAccount}>
-              <Plus className="h-4 w-4" />
-            </Button>
-            {!isUngrouped && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onToggleGroupCollection}>
-                    {group.is_collection_enabled ? (
-                      <>
-                        <Pause className="mr-2 h-4 w-4" />
-                        暂停采集
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" />
-                        启用采集
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onEditGroup}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    编辑分组
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onDeleteGroup} className="text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    删除分组
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+        <div className="flex flex-1 items-center gap-2">
+          <span className="text-sm font-medium">{group.name}</span>
+          <span className="text-muted-foreground text-xs">{accounts.length}</span>
+          {!isUngrouped && (
+            <span className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              group.is_collection_enabled ? 'bg-green-500' : 'bg-muted-foreground/50'
+            )} title={group.is_collection_enabled ? '采集中' : '已暂停'} />
+          )}
         </div>
 
-        <CollapsibleContent>
-          {accounts.length === 0 ? (
-            <div className="text-muted-foreground border-t px-3 py-4 text-center text-sm">
-              该分组暂无公众号
-            </div>
-          ) : (
-            <div className="grid gap-3 border-t p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {accounts.map((account) => (
-                <AccountItem
-                  key={account.id}
-                  account={account}
-                  onEdit={() => onEditAccount(account)}
-                  onDelete={() => onDeleteAccount(account)}
-                  onToggleCollection={() => onToggleAccountCollection(account.id)}
-                />
-              ))}
-            </div>
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onAddAccount} title="添加公众号">
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+          {!isUngrouped && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onToggleGroupCollection}>
+                  {group.is_collection_enabled ? (
+                    <>
+                      <Pause className="mr-2 h-4 w-4" />
+                      暂停采集
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      启用采集
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onEditGroup}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  编辑分组
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onDeleteGroup} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  删除分组
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+        </div>
+      </div>
+
+      {/* 公众号卡片网格 */}
+      <CollapsibleContent>
+        {accounts.length === 0 ? (
+          <div className="text-muted-foreground py-6 text-center text-sm">
+            该分组暂无公众号
+          </div>
+        ) : (
+          <div className="grid gap-3 pb-4 pl-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {accounts.map((account) => (
+              <AccountItem
+                key={account.id}
+                account={account}
+                onEdit={() => onEditAccount(account)}
+                onDelete={() => onDeleteAccount(account)}
+                onToggleCollection={() => onToggleAccountCollection(account.id)}
+              />
+            ))}
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
