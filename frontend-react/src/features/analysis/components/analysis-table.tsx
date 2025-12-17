@@ -18,6 +18,8 @@ import {
   Trash2,
   Loader2,
   CalendarIcon,
+  Check,
+  PlusCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -31,6 +33,17 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -41,13 +54,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  DataTableFacetedFilter,
   DataTableViewOptions,
   SimplePagination,
 } from '@/components/data-table'
 import {
   useRecords,
-  useFilterOptions,
   useDeleteRecords,
   proxyRecord,
   useUserPreference,
@@ -61,7 +72,7 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
-import { callTypeOptions, callResultOptions, sourceOptions } from '../data/filter-options'
+import { callTypeOptions, callResultOptions, sourceOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
 const route = getRouteApi('/_authenticated/analysis/')
@@ -158,7 +169,6 @@ export function AnalysisTable() {
     isFetching: recordsFetching,
     refetch: refetchRecords,
   } = useRecords(filters)
-  const { data: filterOptions } = useFilterOptions()
   const deleteMutation = useDeleteRecords()
 
   // 用户偏好
@@ -378,28 +388,6 @@ export function AnalysisTable() {
       setFilters((prev) => ({ ...prev, page: 1, page_size: pageSize }))
       navigate({
         search: (prev) => ({ ...prev, page: 1, pageSize }),
-      })
-    },
-    [navigate]
-  )
-
-  // FacetedFilter 筛选变化处理
-  const handleFilterChange = useCallback(
-    (columnId: string, values: string[] | undefined) => {
-      const value = values?.length === 1 ? values[0] : undefined
-
-      setFilters((prev) => ({
-        ...prev,
-        page: 1,
-        [columnId === 'call_type' ? 'call_type' : columnId === 'call_result' ? 'call_result' : 'source']: value,
-      }))
-
-      navigate({
-        search: (prev) => ({
-          ...prev,
-          page: 1,
-          [columnId === 'call_type' ? 'callType' : columnId === 'call_result' ? 'callResult' : 'source']: values,
-        }),
       })
     },
     [navigate]
@@ -685,5 +673,93 @@ export function AnalysisTable() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+// 服务端筛选组件
+interface ServerSideFilterProps {
+  title: string
+  value: string | undefined
+  options: FilterOption[]
+  onChange: (value: string | undefined) => void
+}
+
+function ServerSideFilter({
+  title,
+  value,
+  options,
+  onChange,
+}: ServerSideFilterProps) {
+  const selectedOption = options.find((opt) => opt.value === value)
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant='outline' size='sm' className='h-8 border-dashed'>
+          <PlusCircle className='mr-2 h-4 w-4' />
+          {title}
+          {selectedOption && (
+            <>
+              <Separator orientation='vertical' className='mx-2 h-4' />
+              <Badge
+                variant='secondary'
+                className='rounded-sm px-1 font-normal'
+              >
+                {selectedOption.label}
+              </Badge>
+            </>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='w-[200px] p-0' align='start'>
+        <Command>
+          <CommandInput placeholder={`搜索${title}...`} />
+          <CommandList>
+            <CommandEmpty>未找到结果</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => {
+                const isSelected = value === option.value
+                return (
+                  <CommandItem
+                    key={option.value}
+                    onSelect={() => {
+                      onChange(isSelected ? undefined : option.value)
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground'
+                          : 'opacity-50 [&_svg]:invisible'
+                      )}
+                    >
+                      <Check className='h-4 w-4' />
+                    </div>
+                    {option.icon && (
+                      <option.icon className='mr-2 h-4 w-4 text-muted-foreground' />
+                    )}
+                    <span>{option.label}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+            {value && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    onSelect={() => onChange(undefined)}
+                    className='justify-center text-center'
+                  >
+                    清除筛选
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
