@@ -27,7 +27,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
       <SearchProvider>
         <LayoutProvider>
           <SkipToMain />
-          <div className="h-svh w-full">{children ?? <Outlet />}</div>
+          <div className="flex h-svh w-full flex-col">{children ?? <Outlet />}</div>
         </LayoutProvider>
       </SearchProvider>
     )
