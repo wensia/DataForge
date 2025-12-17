@@ -219,56 +219,64 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
         // 无录音
         if (!recordUrl) {
           return (
-            <span className='text-muted-foreground flex justify-center'>
-              <Minus className='h-4 w-4' />
-            </span>
+            <div className='flex w-full items-center justify-center'>
+              <span className='flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-400'>
+                <Minus className='h-4 w-4' />
+              </span>
+            </div>
           )
         }
 
         // 空音频（已标记）
         if (transcriptStatus === 'empty') {
           return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className='text-muted-foreground flex cursor-default justify-center'>
-                  <Minus className='h-4 w-4' />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>空音频</TooltipContent>
-            </Tooltip>
+            <div className='flex w-full items-center justify-center'>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className='flex h-7 w-7 cursor-default items-center justify-center rounded-full bg-gray-100 text-gray-400'>
+                    <Minus className='h-4 w-4' />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>空音频</TooltipContent>
+              </Tooltip>
+            </div>
           )
         }
 
         // 有录音，根据是否有转写结果显示不同图标
         if (hasTranscript) {
           return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className='flex cursor-pointer justify-center text-green-600 hover:text-green-700'
-                  onClick={() => options.onOpenRecordModal(row.original)}
-                >
-                  <FileCheck className='h-5 w-5' />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>已转写 - 点击查看</TooltipContent>
-            </Tooltip>
+            <div className='flex w-full items-center justify-center'>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className='flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-green-100 text-green-600 transition-colors hover:bg-green-200'
+                    onClick={() => options.onOpenRecordModal(row.original)}
+                  >
+                    <FileCheck className='h-4 w-4' />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>已转写 - 点击查看</TooltipContent>
+              </Tooltip>
+            </div>
           )
         }
 
         // 有录音但未转写
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className='text-muted-foreground hover:text-foreground flex cursor-pointer justify-center'
-                onClick={() => options.onOpenRecordModal(row.original)}
-              >
-                <Mic className='h-5 w-5' />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>有录音 - 点击播放</TooltipContent>
-          </Tooltip>
+          <div className='flex w-full items-center justify-center'>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className='flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-blue-100 text-blue-600 transition-colors hover:bg-blue-200'
+                  onClick={() => options.onOpenRecordModal(row.original)}
+                >
+                  <Mic className='h-4 w-4' />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>有录音 - 点击播放</TooltipContent>
+            </Tooltip>
+          </div>
         )
       },
       enableSorting: false,
