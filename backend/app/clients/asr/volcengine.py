@@ -197,22 +197,26 @@ class VolcengineASRClient(ASRClient):
                 await self._rate_limited_request()
                 logger.debug("[volcengine] 限流完成，发送 POST 到 SUBMIT_URL...")
 
-                # 每次请求创建独立客户端，避免跨 asyncio 任务共享导致的
-                # anyio cancel scope 错误
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        self.SUBMIT_URL,
-                        json=payload,
-                        headers=self._build_headers(request_id),
-                    )
-                    response.raise_for_status()
+                # 使用同步客户端 + asyncio.to_thread 避免 gevent/asyncio 事件循环冲突
+                # 异步客户端的 anyio 后端在 Celery gevent worker 中会导致
+                # "no running event loop" 错误
+                def _sync_submit():
+                    with httpx.Client(timeout=30.0) as client:
+                        return client.post(
+                            self.SUBMIT_URL,
+                            json=payload,
+                            headers=self._build_headers(request_id),
+                        )
 
-                    # 保存 logid 用于查询
-                    self._last_logid = response.headers.get("X-Tt-Logid")
+                response = await asyncio.to_thread(_sync_submit)
+                response.raise_for_status()
 
-                    # v3 API: 状态码在 response headers 中
-                    status_code = response.headers.get("X-Api-Status-Code", "")
-                    message = response.headers.get("X-Api-Message", "")
+                # 保存 logid 用于查询
+                self._last_logid = response.headers.get("X-Tt-Logid")
+
+                # v3 API: 状态码在 response headers 中
+                status_code = response.headers.get("X-Api-Status-Code", "")
+                message = response.headers.get("X-Api-Message", "")
 
                 logger.debug(f"火山引擎提交: status={status_code}, msg={message}")
 
@@ -260,24 +264,26 @@ class VolcengineASRClient(ASRClient):
                 # 请求前限流
                 await self._rate_limited_request()
 
-                # 每次请求创建独立客户端，避免跨 asyncio 任务共享导致的
-                # anyio cancel scope 错误
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        self.QUERY_URL,
-                        json={},  # v3 API 查询时请求体为空
-                        headers=self._build_headers(request_id),
-                    )
-                    response.raise_for_status()
+                # 使用同步客户端 + asyncio.to_thread 避免 gevent/asyncio 事件循环冲突
+                def _sync_query():
+                    with httpx.Client(timeout=30.0) as client:
+                        return client.post(
+                            self.QUERY_URL,
+                            json={},  # v3 API 查询时请求体为空
+                            headers=self._build_headers(request_id),
+                        )
 
-                    # 更新 logid
-                    if response.headers.get("X-Tt-Logid"):
-                        self._last_logid = response.headers.get("X-Tt-Logid")
+                response = await asyncio.to_thread(_sync_query)
+                response.raise_for_status()
 
-                    # v3 API: 状态码在 response headers 中
-                    status_code = response.headers.get("X-Api-Status-Code", "")
-                    message = response.headers.get("X-Api-Message", "")
-                    body = response.json()
+                # 更新 logid
+                if response.headers.get("X-Tt-Logid"):
+                    self._last_logid = response.headers.get("X-Tt-Logid")
+
+                # v3 API: 状态码在 response headers 中
+                status_code = response.headers.get("X-Api-Status-Code", "")
+                message = response.headers.get("X-Api-Message", "")
+                body = response.json()
 
                 logger.debug(
                     f"火山引擎查询: status={status_code}, msg={message or '(empty)'}"
