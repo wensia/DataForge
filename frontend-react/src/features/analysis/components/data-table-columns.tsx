@@ -2,9 +2,14 @@
  * 数据表格列定义
  */
 import { type ColumnDef } from '@tanstack/react-table'
-import { Button } from '@/components/ui/button'
+import { Mic, FileCheck, Minus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader, createSelectColumn } from '@/components/data-table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { callTypeMap, callResultMap, formatDate, type CallRecord } from '../types'
 
 interface ColumnOptions {
@@ -213,31 +218,62 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
 
         // 无录音
         if (!recordUrl) {
-          return <span className='text-muted-foreground'>-</span>
+          return (
+            <span className='text-muted-foreground flex justify-center'>
+              <Minus className='h-4 w-4' />
+            </span>
+          )
         }
 
         // 空音频（已标记）
         if (transcriptStatus === 'empty') {
           return (
-            <span className='text-muted-foreground text-xs'>空音频</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className='text-muted-foreground flex cursor-default justify-center'>
+                  <Minus className='h-4 w-4' />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>空音频</TooltipContent>
+            </Tooltip>
           )
         }
 
-        // 有录音，根据是否有转写结果显示不同样式
+        // 有录音，根据是否有转写结果显示不同图标
+        if (hasTranscript) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className='flex cursor-pointer justify-center text-green-600 hover:text-green-700'
+                  onClick={() => options.onOpenRecordModal(row.original)}
+                >
+                  <FileCheck className='h-5 w-5' />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>已转写 - 点击查看</TooltipContent>
+            </Tooltip>
+          )
+        }
+
+        // 有录音但未转写
         return (
-          <Button
-            variant={hasTranscript ? 'default' : 'outline'}
-            size='sm'
-            className={hasTranscript ? 'bg-green-600 hover:bg-green-700' : ''}
-            onClick={() => options.onOpenRecordModal(row.original)}
-          >
-            {hasTranscript ? '已转写' : '录音'}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className='text-muted-foreground hover:text-foreground flex cursor-pointer justify-center'
+                onClick={() => options.onOpenRecordModal(row.original)}
+              >
+                <Mic className='h-5 w-5' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>有录音 - 点击播放</TooltipContent>
+          </Tooltip>
         )
       },
       enableSorting: false,
       enableHiding: true,
-      size: 100,
+      size: 60,
     },
   ]
 }
