@@ -1,6 +1,7 @@
 """任务执行器 - 包装任务执行，记录日志和错误"""
 
 import asyncio
+import inspect
 import json
 import traceback
 from collections.abc import Callable
@@ -116,6 +117,28 @@ async def execute_task_with_execution(
     # 解析参数表达式
     resolved_kwargs = resolve_kwargs(kwargs)
 
+    # 过滤掉 handler 不接受的参数（如 _lock_key）
+    sig = inspect.signature(handler)
+    handler_params = set(sig.parameters.keys())
+
+    # 检查是否接受 **kwargs
+    accepts_var_keyword = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+    )
+
+    if accepts_var_keyword:
+        # handler 接受 **kwargs，传递所有参数
+        filtered_kwargs = resolved_kwargs
+    else:
+        # 只传递 handler 明确声明的参数
+        filtered_kwargs = {
+            k: v for k, v in resolved_kwargs.items() if k in handler_params
+        }
+        # 记录被过滤的参数
+        filtered_out = set(resolved_kwargs.keys()) - set(filtered_kwargs.keys())
+        if filtered_out:
+            logger.debug(f"过滤掉 handler 不接受的参数: {filtered_out}")
+
     start_time = datetime.now()
 
     # 更新执行记录状态为 RUNNING（线程化）
@@ -139,8 +162,8 @@ async def execute_task_with_execution(
     task_status = "completed"
 
     try:
-        # 执行处理函数（使用解析后的参数）
-        result = await handler(**resolved_kwargs)
+        # 执行处理函数（使用过滤后的参数）
+        result = await handler(**filtered_kwargs)
 
         # 获取任务日志
         log_output = get_log_output()
