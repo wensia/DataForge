@@ -363,6 +363,7 @@ def cancel_execution(execution_id: int) -> dict:
         dict: {"success": bool, "message": str}
     """
     from app.utils.redis_client import cleanup_execution_redis, get_logs
+    from app.utils.task_lock import force_release_task_lock
 
     with Session(engine) as session:
         execution = session.get(TaskExecution, execution_id)
@@ -375,6 +376,9 @@ def cancel_execution(execution_id: int) -> dict:
                 "success": False,
                 "message": f"无法取消状态为 {execution.status.value} 的任务",
             }
+
+        # 保存 task_id 用于释放锁
+        task_id = execution.task_id
 
         # 从 Redis 获取已有日志并保存到数据库
         redis_logs = get_logs(execution_id)
@@ -398,6 +402,13 @@ def cancel_execution(execution_id: int) -> dict:
 
         # 清理 Redis 中的日志数据
         cleanup_execution_redis(execution_id)
+
+        # 释放分布式锁（关键：允许任务被再次触发）
+        lock_key = f"task_lock:{task_id}"
+        if force_release_task_lock(lock_key):
+            logger.info(f"任务 #{task_id} 分布式锁已释放: {lock_key}")
+        else:
+            logger.warning(f"任务 #{task_id} 分布式锁释放失败或不存在: {lock_key}")
 
         logger.info(f"任务执行 #{execution_id} 已被取消")
         return {"success": True, "message": "任务已取消"}
@@ -520,6 +531,7 @@ def mark_task_as_stuck(execution_id: int) -> bool:
         是否成功标记
     """
     from app.utils.redis_client import get_logs, publish_log_end
+    from app.utils.task_lock import force_release_task_lock
 
     with Session(engine) as session:
         execution = session.get(TaskExecution, execution_id)
@@ -528,6 +540,9 @@ def mark_task_as_stuck(execution_id: int) -> bool:
 
         if execution.status != ExecutionStatus.RUNNING:
             return False
+
+        # 保存 task_id 用于释放锁
+        task_id = execution.task_id
 
         # 从 Redis 获取日志并保存
         redis_logs = get_logs(execution_id)
@@ -548,6 +563,13 @@ def mark_task_as_stuck(execution_id: int) -> bool:
 
         session.add(execution)
         session.commit()
+
+        # 释放分布式锁（关键：允许任务被再次触发）
+        lock_key = f"task_lock:{task_id}"
+        if force_release_task_lock(lock_key):
+            logger.info(f"卡住任务 #{task_id} 分布式锁已释放: {lock_key}")
+        else:
+            logger.debug(f"卡住任务 #{task_id} 分布式锁不存在或已释放: {lock_key}")
 
         # 发送结束信号（通知可能还在监听的 SSE 客户端）
         publish_log_end(execution_id)
