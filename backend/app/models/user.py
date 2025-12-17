@@ -2,8 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSON
 from sqlmodel import Field, SQLModel
 
 
@@ -53,7 +56,12 @@ class User(SQLModel, table=True):
     )
     call_type_filter: str | None = Field(
         default=None,
-        description="通话类型过滤: null=全部, '呼入'=仅呼入, '外呼'=仅外呼",
+        description="通话类型过滤: null=全部, '呼入'=仅呼入, '外呼'=仅外呼（已废弃，使用 data_filters）",
+    )
+    data_filters: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="数据访问筛选条件 JSON: {start_date, end_date, call_type, departments, staff_names}",
     )
 
     created_at: datetime = Field(

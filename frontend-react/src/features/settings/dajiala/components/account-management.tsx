@@ -420,7 +420,7 @@ function GroupItem({
               该分组暂无公众号
             </div>
           ) : (
-            <div className="border-t">
+            <div className="grid gap-3 border-t p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {accounts.map((account) => (
                 <AccountItem
                   key={account.id}
@@ -448,32 +448,28 @@ interface AccountItemProps {
 
 function AccountItem({ account, onEdit, onDelete, onToggleCollection }: AccountItemProps) {
   return (
-    <div className="hover:bg-muted/50 flex items-center justify-between border-b px-3 py-2 last:border-b-0">
-      <div className="flex items-center gap-3">
-        {account.avatar_url ? (
-          <img
-            src={account.avatar_url}
-            alt={account.name}
-            className="h-8 w-8 rounded-full"
-          />
-        ) : (
-          <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full text-xs">
-            {account.name.slice(0, 1)}
-          </div>
-        )}
-        <div>
-          <div className="text-sm font-medium">{account.name}</div>
-          <div className="text-muted-foreground font-mono text-xs">{account.biz}</div>
+    <div className="bg-muted/30 hover:bg-muted/50 rounded-lg border p-3 transition-colors">
+      {/* 顶部：头像和操作按钮 */}
+      <div className="mb-2 flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          {account.avatar_url ? (
+            <img
+              src={account.avatar_url}
+              alt={account.name}
+              className="h-10 w-10 rounded-full"
+            />
+          ) : (
+            <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium">
+              {account.name.slice(0, 1)}
+            </div>
+          )}
+          <Badge variant={account.is_collection_enabled ? 'default' : 'outline'} className="text-xs">
+            {account.is_collection_enabled ? '采集中' : '已暂停'}
+          </Badge>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Badge variant={account.is_collection_enabled ? 'default' : 'outline'} className="text-xs">
-          {account.is_collection_enabled ? '采集中' : '已暂停'}
-        </Badge>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-7 w-7">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -502,6 +498,16 @@ function AccountItem({ account, onEdit, onDelete, onToggleCollection }: AccountI
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      {/* 名称和 Biz */}
+      <div className="space-y-1">
+        <div className="truncate text-sm font-medium" title={account.name}>
+          {account.name}
+        </div>
+        <div className="text-muted-foreground truncate font-mono text-xs" title={account.biz}>
+          {account.biz}
+        </div>
       </div>
     </div>
   )
