@@ -51,9 +51,7 @@ class User(SQLModel, table=True):
     ai_enabled: bool = Field(default=False, description="是否启用 AI 对话功能")
 
     # 数据访问权限
-    analysis_enabled: bool = Field(
-        default=False, description="是否启用数据分析功能"
-    )
+    analysis_enabled: bool = Field(default=False, description="是否启用数据分析功能")
     call_type_filter: str | None = Field(
         default=None,
         description="通话类型过滤: null=全部, '呼入'=仅呼入, '外呼'=仅外呼（已废弃，使用 data_filters）",

@@ -50,11 +50,10 @@ def require_analysis_access(
 
     # 普通用户检查 analysis_enabled
     if not user.analysis_enabled:
-        raise HTTPException(
-            status_code=403, detail="无数据分析权限，请联系管理员开通"
-        )
+        raise HTTPException(status_code=403, detail="无数据分析权限，请联系管理员开通")
 
     return user
+
 
 router = APIRouter(prefix="/analysis", tags=["数据分析"])
 
@@ -89,7 +88,9 @@ def apply_user_data_filters(
     call_type: str | None,
     department: str | None,
     staff_name: str | None,
-) -> tuple[datetime | None, datetime | None, str | None, list[str] | None, list[str] | None]:
+) -> tuple[
+    datetime | None, datetime | None, str | None, list[str] | None, list[str] | None
+]:
     """应用用户的数据筛选条件
 
     Args:
@@ -142,7 +143,13 @@ def apply_user_data_filters(
     elif user.call_type_filter:
         effective_call_type = user.call_type_filter
 
-    return effective_start_time, effective_end_time, effective_call_type, departments, staff_names
+    return (
+        effective_start_time,
+        effective_end_time,
+        effective_call_type,
+        departments,
+        staff_names,
+    )
 
 
 @router.get("/records", response_model=ResponseModel)
@@ -206,7 +213,9 @@ async def get_records(
         effective_call_type,
         allowed_departments,
         allowed_staff_names,
-    ) = apply_user_data_filters(user, start_time, end_time, call_type, department, staff_name)
+    ) = apply_user_data_filters(
+        user, start_time, end_time, call_type, department, staff_name
+    )
 
     # 如果用户配置了部门/员工限制，需要验证前端传入的值是否在允许范围内
     effective_department = department

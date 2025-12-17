@@ -93,7 +93,9 @@ async def list_users(
                 # 创建本地用户记录
                 with Session(engine) as session:
                     local_user = User(
-                        email=u.email if u.email else None,  # 空字符串转为 None 避免唯一性冲突
+                        email=u.email
+                        if u.email
+                        else None,  # 空字符串转为 None 避免唯一性冲突
                         username=u.username,
                         crm_id=u.id,
                         name=u.name,
@@ -232,7 +234,9 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
 
         if data.call_type_filter is not None:
             # 空字符串转为 None 表示不限制（已废弃，保留兼容）
-            user.call_type_filter = data.call_type_filter if data.call_type_filter else None
+            user.call_type_filter = (
+                data.call_type_filter if data.call_type_filter else None
+            )
 
         # 处理 data_filters（新的筛选条件配置）
         if data.data_filters is not None:
