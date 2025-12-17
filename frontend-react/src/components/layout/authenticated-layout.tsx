@@ -12,7 +12,7 @@ type AuthenticatedLayoutProps = {
 }
 
 // 不显示主侧边栏的路由
-const SIDEBAR_HIDDEN_ROUTES = ['/ai-chat']
+const SIDEBAR_HIDDEN_ROUTES = ['/ai-chat', '/analysis']
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
