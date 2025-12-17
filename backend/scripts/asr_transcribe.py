@@ -334,6 +334,7 @@ async def run(
     concurrency: int = 0,
     correct_table_name: str = "",
     qps: int = 20,
+    _lock_key: str | None = None,
 ) -> dict:
     """ASR 语音识别任务入口
 
@@ -348,6 +349,7 @@ async def run(
         concurrency: 并发数，0 表示自动（默认）
         correct_table_name: 替换词本名称（仅火山引擎有效）
         qps: 每秒请求数限制（仅火山引擎有效），默认 20
+        _lock_key: 分布式锁键名（内部参数，用于长任务续期）
 
     Returns:
         dict: 执行结果
@@ -478,6 +480,15 @@ async def run(
                 f"批次完成: {stats.success_count} 成功, "
                 f"{stats.failed_count} 失败, {stats.skipped_count} 跳过"
             )
+
+            # 续期分布式锁（借鉴 celery-once 的设计，防止长任务锁过期）
+            if _lock_key:
+                from app.utils.task_lock import extend_task_lock
+
+                if extend_task_lock(_lock_key, timeout=3600):
+                    task_log(f"锁已续期: {_lock_key}")
+                else:
+                    task_log(f"[WARN] 锁续期失败: {_lock_key}")
 
     # 最终统计
     msg = (

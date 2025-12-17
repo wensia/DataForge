@@ -116,6 +116,7 @@ def extend_task_lock(lock_key: str, timeout: int = 3600) -> bool:
     """延长锁的过期时间
 
     用于长时间运行的任务定期续期。
+    借鉴 celery-once 的设计，确保长任务不会因锁过期而被重复执行。
 
     Args:
         lock_key: 锁的 Redis key
@@ -131,10 +132,14 @@ def extend_task_lock(lock_key: str, timeout: int = 3600) -> bool:
     try:
         # 只有锁的持有者才能延期
         current_holder = client.get(lock_key)
+        # 处理 bytes/str 类型兼容
+        if isinstance(current_holder, bytes):
+            current_holder = current_holder.decode("utf-8")
         if current_holder == _worker_id:
             client.expire(lock_key, timeout)
-            logger.debug(f"锁已延期: {lock_key}")
+            logger.debug(f"锁已延期: {lock_key}, TTL={timeout}s")
             return True
+        logger.debug(f"锁延期失败，非当前持有者: {lock_key}")
         return False
     except Exception as e:
         logger.warning(f"延期锁失败: {e}")

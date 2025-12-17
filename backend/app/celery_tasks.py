@@ -234,6 +234,7 @@ def execute_scheduled_task(
                         handler=handler,
                         execution_id=execution_id,
                         trigger_type=trigger_type,
+                        _lock_key=lock_key,  # 传递锁键，让任务内部可以续期
                         **kwargs,
                     )
                 )

@@ -323,6 +323,8 @@ class VolcengineASRClient(ASRClient):
         """
         start_time = time.time()
         poll_count = 0
+        empty_body_count = 0  # 空 body 计数
+        max_empty_body_retries = 20  # 最多等待 20 次空 body（约 100 秒）
 
         # 添加随机初始延迟，避免多个任务同时轮询
         initial_delay = random.uniform(0, 2.0)
@@ -342,8 +344,16 @@ class VolcengineASRClient(ASRClient):
                     logger.info(f"火山引擎 ASR 任务完成: {request_id}")
                     return body
                 # 有时候 header 返回成功但 body 还没准备好，继续等待
+                # 但添加重试限制，防止无限轮询（参考生产环境最佳实践）
+                empty_body_count += 1
+                if empty_body_count >= max_empty_body_retries:
+                    raise RuntimeError(
+                        f"ASR 任务 body 持续为空（已重试 {empty_body_count} 次）: {request_id}"
+                    )
                 status_msg = "等待结果"
-                logger.debug("ASR 任务 header 成功但 body 为空，继续等待")
+                logger.debug(
+                    f"ASR body 为空，等待中 ({empty_body_count}/{max_empty_body_retries})"
+                )
             elif status_code == self.CODE_PROCESSING:
                 status_msg = "处理中"
                 logger.debug(f"ASR 任务处理中: {request_id}")

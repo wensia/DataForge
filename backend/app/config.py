@@ -32,10 +32,13 @@ class Settings(BaseSettings):
     celery_worker_soft_shutdown_timeout: float = 30.0  # 软关闭超时（秒）
 
     # Celery Redis 配置（重要！防止长任务被重复投递）
-    celery_broker_visibility_timeout: int = 7200  # 必须大于最长任务执行时间（2小时）
+    # 参考: https://github.com/celery/celery/issues/5935
+    # 生产环境推荐值，必须大于 task_timeout × 2
+    celery_broker_visibility_timeout: int = 36000  # 10小时
 
     # Celery 任务超时配置
-    celery_task_default_timeout: int = 3600  # 默认任务超时 1 小时
+    # ASR 批量任务可能需要处理一个月的数据，需要更长时间
+    celery_task_default_timeout: int = 14400  # 4小时
 
     # Celery 任务重试配置
     celery_task_default_max_retries: int = 3  # 默认最大重试次数
