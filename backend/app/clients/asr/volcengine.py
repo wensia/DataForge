@@ -325,6 +325,8 @@ class VolcengineASRClient(ASRClient):
         poll_count = 0
         empty_body_count = 0  # 空 body 计数
         max_empty_body_retries = 20  # 最多等待 20 次空 body（约 100 秒）
+        unknown_status_count = 0  # 未知状态计数
+        max_unknown_status_retries = 30  # 最多容忍 30 次未知状态（约 150 秒）
 
         # 添加随机初始延迟，避免多个任务同时轮询
         initial_delay = random.uniform(0, 2.0)
@@ -365,12 +367,25 @@ class VolcengineASRClient(ASRClient):
                 logger.info(f"ASR 静音/空音频: {request_id}")
                 return body
             elif status_code.startswith("4"):
-                # 4xx 错误
+                # 4xx 错误（请求错误）
                 message = body.get("message") or header_msg or "未知错误"
                 raise RuntimeError(f"ASR 任务失败: {status_code} - {message}")
+            elif status_code.startswith("5"):
+                # 5xx 错误（服务器内部错误，如 55000001, 55000031）
+                # 根据火山引擎文档，55000xxx 为内部服务器处理错误
+                message = body.get("message") or header_msg or "服务器内部错误"
+                raise RuntimeError(f"ASR 服务器错误: {status_code} - {message}")
             else:
-                status_msg = f"状态: {status_code}"
-                logger.warning(f"ASR 未知状态: {status_code}")
+                # 其他未知状态码，添加重试限制防止无限轮询
+                unknown_status_count += 1
+                status_msg = f"未知状态: {status_code}"
+                if unknown_status_count >= max_unknown_status_retries:
+                    raise RuntimeError(
+                        f"ASR 任务持续返回未知状态码 {status_code}（已重试 {unknown_status_count} 次）: {request_id}"
+                    )
+                logger.warning(
+                    f"ASR 未知状态: {status_code} ({unknown_status_count}/{max_unknown_status_retries})"
+                )
 
             # 每 6 次轮询（约 30 秒）调用一次进度回调
             if progress_callback and poll_count % 6 == 0:
