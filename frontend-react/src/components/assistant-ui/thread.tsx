@@ -266,7 +266,7 @@ const UserActionBar: FC = () => {
     <ActionBarPrimitive.Root
       hideWhenRunning
       autohide="not-last"
-      className="aui-user-action-bar-root mt-1 flex gap-1 justify-end text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+      className="aui-user-action-bar-root mt-1 flex gap-1 justify-end text-muted-foreground"
     >
       <ActionBarPrimitive.Copy asChild>
         <TooltipIconButton tooltip="复制">
