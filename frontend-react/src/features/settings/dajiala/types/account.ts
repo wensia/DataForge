@@ -20,6 +20,7 @@ export interface WechatAccount {
   biz: string
   name: string
   avatar_url: string | null
+  local_avatar: string | null // 本地头像路径（优先使用）
   group_id: number | null
   group_name: string | null
   is_collection_enabled: boolean

@@ -284,3 +284,27 @@ export function useParseArticleUrl() {
     },
   })
 }
+
+// ============ 头像同步 API ============
+
+/** 同步头像结果 */
+export interface SyncAvatarsResult {
+  synced: number
+  failed: number
+}
+
+/** 批量同步公众号头像到本地 */
+export function useSyncAvatars() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post<ApiResponse<SyncAvatarsResult>>(
+        '/wechat-accounts/sync-avatars'
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.all })
+    },
+  })
+}

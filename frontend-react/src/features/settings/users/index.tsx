@@ -72,6 +72,15 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 
+/** 数据筛选条件类型 */
+interface DataFilters {
+  start_date?: string | null // 开始日期限制 (YYYY-MM-DD)
+  end_date?: string | null // 结束日期限制 (YYYY-MM-DD)
+  call_type?: string | null // 通话类型 (呼入/外呼)
+  departments?: string[] | null // 部门限制
+  staff_names?: string[] | null // 员工限制
+}
+
 /** 用户类型 */
 interface User {
   id: number
@@ -82,7 +91,8 @@ interface User {
   is_active: boolean
   ai_enabled: boolean
   analysis_enabled: boolean
-  call_type_filter: string | null
+  call_type_filter: string | null // 已废弃
+  data_filters: DataFilters | null // 新的数据筛选条件
   created_at: string
   last_login_at: string | null
 }
@@ -121,6 +131,7 @@ function useUpdateUser() {
         ai_enabled?: boolean
         analysis_enabled?: boolean
         call_type_filter?: string | null
+        data_filters?: DataFilters | null
       }
     }) => {
       const response = await apiClient.put<ApiResponse<User>>(
@@ -132,6 +143,20 @@ function useUpdateUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all })
     },
+  })
+}
+
+// 获取筛选选项（员工列表）
+function useFilterOptions() {
+  return useQuery({
+    queryKey: ['filter-options'],
+    queryFn: async () => {
+      const response = await apiClient.get<
+        ApiResponse<{ staff_names: string[] }>
+      >('/analysis/filter-options')
+      return response.data.data
+    },
+    staleTime: 5 * 60 * 1000, // 5分钟缓存
   })
 }
 
@@ -164,7 +189,12 @@ const editFormSchema = z.object({
   is_active: z.boolean(),
   ai_enabled: z.boolean(),
   analysis_enabled: z.boolean(),
-  call_type_filter: z.string(),
+  call_type_filter: z.string(), // 已废弃，保留兼容
+  // 新的数据筛选条件
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+  data_call_type: z.string().optional(),
+  staff_names: z.array(z.string()).optional(),
 })
 
 type EditUserForm = z.infer<typeof editFormSchema>
@@ -172,6 +202,7 @@ type EditUserForm = z.infer<typeof editFormSchema>
 export function UsersSettings() {
   const { data: users = [], isLoading, refetch, isRefetching } = useUsers()
   const updateUser = useUpdateUser()
+  const { data: filterOptions } = useFilterOptions()
 
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -340,18 +371,28 @@ export function UsersSettings() {
       ai_enabled: false,
       analysis_enabled: false,
       call_type_filter: '',
+      start_date: '',
+      end_date: '',
+      data_call_type: '',
+      staff_names: [],
     },
   })
 
   // 当编辑用户变化时，填充表单
   useEffect(() => {
     if (editingUser) {
+      const dataFilters = editingUser.data_filters || {}
       editForm.reset({
         role: editingUser.role,
         is_active: editingUser.is_active,
         ai_enabled: editingUser.ai_enabled,
         analysis_enabled: editingUser.analysis_enabled,
         call_type_filter: editingUser.call_type_filter || '',
+        // 新的数据筛选条件
+        start_date: dataFilters.start_date || '',
+        end_date: dataFilters.end_date || '',
+        data_call_type: dataFilters.call_type || '',
+        staff_names: dataFilters.staff_names || [],
       })
     }
   }, [editingUser, editForm])
@@ -366,6 +407,7 @@ export function UsersSettings() {
         ai_enabled?: boolean
         analysis_enabled?: boolean
         call_type_filter?: string | null
+        data_filters?: DataFilters | null
       } = {}
 
       if (data.role !== editingUser.role) {
@@ -380,10 +422,27 @@ export function UsersSettings() {
       if (data.analysis_enabled !== editingUser.analysis_enabled) {
         updateData.analysis_enabled = data.analysis_enabled
       }
-      // 处理 call_type_filter: 空字符串转换为 null
-      const newCallTypeFilter = data.call_type_filter || null
-      if (newCallTypeFilter !== editingUser.call_type_filter) {
-        updateData.call_type_filter = newCallTypeFilter
+
+      // 构建新的 data_filters
+      const oldFilters = editingUser.data_filters || {}
+      const newFilters: DataFilters = {
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        call_type: data.data_call_type || null,
+        staff_names: data.staff_names && data.staff_names.length > 0 ? data.staff_names : null,
+      }
+
+      // 检查 data_filters 是否有变化
+      const filtersChanged =
+        newFilters.start_date !== (oldFilters.start_date || null) ||
+        newFilters.end_date !== (oldFilters.end_date || null) ||
+        newFilters.call_type !== (oldFilters.call_type || null) ||
+        JSON.stringify(newFilters.staff_names || []) !== JSON.stringify(oldFilters.staff_names || [])
+
+      if (filtersChanged) {
+        // 只有当有值时才发送 data_filters
+        const hasAnyFilter = newFilters.start_date || newFilters.end_date || newFilters.call_type || newFilters.staff_names
+        updateData.data_filters = hasAnyFilter ? newFilters : null
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -655,33 +714,134 @@ export function UsersSettings() {
                 )}
               />
 
-              <FormField
-                control={editForm.control}
-                name='call_type_filter'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>通话类型限制</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='选择通话类型限制' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {callTypeFilterOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className='text-muted-foreground text-xs'>
-                      限制用户只能查看特定类型的通话记录
-                    </p>
-                    <FormMessage />
-                  </FormItem>
+              {/* 数据访问限制区域 */}
+              <div className='space-y-4 rounded-lg border p-4'>
+                <h4 className='text-sm font-medium'>数据访问限制</h4>
+                <p className='text-muted-foreground text-xs'>
+                  配置用户可以查看的数据范围。未设置的字段表示不限制。
+                </p>
+
+                <div className='grid grid-cols-2 gap-4'>
+                  <FormField
+                    control={editForm.control}
+                    name='start_date'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>开始日期</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='date'
+                            {...field}
+                            placeholder='不限制'
+                          />
+                        </FormControl>
+                        <p className='text-muted-foreground text-xs'>
+                          用户只能看此日期之后的数据
+                        </p>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name='end_date'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>结束日期</FormLabel>
+                        <FormControl>
+                          <Input
+                            type='date'
+                            {...field}
+                            placeholder='不限制'
+                          />
+                        </FormControl>
+                        <p className='text-muted-foreground text-xs'>
+                          用户只能看此日期之前的数据
+                        </p>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={editForm.control}
+                  name='data_call_type'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>通话类型限制</FormLabel>
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder='全部（不限制）' />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {callTypeFilterOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={editForm.control}
+                  name='staff_names'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>员工限制</FormLabel>
+                      <div className='max-h-32 overflow-y-auto rounded-md border p-2'>
+                        {filterOptions?.staff_names && filterOptions.staff_names.length > 0 ? (
+                          <div className='space-y-2'>
+                            {filterOptions.staff_names.map((staffName) => (
+                              <label
+                                key={staffName}
+                                className='flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-1 rounded'
+                              >
+                                <input
+                                  type='checkbox'
+                                  checked={field.value?.includes(staffName) || false}
+                                  onChange={(e) => {
+                                    const currentValues = field.value || []
+                                    if (e.target.checked) {
+                                      field.onChange([...currentValues, staffName])
+                                    } else {
+                                      field.onChange(currentValues.filter((v) => v !== staffName))
+                                    }
+                                  }}
+                                  className='h-4 w-4 rounded border-gray-300'
+                                />
+                                {staffName}
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className='text-muted-foreground text-xs py-2'>
+                            暂无员工数据
+                          </p>
+                        )}
+                      </div>
+                      <p className='text-muted-foreground text-xs'>
+                        选择用户可以查看的员工数据，不选则不限制
+                      </p>
+                    </FormItem>
+                  )}
+                />
+
+                {/* 显示当前配置摘要 */}
+                {editingUser?.data_filters && Object.keys(editingUser.data_filters).some(k => editingUser.data_filters?.[k as keyof DataFilters]) && (
+                  <div className='text-xs text-muted-foreground bg-muted/50 p-2 rounded'>
+                    <span className='font-medium'>当前限制: </span>
+                    {editingUser.data_filters.start_date && `从 ${editingUser.data_filters.start_date} 起`}
+                    {editingUser.data_filters.end_date && ` 到 ${editingUser.data_filters.end_date}`}
+                    {editingUser.data_filters.call_type && ` | ${editingUser.data_filters.call_type}`}
+                    {editingUser.data_filters.staff_names && editingUser.data_filters.staff_names.length > 0 && ` | ${editingUser.data_filters.staff_names.length}个员工`}
+                  </div>
                 )}
-              />
+              </div>
 
               <DialogFooter>
                 <Button

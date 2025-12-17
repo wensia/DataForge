@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   ChevronRight,
+  Download,
   Edit,
   FolderPlus,
   Link,
@@ -55,6 +56,7 @@ import {
   useDeleteGroup,
   useGroupedAccounts,
   useParseArticleUrl,
+  useSyncAvatars,
   useToggleAccountCollection,
   useToggleGroupCollection,
   useUpdateAccount,
@@ -96,6 +98,7 @@ export function AccountManagement() {
   const updateAccount = useUpdateAccount()
   const deleteAccount = useDeleteAccount()
   const toggleAccountCollection = useToggleAccountCollection()
+  const syncAvatars = useSyncAvatars()
 
   const toggleExpand = (groupId: number | null) => {
     setExpandedGroups((prev) => {
@@ -178,6 +181,15 @@ export function AccountManagement() {
     }
   }
 
+  const handleSyncAvatars = async () => {
+    try {
+      const result = await syncAvatars.mutateAsync()
+      toast.success(result.message)
+    } catch {
+      toast.error('同步头像失败')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -199,6 +211,10 @@ export function AccountManagement() {
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
             <RefreshCw className={cn('mr-2 h-4 w-4', isRefetching && 'animate-spin')} />
             刷新
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSyncAvatars} disabled={syncAvatars.isPending}>
+            <Download className={cn('mr-2 h-4 w-4', syncAvatars.isPending && 'animate-pulse')} />
+            {syncAvatars.isPending ? '同步中...' : '同步头像'}
           </Button>
           <Button variant="outline" size="sm" onClick={handleOpenCreateGroup}>
             <FolderPlus className="mr-2 h-4 w-4" />
@@ -441,16 +457,19 @@ interface AccountItemProps {
 }
 
 function AccountItem({ account, onEdit, onDelete, onToggleCollection }: AccountItemProps) {
+  // 优先使用本地头像（解决微信防盗链问题）
+  const avatarSrc = account.local_avatar || account.avatar_url
+
   return (
     <div className="bg-muted/30 hover:bg-muted/50 rounded-lg border p-3 transition-colors">
       {/* 顶部：头像和操作按钮 */}
       <div className="mb-2 flex items-start justify-between">
         <div className="flex items-center gap-2">
-          {account.avatar_url ? (
+          {avatarSrc ? (
             <img
-              src={account.avatar_url}
+              src={avatarSrc}
               alt={account.name}
-              className="h-10 w-10 rounded-full"
+              className="h-10 w-10 rounded-full object-cover"
             />
           ) : (
             <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium">

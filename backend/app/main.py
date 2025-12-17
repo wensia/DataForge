@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.api.v1 import router as api_v1_router
@@ -120,6 +121,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # 注册 API 路由
 app.include_router(api_v1_router, prefix=settings.api_prefix)
+
+# 挂载静态文件目录（用于头像等上传文件）
+uploads_path = Path(settings.uploads_dir)
+uploads_path.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 
 @app.get("/")

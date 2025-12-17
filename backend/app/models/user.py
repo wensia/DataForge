@@ -88,6 +88,16 @@ class UserCreate(SQLModel):
     role: UserRole = Field(default=UserRole.USER, description="用户角色")
 
 
+class DataFilters(BaseModel):
+    """用户数据访问筛选条件"""
+
+    start_date: str | None = None  # 开始日期限制 (YYYY-MM-DD)
+    end_date: str | None = None  # 结束日期限制 (YYYY-MM-DD)
+    call_type: str | None = None  # 通话类型 (呼入/外呼)
+    departments: list[str] | None = None  # 部门限制
+    staff_names: list[str] | None = None  # 员工限制
+
+
 class UserUpdate(SQLModel):
     """更新用户请求模型（仅本地扩展字段）"""
 
@@ -95,7 +105,8 @@ class UserUpdate(SQLModel):
     is_active: bool | None = None
     ai_enabled: bool | None = None
     analysis_enabled: bool | None = None
-    call_type_filter: str | None = None
+    call_type_filter: str | None = None  # 已废弃，保留兼容
+    data_filters: dict[str, Any] | None = None  # 新的数据筛选条件
 
 
 class UserResponse(SQLModel):
@@ -111,7 +122,8 @@ class UserResponse(SQLModel):
     is_active: bool
     ai_enabled: bool
     analysis_enabled: bool
-    call_type_filter: str | None = None
+    call_type_filter: str | None = None  # 已废弃，保留兼容
+    data_filters: dict[str, Any] | None = None  # 新的数据筛选条件
     created_at: datetime
     last_login_at: datetime | None = None
 

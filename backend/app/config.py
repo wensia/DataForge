@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     crm_base_url: str = ""  # CRM 系统 Open API 基础地址
     crm_service_key: str = ""  # CRM 服务端 API Key
 
+    # 文件上传配置
+    uploads_dir: str = "uploads"  # 上传文件目录（相对于 backend 目录）
+
     @property
     def celery_broker(self) -> str:
         """获取 Celery broker URL"""

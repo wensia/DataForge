@@ -82,6 +82,69 @@ async def get_filter_options(
     )
 
 
+def apply_user_data_filters(
+    user: User,
+    start_time: datetime | None,
+    end_time: datetime | None,
+    call_type: str | None,
+    department: str | None,
+    staff_name: str | None,
+) -> tuple[datetime | None, datetime | None, str | None, list[str] | None, list[str] | None]:
+    """应用用户的数据筛选条件
+
+    Args:
+        user: 用户对象
+        start_time: 前端传入的开始时间
+        end_time: 前端传入的结束时间
+        call_type: 前端传入的通话类型
+        department: 前端传入的部门
+        staff_name: 前端传入的员工
+
+    Returns:
+        tuple: (effective_start_time, effective_end_time, effective_call_type, departments, staff_names)
+    """
+    effective_start_time = start_time
+    effective_end_time = end_time
+    effective_call_type = call_type
+    departments: list[str] | None = None
+    staff_names: list[str] | None = None
+
+    # 优先使用新的 data_filters 配置
+    if user.data_filters:
+        filters = user.data_filters
+
+        # 开始日期限制
+        if filters.get("start_date"):
+            min_start = datetime.fromisoformat(filters["start_date"])
+            if not effective_start_time or effective_start_time < min_start:
+                effective_start_time = min_start
+
+        # 结束日期限制
+        if filters.get("end_date"):
+            max_end = datetime.fromisoformat(filters["end_date"])
+            max_end = max_end.replace(hour=23, minute=59, second=59)
+            if not effective_end_time or effective_end_time > max_end:
+                effective_end_time = max_end
+
+        # 通话类型限制
+        if filters.get("call_type"):
+            effective_call_type = filters["call_type"]
+
+        # 部门限制
+        if filters.get("departments"):
+            departments = filters["departments"]
+
+        # 员工限制
+        if filters.get("staff_names"):
+            staff_names = filters["staff_names"]
+
+    # 兼容旧的 call_type_filter（如果 data_filters 中没有 call_type）
+    elif user.call_type_filter:
+        effective_call_type = user.call_type_filter
+
+    return effective_start_time, effective_end_time, effective_call_type, departments, staff_names
+
+
 @router.get("/records", response_model=ResponseModel)
 async def get_records(
     source: str | None = None,
@@ -101,7 +164,14 @@ async def get_records(
 ) -> ResponseModel:
     """获取通话记录列表
 
-    需要数据分析权限。如果用户配置了 call_type_filter，会强制过滤数据。
+    需要数据分析权限。如果用户配置了数据筛选条件，会强制过滤数据。
+
+    用户可配置的筛选条件（在 data_filters 中）：
+    - start_date: 开始日期限制（用户只能看此日期之后的数据）
+    - end_date: 结束日期限制
+    - call_type: 通话类型限制
+    - departments: 部门限制（数组）
+    - staff_names: 员工限制（数组）
 
     Args:
         source: 数据来源筛选 (feishu / yunke)
@@ -129,20 +199,42 @@ async def get_records(
     ):
         end_time = end_time.replace(hour=23, minute=59, second=59)
 
-    # 应用用户的数据过滤配置（强制覆盖前端传入的 call_type）
-    effective_call_type = call_type
-    if user.call_type_filter:
-        effective_call_type = user.call_type_filter
+    # 应用用户的数据过滤配置
+    (
+        effective_start_time,
+        effective_end_time,
+        effective_call_type,
+        allowed_departments,
+        allowed_staff_names,
+    ) = apply_user_data_filters(user, start_time, end_time, call_type, department, staff_name)
+
+    # 如果用户配置了部门/员工限制，需要验证前端传入的值是否在允许范围内
+    effective_department = department
+    effective_staff_name = staff_name
+
+    if allowed_departments:
+        if department:
+            # 如果前端指定了部门，检查是否在允许范围内
+            if department not in allowed_departments:
+                effective_department = None  # 不允许的部门，返回空结果
+        # 部门限制会在 get_call_records 中处理
+
+    if allowed_staff_names:
+        if staff_name:
+            # 如果前端指定了员工，检查是否在允许范围内
+            if staff_name not in allowed_staff_names:
+                effective_staff_name = None  # 不允许的员工，返回空结果
+        # 员工限制会在 get_call_records 中处理
 
     offset = (page - 1) * page_size
 
     records, total = sync_svc.get_call_records(
         session=session,
         source=source,
-        start_time=start_time,
-        end_time=end_time,
-        department=department,
-        staff_name=staff_name,
+        start_time=effective_start_time,
+        end_time=effective_end_time,
+        department=effective_department,
+        staff_name=effective_staff_name,
         call_type=effective_call_type,
         call_result=call_result,
         callee=callee,
@@ -150,6 +242,8 @@ async def get_records(
         duration_max=duration_max,
         limit=page_size,
         offset=offset,
+        allowed_departments=allowed_departments,
+        allowed_staff_names=allowed_staff_names,
     )
 
     return ResponseModel(
@@ -172,7 +266,7 @@ async def get_records_stats(
 ) -> ResponseModel:
     """获取通话记录统计
 
-    需要数据分析权限。如果用户配置了 call_type_filter，统计数据也会相应过滤。
+    需要数据分析权限。如果用户配置了数据筛选条件，统计数据也会相应过滤。
 
     Args:
         start_time: 开始时间
@@ -181,11 +275,22 @@ async def get_records_stats(
     Returns:
         ResponseModel: 统计数据
     """
+    # 应用用户的数据过滤配置
+    (
+        effective_start_time,
+        effective_end_time,
+        effective_call_type,
+        allowed_departments,
+        allowed_staff_names,
+    ) = apply_user_data_filters(user, start_time, end_time, None, None, None)
+
     stats = sync_svc.get_call_record_stats(
         session=session,
-        start_time=start_time,
-        end_time=end_time,
-        call_type=user.call_type_filter,
+        start_time=effective_start_time,
+        end_time=effective_end_time,
+        call_type=effective_call_type,
+        allowed_departments=allowed_departments,
+        allowed_staff_names=allowed_staff_names,
     )
 
     return ResponseModel(data=CallRecordStats(**stats))

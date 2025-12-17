@@ -6,11 +6,11 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
+from loguru import logger
+from pydantic import BaseModel
 from sqlmodel import Session, func, or_, select
 
 from app.database import get_session
-from pydantic import BaseModel
-
 from app.models.wechat_account import (
     BatchMoveGroupRequest,
     MoveGroupRequest,
@@ -21,6 +21,7 @@ from app.models.wechat_account import (
 )
 from app.models.wechat_account_group import WechatAccountGroup
 from app.schemas.response import ResponseModel
+from app.services.avatar_service import download_avatar_if_needed
 from app.services.wechat_article_parser import (
     WechatArticleParseError,
     parse_wechat_article_url,
@@ -194,7 +195,7 @@ def get_accounts_grouped(
 
 
 @router.post("", response_model=ResponseModel)
-def create_account(
+async def create_account(
     data: WechatAccountCreate,
     session: Session = Depends(get_session),
 ):
@@ -212,10 +213,16 @@ def create_account(
         if not group:
             return ResponseModel.error(code=400, message="指定的分组不存在")
 
+    # 下载头像到本地
+    local_avatar = None
+    if data.avatar_url:
+        local_avatar = await download_avatar_if_needed(data.avatar_url, data.biz)
+
     account = WechatAccount(
         biz=data.biz,
         name=data.name,
         avatar_url=data.avatar_url,
+        local_avatar=local_avatar,
         group_id=data.group_id,
         is_collection_enabled=data.is_collection_enabled,
         collection_frequency=data.collection_frequency,
@@ -245,7 +252,7 @@ def get_account(
 
 
 @router.put("/{account_id}", response_model=ResponseModel)
-def update_account(
+async def update_account(
     account_id: int,
     data: WechatAccountUpdate,
     session: Session = Depends(get_session),
@@ -262,6 +269,13 @@ def update_account(
         group = session.get(WechatAccountGroup, update_data["group_id"])
         if not group:
             return ResponseModel.error(code=400, message="指定的分组不存在")
+
+    # 如果头像 URL 变化了，重新下载
+    if "avatar_url" in update_data and update_data["avatar_url"] != account.avatar_url:
+        local_avatar = await download_avatar_if_needed(
+            update_data["avatar_url"], account.biz
+        )
+        update_data["local_avatar"] = local_avatar
 
     for key, value in update_data.items():
         setattr(account, key, value)
@@ -373,3 +387,51 @@ def batch_move_to_group(
     session.commit()
 
     return ResponseModel(message=f"已移动 {len(accounts)} 个公众号")
+
+
+@router.post("/sync-avatars", response_model=ResponseModel)
+async def sync_avatars(
+    session: Session = Depends(get_session),
+):
+    """批量同步所有公众号头像到本地
+
+    遍历所有有 avatar_url 但没有 local_avatar 的公众号，下载头像到本地。
+    """
+    # 查找需要同步的公众号
+    accounts = session.exec(
+        select(WechatAccount).where(
+            WechatAccount.avatar_url.isnot(None),
+            WechatAccount.local_avatar.is_(None),
+        )
+    ).all()
+
+    if not accounts:
+        return ResponseModel(message="所有头像已同步", data={"synced": 0, "failed": 0})
+
+    synced = 0
+    failed = 0
+
+    for account in accounts:
+        try:
+            local_avatar = await download_avatar_if_needed(
+                account.avatar_url, account.biz, account.local_avatar
+            )
+            if local_avatar:
+                account.local_avatar = local_avatar
+                account.updated_at = datetime.now()
+                session.add(account)
+                synced += 1
+                logger.info(f"同步头像成功: {account.name} ({account.biz})")
+            else:
+                failed += 1
+                logger.warning(f"同步头像失败: {account.name} ({account.biz})")
+        except Exception as e:
+            failed += 1
+            logger.error(f"同步头像异常: {account.name} ({account.biz}), 错误: {e}")
+
+    session.commit()
+
+    return ResponseModel(
+        message=f"同步完成：成功 {synced} 个，失败 {failed} 个",
+        data={"synced": synced, "failed": failed},
+    )

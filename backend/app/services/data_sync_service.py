@@ -338,6 +338,8 @@ def get_call_records(
     duration_max: int | None = None,
     limit: int = 100,
     offset: int = 0,
+    allowed_departments: list[str] | None = None,
+    allowed_staff_names: list[str] | None = None,
 ) -> tuple[list[CallRecord], int]:
     """查询通话记录
 
@@ -355,6 +357,8 @@ def get_call_records(
         duration_max: 最大通话时长（秒）
         limit: 返回数量限制
         offset: 偏移量
+        allowed_departments: 允许的部门列表（用于用户权限控制）
+        allowed_staff_names: 允许的员工列表（用于用户权限控制）
 
     Returns:
         tuple: (记录列表, 总数)
@@ -383,6 +387,12 @@ def get_call_records(
     if duration_max is not None:
         query = query.where(CallRecord.duration <= duration_max)
 
+    # 应用权限控制筛选（用户只能看特定部门/员工的数据）
+    if allowed_departments:
+        query = query.where(CallRecord.department.in_(allowed_departments))
+    if allowed_staff_names:
+        query = query.where(CallRecord.staff_name.in_(allowed_staff_names))
+
     # 获取总数
     from sqlalchemy import func
 
@@ -402,6 +412,8 @@ def get_call_record_stats(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
     call_type: str | None = None,
+    allowed_departments: list[str] | None = None,
+    allowed_staff_names: list[str] | None = None,
 ) -> dict[str, Any]:
     """获取通话记录统计
 
@@ -410,6 +422,8 @@ def get_call_record_stats(
         start_time: 开始时间
         end_time: 结束时间
         call_type: 通话类型过滤（用于用户权限控制）
+        allowed_departments: 允许的部门列表（用于用户权限控制）
+        allowed_staff_names: 允许的员工列表（用于用户权限控制）
 
     Returns:
         dict: 统计结果
@@ -423,6 +437,12 @@ def get_call_record_stats(
         query = query.where(CallRecord.call_time <= end_time)
     if call_type:
         query = query.where(CallRecord.call_type == call_type)
+
+    # 应用权限控制筛选
+    if allowed_departments:
+        query = query.where(CallRecord.department.in_(allowed_departments))
+    if allowed_staff_names:
+        query = query.where(CallRecord.staff_name.in_(allowed_staff_names))
 
     records = session.exec(query).all()
 

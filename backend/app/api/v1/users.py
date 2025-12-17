@@ -134,7 +134,8 @@ async def list_users(
                     is_active=local_user.is_active,  # 使用本地启用状态
                     ai_enabled=local_user.ai_enabled,  # 使用本地 AI 设置
                     analysis_enabled=local_user.analysis_enabled,  # 数据分析权限
-                    call_type_filter=local_user.call_type_filter,  # 通话类型过滤
+                    call_type_filter=local_user.call_type_filter,  # 通话类型过滤（已废弃）
+                    data_filters=local_user.data_filters,  # 数据筛选条件
                     created_at=u.joined_at or datetime.utcnow(),
                     last_login_at=local_user.last_login_at,
                     identities=identities,
@@ -187,6 +188,7 @@ async def get_user(request: Request, user_id: int):
                 ai_enabled=user.ai_enabled,
                 analysis_enabled=user.analysis_enabled,
                 call_type_filter=user.call_type_filter,
+                data_filters=user.data_filters,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             )
@@ -229,8 +231,21 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
             user.analysis_enabled = data.analysis_enabled
 
         if data.call_type_filter is not None:
-            # 空字符串转为 None 表示不限制
+            # 空字符串转为 None 表示不限制（已废弃，保留兼容）
             user.call_type_filter = data.call_type_filter if data.call_type_filter else None
+
+        # 处理 data_filters（新的筛选条件配置）
+        if data.data_filters is not None:
+            # 清理空值：移除值为 None 或空列表的键
+            cleaned_filters = {}
+            for key, value in data.data_filters.items():
+                if value is not None:
+                    if isinstance(value, list) and len(value) == 0:
+                        continue
+                    if isinstance(value, str) and value == "":
+                        continue
+                    cleaned_filters[key] = value
+            user.data_filters = cleaned_filters if cleaned_filters else None
 
         user.updated_at = datetime.utcnow()
 
@@ -253,6 +268,7 @@ async def update_user(request: Request, user_id: int, data: UserUpdate):
                 ai_enabled=user.ai_enabled,
                 analysis_enabled=user.analysis_enabled,
                 call_type_filter=user.call_type_filter,
+                data_filters=user.data_filters,
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),

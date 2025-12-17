@@ -17,7 +17,8 @@ class WechatAccount(BaseTable, table=True):
 
     biz: str = Field(unique=True, index=True, description="公众号 biz（唯一标识）")
     name: str = Field(description="公众号名称")
-    avatar_url: str | None = Field(default=None, description="头像 URL")
+    avatar_url: str | None = Field(default=None, description="头像 URL（原始外链）")
+    local_avatar: str | None = Field(default=None, description="本地头像路径")
 
     group_id: int | None = Field(
         default=None,
@@ -64,6 +65,7 @@ class WechatAccountResponse(SQLModel):
     biz: str
     name: str
     avatar_url: str | None
+    local_avatar: str | None = None  # 本地头像路径
     group_id: int | None
     group_name: str | None = None  # 分组名称（用于显示）
     is_collection_enabled: bool
@@ -83,6 +85,7 @@ class WechatAccountResponse(SQLModel):
             biz=account.biz,
             name=account.name,
             avatar_url=account.avatar_url,
+            local_avatar=account.local_avatar,
             group_id=account.group_id,
             group_name=group_name,
             is_collection_enabled=account.is_collection_enabled,
