@@ -59,6 +59,7 @@ import {
 } from '@/components/data-table'
 import {
   useRecords,
+  useFilterOptions,
   useDeleteRecords,
   proxyRecord,
   useUserPreference,
@@ -169,7 +170,17 @@ export function AnalysisTable() {
     isFetching: recordsFetching,
     refetch: refetchRecords,
   } = useRecords(filters)
+  const { data: filterOptions } = useFilterOptions()
   const deleteMutation = useDeleteRecords()
+
+  // 员工选项 (从 API 获取)
+  const staffOptions: FilterOption[] = useMemo(() => {
+    if (!filterOptions?.staff_names) return []
+    return filterOptions.staff_names.map((name) => ({
+      label: name,
+      value: name,
+    }))
+  }, [filterOptions?.staff_names])
 
   // 用户偏好
   const { data: savedPreference, isLoading: preferenceLoading } =
@@ -408,9 +419,9 @@ export function AnalysisTable() {
   )
 
   return (
-    <div className='flex flex-1 flex-col gap-4 overflow-hidden'>
+    <div className='flex h-full flex-1 flex-col gap-4 overflow-hidden'>
       {/* 工具栏 */}
-      <div className='flex flex-col gap-3'>
+      <div className='flex flex-shrink-0 flex-col gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
           {/* 日期范围选择器 */}
           <Popover>
@@ -495,6 +506,23 @@ export function AnalysisTable() {
               })
             }}
           />
+          {staffOptions.length > 0 && (
+            <ServerSideFilter
+              title='员工'
+              value={filters.staff_name}
+              options={staffOptions}
+              onChange={(value) => {
+                setFilters((prev) => ({ ...prev, page: 1, staff_name: value }))
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    page: 1,
+                    staffName: value,
+                  }),
+                })
+              }}
+            />
+          )}
 
           {/* 时长范围 */}
           <div className='flex items-center gap-1'>
@@ -581,7 +609,7 @@ export function AnalysisTable() {
       </div>
 
       {/* 表格 */}
-      <div className='overflow-auto rounded-md border flex-1'>
+      <div className='min-h-0 flex-1 overflow-auto rounded-md border'>
         <table className='w-full caption-bottom text-sm'>
           <thead className='bg-card sticky top-0 z-10 [&_tr]:border-b'>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -634,16 +662,18 @@ export function AnalysisTable() {
         </table>
       </div>
 
-      {/* 分页 */}
+      {/* 分页 - 固定在底部 */}
       {recordsData && (
-        <SimplePagination
-          page={filters.page || 1}
-          pageSize={filters.page_size || 20}
-          total={recordsData.total}
-          totalPages={recordsData.pages}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-        />
+        <div className='flex-shrink-0'>
+          <SimplePagination
+            page={filters.page || 1}
+            pageSize={filters.page_size || 20}
+            total={recordsData.total}
+            totalPages={recordsData.pages}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       )}
 
       {/* 删除确认对话框 */}
