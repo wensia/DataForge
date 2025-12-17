@@ -16,10 +16,45 @@ from app.models.analysis_result import (
     ChatRequest,
 )
 from app.models.call_record import CallRecordResponse, CallRecordStats
+from app.models.user import User
 from app.schemas.response import ResponseModel
 from app.services import ai_analysis_service as ai_svc
 from app.services import data_sync_service as sync_svc
-from app.utils.jwt_auth import TokenPayload, require_admin
+from app.utils.jwt_auth import TokenPayload, get_current_user, require_admin
+
+
+# ============ 权限检查依赖 ============
+
+
+def require_analysis_access(
+    current_user: TokenPayload = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> User:
+    """要求数据分析访问权限
+
+    管理员默认有权限，普通用户需要 analysis_enabled=True
+
+    Returns:
+        User: 当前用户对象（包含 call_type_filter 等配置）
+
+    Raises:
+        HTTPException: 404 用户不存在，403 无权限
+    """
+    user = session.get(User, current_user.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 管理员默认有权限
+    if current_user.role == "admin":
+        return user
+
+    # 普通用户检查 analysis_enabled
+    if not user.analysis_enabled:
+        raise HTTPException(
+            status_code=403, detail="无数据分析权限，请联系管理员开通"
+        )
+
+    return user
 
 router = APIRouter(prefix="/analysis", tags=["数据分析"])
 
@@ -29,9 +64,12 @@ router = APIRouter(prefix="/analysis", tags=["数据分析"])
 
 @router.get("/filter-options", response_model=ResponseModel)
 async def get_filter_options(
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取筛选选项（员工列表等）
+
+    需要数据分析权限。
 
     Returns:
         ResponseModel: 包含员工列表等筛选选项
@@ -58,9 +96,12 @@ async def get_records(
     duration_max: int | None = Query(None, ge=0, description="最大通话时长（秒）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取通话记录列表
+
+    需要数据分析权限。如果用户配置了 call_type_filter，会强制过滤数据。
 
     Args:
         source: 数据来源筛选 (feishu / yunke)
@@ -88,6 +129,11 @@ async def get_records(
     ):
         end_time = end_time.replace(hour=23, minute=59, second=59)
 
+    # 应用用户的数据过滤配置（强制覆盖前端传入的 call_type）
+    effective_call_type = call_type
+    if user.call_type_filter:
+        effective_call_type = user.call_type_filter
+
     offset = (page - 1) * page_size
 
     records, total = sync_svc.get_call_records(
@@ -97,7 +143,7 @@ async def get_records(
         end_time=end_time,
         department=department,
         staff_name=staff_name,
-        call_type=call_type,
+        call_type=effective_call_type,
         call_result=call_result,
         callee=callee,
         duration_min=duration_min,
@@ -121,9 +167,12 @@ async def get_records(
 async def get_records_stats(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取通话记录统计
+
+    需要数据分析权限。如果用户配置了 call_type_filter，统计数据也会相应过滤。
 
     Args:
         start_time: 开始时间
@@ -136,6 +185,7 @@ async def get_records_stats(
         session=session,
         start_time=start_time,
         end_time=end_time,
+        call_type=user.call_type_filter,
     )
 
     return ResponseModel(data=CallRecordStats(**stats))
@@ -241,9 +291,12 @@ async def sync_yunke_data(
 @router.post("/summary", response_model=ResponseModel)
 async def generate_summary(
     request: AnalysisRequest,
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """生成数据摘要
+
+    需要数据分析权限。
 
     Args:
         request: 分析请求参数
@@ -252,11 +305,16 @@ async def generate_summary(
         ResponseModel: 摘要结果
     """
     try:
+        # 应用用户的数据过滤配置
+        filters = request.filters or {}
+        if user.call_type_filter:
+            filters["call_type"] = user.call_type_filter
+
         result = await ai_svc.generate_summary(
             session=session,
             start_time=request.date_start,
             end_time=request.date_end,
-            filters=request.filters,
+            filters=filters,
             provider=request.ai_provider,
             max_records=request.max_records,
         )
@@ -269,9 +327,12 @@ async def generate_summary(
 async def analyze_trend(
     request: AnalysisRequest,
     focus: str | None = None,
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """分析数据趋势
+
+    需要数据分析权限。
 
     Args:
         request: 分析请求参数
@@ -298,9 +359,12 @@ async def analyze_trend(
 async def detect_anomalies(
     request: AnalysisRequest,
     threshold: str | None = None,
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """检测数据异常
+
+    需要数据分析权限。
 
     Args:
         request: 分析请求参数
@@ -326,11 +390,12 @@ async def detect_anomalies(
 @router.post("/chat", response_model=ResponseModel)
 async def chat_with_data(
     request: ChatRequest,
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """智能问答
 
-    基于数据回答用户问题。
+    需要数据分析权限。基于数据回答用户问题。
 
     Args:
         request: 聊天请求参数
@@ -363,9 +428,12 @@ async def get_analysis_history(
     analysis_type: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取分析历史
+
+    需要数据分析权限。
 
     Args:
         analysis_type: 分析类型筛选
@@ -402,11 +470,12 @@ async def get_analysis_history(
 async def analyze_call_records(
     question: str = Body(..., embed=True, description="用户问题"),
     history: list[dict[str, str]] | None = Body(None, description="对话历史"),
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """通话记录智能分析（DeepSeek + Function Calling）
 
-    使用 DeepSeek 自动执行 SQL 查询并分析通话数据。
+    需要数据分析权限。使用 DeepSeek 自动执行 SQL 查询并分析通话数据。
 
     特性:
     - 自动执行 SQL 查询
@@ -455,11 +524,12 @@ async def quick_query_phones(
     phones: list[str] = Body(..., description="被叫号码列表"),
     start_date: str | None = Body(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: str | None = Body(None, description="结束日期 (YYYY-MM-DD)"),
+    user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """快速查询被叫号码
 
-    不使用 AI，直接执行 SQL 查询被叫号码的通话统计。
+    需要数据分析权限。不使用 AI，直接执行 SQL 查询被叫号码的通话统计。
 
     Args:
         phones: 被叫号码列表

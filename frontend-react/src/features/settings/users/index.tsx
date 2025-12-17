@@ -22,6 +22,7 @@ import {
   User as UserIcon,
   Pencil,
   Bot,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import apiClient from '@/lib/api-client'
@@ -80,6 +81,8 @@ interface User {
   role: string
   is_active: boolean
   ai_enabled: boolean
+  analysis_enabled: boolean
+  call_type_filter: string | null
   created_at: string
   last_login_at: string | null
 }
@@ -116,6 +119,8 @@ function useUpdateUser() {
         role?: string
         is_active?: boolean
         ai_enabled?: boolean
+        analysis_enabled?: boolean
+        call_type_filter?: string | null
       }
     }) => {
       const response = await apiClient.put<ApiResponse<User>>(
@@ -148,10 +153,18 @@ const roleOptions = [
   { value: 'user', label: '普通用户', icon: UserIcon },
 ]
 
+const callTypeFilterOptions = [
+  { value: '', label: '全部（不限制）' },
+  { value: '呼入', label: '仅呼入' },
+  { value: '外呼', label: '仅外呼' },
+]
+
 const editFormSchema = z.object({
   role: z.string().min(1, '请选择角色'),
   is_active: z.boolean(),
   ai_enabled: z.boolean(),
+  analysis_enabled: z.boolean(),
+  call_type_filter: z.string(),
 })
 
 type EditUserForm = z.infer<typeof editFormSchema>
@@ -241,6 +254,21 @@ export function UsersSettings() {
       },
     },
     {
+      accessorKey: 'analysis_enabled',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title='数据分析' />
+      ),
+      cell: ({ row }) => {
+        const analysisEnabled = row.getValue('analysis_enabled') as boolean
+        return (
+          <Badge variant={analysisEnabled ? 'outline' : 'secondary'} className='gap-1'>
+            <BarChart3 className='h-3 w-3' />
+            {analysisEnabled ? '已开启' : '未开启'}
+          </Badge>
+        )
+      },
+    },
+    {
       accessorKey: 'last_login_at',
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='最后登录' />
@@ -310,6 +338,8 @@ export function UsersSettings() {
       role: 'user',
       is_active: true,
       ai_enabled: false,
+      analysis_enabled: false,
+      call_type_filter: '',
     },
   })
 
@@ -320,6 +350,8 @@ export function UsersSettings() {
         role: editingUser.role,
         is_active: editingUser.is_active,
         ai_enabled: editingUser.ai_enabled,
+        analysis_enabled: editingUser.analysis_enabled,
+        call_type_filter: editingUser.call_type_filter || '',
       })
     }
   }, [editingUser, editForm])
@@ -332,6 +364,8 @@ export function UsersSettings() {
         role?: string
         is_active?: boolean
         ai_enabled?: boolean
+        analysis_enabled?: boolean
+        call_type_filter?: string | null
       } = {}
 
       if (data.role !== editingUser.role) {
@@ -342,6 +376,14 @@ export function UsersSettings() {
       }
       if (data.ai_enabled !== editingUser.ai_enabled) {
         updateData.ai_enabled = data.ai_enabled
+      }
+      if (data.analysis_enabled !== editingUser.analysis_enabled) {
+        updateData.analysis_enabled = data.analysis_enabled
+      }
+      // 处理 call_type_filter: 空字符串转换为 null
+      const newCallTypeFilter = data.call_type_filter || null
+      if (newCallTypeFilter !== editingUser.call_type_filter) {
+        updateData.call_type_filter = newCallTypeFilter
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -585,6 +627,58 @@ export function UsersSettings() {
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='analysis_enabled'
+                render={({ field }) => (
+                  <FormItem className='flex items-center justify-between rounded-lg border p-3'>
+                    <div className='space-y-0.5'>
+                      <FormLabel className='flex items-center gap-2'>
+                        <BarChart3 className='h-4 w-4' />
+                        数据分析功能
+                      </FormLabel>
+                      <p className='text-muted-foreground text-sm'>
+                        开启后用户可以访问数据分析页面
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name='call_type_filter'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>通话类型限制</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder='选择通话类型限制' />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {callTypeFilterOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className='text-muted-foreground text-xs'>
+                      限制用户只能查看特定类型的通话记录
+                    </p>
+                    <FormMessage />
                   </FormItem>
                 )}
               />

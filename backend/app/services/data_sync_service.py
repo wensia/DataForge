@@ -401,6 +401,7 @@ def get_call_record_stats(
     session: Session,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    call_type: str | None = None,
 ) -> dict[str, Any]:
     """获取通话记录统计
 
@@ -408,6 +409,7 @@ def get_call_record_stats(
         session: 数据库会话
         start_time: 开始时间
         end_time: 结束时间
+        call_type: 通话类型过滤（用于用户权限控制）
 
     Returns:
         dict: 统计结果
@@ -419,6 +421,8 @@ def get_call_record_stats(
         query = query.where(CallRecord.call_time >= start_time)
     if end_time:
         query = query.where(CallRecord.call_time <= end_time)
+    if call_type:
+        query = query.where(CallRecord.call_type == call_type)
 
     records = session.exec(query).all()
 

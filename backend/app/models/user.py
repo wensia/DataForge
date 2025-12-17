@@ -47,6 +47,15 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True, description="是否启用")
     ai_enabled: bool = Field(default=False, description="是否启用 AI 对话功能")
 
+    # 数据访问权限
+    analysis_enabled: bool = Field(
+        default=False, description="是否启用数据分析功能"
+    )
+    call_type_filter: str | None = Field(
+        default=None,
+        description="通话类型过滤: null=全部, '呼入'=仅呼入, '外呼'=仅外呼",
+    )
+
     created_at: datetime = Field(
         default_factory=datetime.utcnow, description="创建时间"
     )
@@ -77,6 +86,8 @@ class UserUpdate(SQLModel):
     role: UserRole | None = None
     is_active: bool | None = None
     ai_enabled: bool | None = None
+    analysis_enabled: bool | None = None
+    call_type_filter: str | None = None
 
 
 class UserResponse(SQLModel):
@@ -91,6 +102,8 @@ class UserResponse(SQLModel):
     role: UserRole
     is_active: bool
     ai_enabled: bool
+    analysis_enabled: bool
+    call_type_filter: str | None = None
     created_at: datetime
     last_login_at: datetime | None = None
 
