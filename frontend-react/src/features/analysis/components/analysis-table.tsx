@@ -419,7 +419,7 @@ export function AnalysisTable() {
   )
 
   return (
-    <div className='flex flex-1 flex-col gap-4'>
+    <div className='flex flex-1 flex-col gap-4 overflow-hidden'>
       {/* 工具栏 */}
       <div className='flex flex-shrink-0 flex-col gap-3'>
         <div className='flex flex-wrap items-center gap-2'>
