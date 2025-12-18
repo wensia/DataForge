@@ -17,7 +17,7 @@ from app.models.task_execution import (
     TaskExecutionDetailResponse,
     TaskExecutionResponse,
 )
-from app.scheduler.registry import get_registered_handlers
+from app.scheduler.registry import get_registered_tasks
 from app.schemas.response import ResponseModel
 from app.services import task_service
 from app.utils.redis_client import (
@@ -51,8 +51,8 @@ async def get_categories():
 
 @router.get("/handlers", response_model=ResponseModel[list[dict]])
 async def get_handlers():
-    """获取所有可用的任务处理函数"""
-    handlers = get_registered_handlers()
+    """获取所有可用的任务处理函数（已注册的 Celery 任务）"""
+    handlers = get_registered_tasks()
     return ResponseModel.success(data=handlers)
 
 
@@ -200,24 +200,30 @@ async def delete_task(task_id: int):
 @router.post("/{task_id}/run", response_model=ResponseModel)
 async def run_task(task_id: int):
     """手动触发任务执行（通过 Celery 异步执行）"""
-    from app.celery_tasks import execute_scheduled_task
+    from app.celery_app import celery_app
 
-    # 验证任务存在和处理函数有效
+    # 验证任务存在和 task_name 有效
     result = task_service.validate_task_for_run(task_id)
     if not result["success"]:
         return ResponseModel.error(code=400, message=result["message"])
 
-    # 通过 Celery 异步执行任务
-    celery_result = execute_scheduled_task.delay(
-        task_id=task_id,
-        handler_path=result["handler_path"],
-        handler_kwargs=result["handler_kwargs"],
-        trigger_type="manual",
+    # 通过 Celery 直接调用任务
+    task_name = result["task_name"]
+    handler_kwargs = result["handler_kwargs"]
+
+    celery_result = celery_app.send_task(
+        task_name,
+        kwargs={
+            "scheduled_task_id": task_id,
+            "trigger_type": "manual",
+            **handler_kwargs,
+        },
     )
 
     return ResponseModel.success(
         data={
             "task_id": task_id,
+            "task_name": task_name,
             "celery_task_id": celery_result.id,
             "message": "任务已发送到 Celery 队列",
         },
@@ -302,7 +308,7 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
         running_time = (datetime.now() - execution.started_at).total_seconds()
         if running_time > MAX_RUNNING_TIME:
             yield f'data: {{"warning": "任务运行超时（已运行 {int(running_time)} 秒）", "timeout": true}}\n\n'
-            yield f'data: {{"status": "timeout", "finished": true}}\n\n'
+            yield 'data: {"status": "timeout", "finished": true}\n\n'
             return
 
     # 5. pending/running：先发送已存在的 Redis 日志（若还没开始可能为空）
@@ -428,7 +434,7 @@ async def _log_stream_generator(execution_id: int) -> AsyncGenerator[str, None]:
                     ).total_seconds()
                     if running_time > MAX_RUNNING_TIME:
                         yield f'data: {{"warning": "任务运行超时（已运行 {int(running_time)} 秒）", "timeout": true}}\n\n'
-                        yield f'data: {{"status": "timeout", "finished": true}}\n\n'
+                        yield 'data: {"status": "timeout", "finished": true}\n\n'
                         break
     finally:
         await pubsub.unsubscribe()

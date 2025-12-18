@@ -28,7 +28,6 @@ from app.models.task_execution import (
     TaskExecution,
     TaskExecutionDetailResponse,
 )
-from app.scheduler.registry import get_handler
 
 
 def get_all_tasks(
@@ -197,19 +196,29 @@ def validate_task_for_run(task_id: int) -> dict:
 
     用于 API 端点快速验证，不阻塞事件循环
     """
+    from app.celery_app import celery_app
+
     with Session(engine) as session:
         task = session.get(ScheduledTask, task_id)
         if not task:
             return {"success": False, "message": "任务不存在"}
 
-        try:
-            # 验证处理函数存在
-            get_handler(task.handler_path)
-            kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
+        # 验证 task_name 已配置
+        if not task.task_name:
+            return {"success": False, "message": "任务未配置 task_name"}
 
+        # 验证 Celery 任务已注册
+        if task.task_name not in celery_app.tasks:
+            return {
+                "success": False,
+                "message": f"Celery 任务未注册: {task.task_name}",
+            }
+
+        try:
+            kwargs = json.loads(task.handler_kwargs) if task.handler_kwargs else {}
             return {
                 "success": True,
-                "handler_path": task.handler_path,
+                "task_name": task.task_name,
                 "handler_kwargs": kwargs,
             }
         except Exception as e:
@@ -218,23 +227,33 @@ def validate_task_for_run(task_id: int) -> dict:
 
 def run_task_in_background(
     task_id: int,
-    handler_path: str,
+    task_name: str,
     handler_kwargs: dict,
 ) -> str:
     """使用 Celery 在后台执行任务
 
+    Args:
+        task_id: 调度任务 ID
+        task_name: Celery 任务名称（如 dataforge.sync_accounts）
+        handler_kwargs: 任务参数
+
     Returns:
         Celery task ID
     """
-    from app.celery_tasks import execute_scheduled_task
+    from app.celery_app import celery_app
 
-    result = execute_scheduled_task.delay(
-        task_id=task_id,
-        handler_path=handler_path,
-        handler_kwargs=handler_kwargs,
-        trigger_type="manual",
+    # 直接通过 Celery 调用任务
+    result = celery_app.send_task(
+        task_name,
+        kwargs={
+            "scheduled_task_id": task_id,
+            "trigger_type": "manual",
+            **handler_kwargs,
+        },
     )
-    logger.info(f"任务 #{task_id} 已提交到 Celery，task_id: {result.id}")
+    logger.info(
+        f"任务 #{task_id} ({task_name}) 已提交到 Celery，celery_task_id: {result.id}"
+    )
     return result.id
 
 
