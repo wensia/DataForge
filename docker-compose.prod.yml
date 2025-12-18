@@ -45,6 +45,7 @@ services:
     restart: unless-stopped
     volumes:
       - backend-logs:/app/logs
+      - backend-uploads:/app/uploads
       - /etc/localtime:/etc/localtime:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8847/api/v1/health"]
@@ -131,5 +132,7 @@ networks:
 volumes:
   backend-logs:
     name: dataforge-backend-logs
+  backend-uploads:
+    name: dataforge-backend-uploads
   celery-logs:
     name: dataforge-celery-logs
