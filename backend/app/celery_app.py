@@ -14,12 +14,18 @@ from loguru import logger
 
 from app.config import settings
 
+# 导入信号处理器模块（触发信号注册）
+import app.celery_signals  # noqa: F401
+
 # 创建 Celery 应用
 celery_app = Celery(
     "dataforge",
     broker=settings.celery_broker,
     backend=settings.celery_backend,
-    include=["app.celery_tasks"],
+    # 包含任务模块
+    # app.tasks 包含新的装饰器任务
+    # app.celery_tasks 保留用于向后兼容
+    include=["app.tasks", "app.celery_tasks"],
 )
 
 # ============================================================================

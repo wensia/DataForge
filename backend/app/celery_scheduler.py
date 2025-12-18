@@ -103,26 +103,39 @@ class DatabaseScheduleEntry(ScheduleEntry):
 
     @classmethod
     def from_task(cls, task: ScheduledTask, app: Any = None) -> "DatabaseScheduleEntry":
-        """从数据库任务创建调度项"""
-        # 构建 Celery 任务参数
-        name = f"task_{task.id}_{task.name}"
-        celery_task = "dataforge.execute_task"
+        """从数据库任务创建调度项
 
-        # 解析 handler_kwargs
-        handler_kwargs: dict[str, Any] = {}
+        新系统优先使用 task_name 直接调用注册的 Celery 任务，
+        旧系统回退到使用 dataforge.execute_task 包装器。
+        """
+        name = f"task_{task.id}_{task.name}"
+
+        # 解析任务参数
+        task_kwargs: dict[str, Any] = {}
         if task.handler_kwargs:
             try:
-                handler_kwargs = json.loads(task.handler_kwargs)
+                task_kwargs = json.loads(task.handler_kwargs)
             except json.JSONDecodeError:
                 pass
 
-        # 任务参数
-        kwargs = {
-            "task_id": task.id,
-            "handler_path": task.handler_path,
-            "handler_kwargs": handler_kwargs,
-            "trigger_type": "scheduled",
-        }
+        # 新系统：使用 task_name 直接调用
+        if task.task_name:
+            celery_task = task.task_name
+
+            # 任务参数：添加 scheduled_task_id 用于执行记录追踪
+            kwargs = {
+                **task_kwargs,
+                "scheduled_task_id": task.id,
+            }
+        else:
+            # 旧系统向后兼容：使用 execute_task 包装器
+            celery_task = "dataforge.execute_task"
+            kwargs = {
+                "task_id": task.id,
+                "handler_path": task.handler_path,
+                "handler_kwargs": task_kwargs,
+                "trigger_type": "scheduled",
+            }
 
         # 创建调度器
         sched = cls._make_schedule_static(task)

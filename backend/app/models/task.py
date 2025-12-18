@@ -41,8 +41,11 @@ class ScheduledTask(SQLModel, table=True):
     run_date: datetime | None = Field(default=None, description="一次性执行时间")
 
     # 任务处理
-    handler_path: str = Field(description="处理函数路径")
-    handler_kwargs: str | None = Field(default=None, description="处理函数参数 JSON")
+    # task_name: 新的 Celery 任务名称（如 "dataforge.sync_accounts"）
+    # handler_path: 旧的处理函数路径（保留用于向后兼容，将逐步废弃）
+    task_name: str | None = Field(default=None, index=True, description="Celery 任务名称")
+    handler_path: str | None = Field(default=None, description="处理函数路径（已废弃）")
+    handler_kwargs: str | None = Field(default=None, description="任务参数 JSON")
 
     # 状态
     status: TaskStatus = Field(default=TaskStatus.ACTIVE, description="任务状态")
@@ -78,7 +81,9 @@ class ScheduledTaskCreate(SQLModel):
     cron_expression: str | None = None
     interval_seconds: int | None = None
     run_date: datetime | None = None
-    handler_path: str
+    # 新系统使用 task_name，旧系统使用 handler_path
+    task_name: str | None = None
+    handler_path: str | None = None
     handler_kwargs: str | None = None
     category: str | None = None
     notify_on_success: bool = False
@@ -94,6 +99,7 @@ class ScheduledTaskUpdate(SQLModel):
     cron_expression: str | None = None
     interval_seconds: int | None = None
     run_date: datetime | None = None
+    task_name: str | None = None
     handler_kwargs: str | None = None
     status: TaskStatus | None = None
     category: str | None = None
@@ -112,7 +118,8 @@ class ScheduledTaskResponse(SQLModel):
     cron_expression: str | None
     interval_seconds: int | None
     run_date: datetime | None
-    handler_path: str
+    task_name: str | None
+    handler_path: str | None
     handler_kwargs: str | None
     status: TaskStatus
     is_system: bool
