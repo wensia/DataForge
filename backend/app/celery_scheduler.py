@@ -105,37 +105,44 @@ class DatabaseScheduleEntry(ScheduleEntry):
     def from_task(cls, task: ScheduledTask, app: Any = None) -> "DatabaseScheduleEntry":
         """从数据库任务创建调度项
 
-        新系统优先使用 task_name 直接调用注册的 Celery 任务，
-        旧系统回退到使用 dataforge.execute_task 包装器。
+        使用 task_name 直接调用注册的 Celery 任务。
         """
         name = f"task_{task.id}_{task.name}"
+
+        # 验证任务名称
+        if not task.task_name:
+            logger.error(f"Task {task.id} ({task.name}) missing task_name")
+            raise ValueError(f"Task {task.id} ({task.name}) missing task_name")
+
+        # 验证任务已注册
+        app_instance = app or current_app
+        if task.task_name not in app_instance.tasks:
+            logger.error(
+                f"Celery task not registered: {task.task_name}. "
+                f"Available tasks: {list(app_instance.tasks.keys())}"
+            )
+            raise ValueError(
+                f"Celery task not registered: {task.task_name}. "
+                "Please check if the task is imported in app/tasks/__init__.py"
+            )
 
         # 解析任务参数
         task_kwargs: dict[str, Any] = {}
         if task.handler_kwargs:
             try:
                 task_kwargs = json.loads(task.handler_kwargs)
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in handler_kwargs for task {task.id}: {e}")
+                task_kwargs = {}
 
-        # 新系统：使用 task_name 直接调用
-        if task.task_name:
-            celery_task = task.task_name
+        # 使用 task_name 直接调用
+        celery_task = task.task_name
 
-            # 任务参数：添加 scheduled_task_id 用于执行记录追踪
-            kwargs = {
-                **task_kwargs,
-                "scheduled_task_id": task.id,
-            }
-        else:
-            # 旧系统向后兼容：使用 execute_task 包装器
-            celery_task = "dataforge.execute_task"
-            kwargs = {
-                "task_id": task.id,
-                "handler_path": task.handler_path,
-                "handler_kwargs": task_kwargs,
-                "trigger_type": "scheduled",
-            }
+        # 任务参数：添加 scheduled_task_id 用于执行记录追踪和分布式锁
+        kwargs = {
+            **task_kwargs,
+            "scheduled_task_id": task.id,
+        }
 
         # 创建调度器
         sched = cls._make_schedule_static(task)

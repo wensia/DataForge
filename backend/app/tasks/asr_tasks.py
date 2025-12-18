@@ -4,11 +4,13 @@
 """
 
 import asyncio
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 
 from loguru import logger
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
 from sqlmodel import Session, select
 
 from app.celery_app import celery_app
@@ -432,5 +434,291 @@ def asr_transcribe(
             correct_table_name=correct_table_name,
             qps=qps,
             extend_lock_callback=extend_lock_callback,
+        )
+    )
+
+
+# ============================================================================
+# ASR 文本替换任务
+# ============================================================================
+
+# 替换词本路径
+REPLACEMENT_DICT_PATH = Path(__file__).parent.parent.parent / "asr_replacement_dict.txt"
+
+
+def _load_replacement_dict() -> dict[str, str]:
+    """加载替换词本
+
+    Returns:
+        dict: 错误词 -> 正确词 的映射字典
+    """
+    replacements = {}
+    if not REPLACEMENT_DICT_PATH.exists():
+        task_log(f"替换词本不存在: {REPLACEMENT_DICT_PATH}")
+        return replacements
+
+    with open(REPLACEMENT_DICT_PATH, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and "|" in line:
+                parts = line.split("|", 1)
+                if len(parts) == 2:
+                    wrong, correct = parts
+                    if wrong and correct:
+                        replacements[wrong] = correct
+    return replacements
+
+
+def _replace_text(text: str, replacements: dict[str, str]) -> str:
+    """对文本进行替换
+
+    Args:
+        text: 原始文本
+        replacements: 替换词典
+
+    Returns:
+        str: 替换后的文本
+    """
+    for wrong, correct in replacements.items():
+        text = text.replace(wrong, correct)
+    return text
+
+
+def _build_text_replace_query(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+):
+    """构建查询语句 - 查找需要替换的记录"""
+    statement = select(CallRecord).where(CallRecord.transcript.isnot(None))
+
+    if start_time:
+        statement = statement.where(CallRecord.call_time >= start_time)
+    if end_time:
+        statement = statement.where(CallRecord.call_time <= end_time)
+
+    return statement
+
+
+def _count_text_replace_records(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> int:
+    """统计需要处理的记录总数（不加载数据到内存）"""
+    with Session(engine) as session:
+        base_query = _build_text_replace_query(start_time, end_time)
+        count_query = select(func.count()).select_from(base_query.subquery())
+        return session.exec(count_query).one()
+
+
+def _get_text_replace_records_paged(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    page_size: int = 500,
+) -> Generator[list[CallRecord], None, None]:
+    """分页获取记录（生成器模式）
+
+    每次从数据库获取 page_size 条记录，避免一次性加载全量数据到内存。
+
+    Yields:
+        list[CallRecord]: 每页的通话记录列表
+    """
+    offset = 0
+
+    while True:
+        with Session(engine) as session:
+            statement = _build_text_replace_query(start_time, end_time)
+            statement = statement.order_by(CallRecord.call_time.desc())
+            statement = statement.limit(page_size).offset(offset)
+
+            records = list(session.exec(statement).all())
+
+            if not records:
+                break
+
+            yield records
+            offset += page_size
+
+            if len(records) < page_size:
+                break
+
+
+async def _run_text_replace(
+    start_time: datetime | None,
+    end_time: datetime | None,
+    batch_size: int,
+    dry_run: bool,
+) -> dict:
+    """执行 ASR 文本替换（异步入口）
+
+    Args:
+        start_time: 开始时间（可选，默认处理所有）
+        end_time: 结束时间（可选）
+        batch_size: 批量处理大小
+        dry_run: 试运行模式（不实际更新数据库）
+
+    Returns:
+        dict: 执行结果统计
+    """
+    # 加载替换词本
+    replacements = _load_replacement_dict()
+    task_log(f"已加载 {len(replacements)} 条替换规则")
+
+    if not replacements:
+        return {
+            "status": "error",
+            "message": "替换词本为空或不存在",
+            "total": 0,
+            "updated": 0,
+        }
+
+    # 统计需要处理的记录总数（不加载数据到内存）
+    total = _count_text_replace_records(start_time, end_time)
+    task_log(f"找到 {total} 条待处理记录")
+
+    if total == 0:
+        return {
+            "status": "completed",
+            "message": "没有需要处理的记录",
+            "total": 0,
+            "updated": 0,
+            "skipped": 0,
+        }
+
+    # 统计
+    updated = 0
+    skipped = 0
+    processed = 0
+    examples = []  # 记录替换示例
+
+    # 使用分页查询，避免一次性加载全量数据到内存
+    db_page_size = 500
+    task_log(f"使用分页查询，每页 {db_page_size} 条记录")
+
+    for page_records in _get_text_replace_records_paged(
+        start_time, end_time, page_size=db_page_size
+    ):
+        # 每页记录单独开启事务处理
+        with Session(engine) as session:
+            for record in page_records:
+                # 重新从当前 session 获取记录（避免 detached 状态）
+                db_record = session.get(CallRecord, record.id)
+                if not db_record or not db_record.transcript:
+                    skipped += 1
+                    continue
+
+                # 对每个 segment 的 text 进行替换
+                modified = False
+                new_transcript = []
+                for segment in db_record.transcript:
+                    new_segment = segment.copy()
+                    if "text" in segment and segment["text"]:
+                        original_text = segment["text"]
+                        new_text = _replace_text(original_text, replacements)
+                        if new_text != original_text:
+                            modified = True
+                            new_segment["text"] = new_text
+                            # 记录前几个替换示例
+                            if len(examples) < 5:
+                                examples.append(
+                                    {
+                                        "record_id": db_record.id,
+                                        "original": original_text[:50],
+                                        "replaced": new_text[:50],
+                                    }
+                                )
+                    new_transcript.append(new_segment)
+
+                if modified:
+                    if not dry_run:
+                        db_record.transcript = new_transcript
+                        session.add(db_record)
+                    updated += 1
+
+            if not dry_run:
+                session.commit()
+
+        processed += len(page_records)
+        task_log(f"已处理 {processed}/{total} 条记录")
+
+    # 打印替换示例
+    if examples:
+        task_log("替换示例:")
+        for ex in examples:
+            task_log(
+                f"  记录 {ex['record_id']}: '{ex['original']}' -> '{ex['replaced']}'"
+            )
+
+    result = {
+        "status": "completed",
+        "message": f"替换完成，更新 {updated} 条记录",
+        "total": total,
+        "updated": updated,
+        "skipped": skipped,
+        "dry_run": dry_run,
+        "examples": examples,
+    }
+    task_log(f"执行完成: 总计 {total} 条，更新 {updated} 条，跳过 {skipped} 条")
+    return result
+
+
+@celery_app.task(
+    base=DataForgeTask,
+    name="dataforge.asr_text_replace",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=300,
+    lock_timeout=7200,  # 2小时超时
+)
+def asr_text_replace(
+    self,
+    start_time: str = "",
+    end_time: str = "",
+    batch_size: int = 500,
+    dry_run: bool = False,
+    scheduled_task_id: int | None = None,
+) -> dict:
+    """ASR 转写文本替换
+
+    使用替换词本对已转录的通话记录进行错别字纠正。
+
+    Args:
+        start_time: 开始时间 "YYYY-MM-DD HH:mm"（可选，默认处理所有）
+        end_time: 结束时间 "YYYY-MM-DD HH:mm"（可选）
+        batch_size: 批量处理大小
+        dry_run: 试运行模式（不实际更新数据库）
+        scheduled_task_id: 调度任务ID
+
+    Returns:
+        dict: 执行结果
+    """
+    # 参数标准化
+    start_dt = None
+    end_dt = None
+
+    if start_time:
+        try:
+            start_dt = _normalize_time_param(start_time, "00:00")
+        except ValueError as e:
+            return {"status": "failed", "message": f"开始时间格式错误: {e}"}
+
+    if end_time:
+        try:
+            end_dt = _normalize_time_param(end_time, "23:59")
+        except ValueError as e:
+            return {"status": "failed", "message": f"结束时间格式错误: {e}"}
+
+    task_log("开始 ASR 文本替换任务")
+    if start_dt and end_dt:
+        task_log(f"时间范围: {start_dt} ~ {end_dt}")
+    task_log(f"批量处理大小: {batch_size}")
+    task_log(f"试运行模式: {dry_run}")
+
+    # 使用 run_async 在独立线程中运行异步代码
+    return run_async(
+        _run_text_replace(
+            start_time=start_dt,
+            end_time=end_dt,
+            batch_size=batch_size,
+            dry_run=dry_run,
         )
     )

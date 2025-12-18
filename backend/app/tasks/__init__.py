@@ -22,9 +22,9 @@
 from app.tasks.base import DataForgeTask, DataForgeTaskNoLock
 
 # 导入所有任务（触发注册）
-from app.tasks.asr_tasks import asr_transcribe
+from app.tasks.asr_tasks import asr_text_replace, asr_transcribe
 from app.tasks.cleanup_tasks import cleanup_executions, cleanup_stuck_tasks
-from app.tasks.sync_tasks import sync_accounts, sync_call_logs
+from app.tasks.sync_tasks import sync_accounts, sync_call_logs, sync_call_logs_to_feishu
 
 # 任务注册表（task_name -> 任务描述）
 # 用于前端下拉框选择、API 文档等
@@ -78,6 +78,33 @@ REGISTERED_TASKS = {
             {"name": "qps", "type": "int", "required": False, "label": "QPS限制", "default": 20},
         ],
     },
+    "dataforge.asr_text_replace": {
+        "name": "ASR 文本替换",
+        "description": "使用替换词本对已转录的通话记录进行错别字纠正",
+        "category": "asr",
+        "params": [
+            {"name": "start_time", "type": "str", "required": False, "label": "开始时间"},
+            {"name": "end_time", "type": "str", "required": False, "label": "结束时间"},
+            {"name": "batch_size", "type": "int", "required": False, "label": "批量处理大小", "default": 500},
+            {"name": "dry_run", "type": "bool", "required": False, "label": "试运行模式", "default": False},
+        ],
+    },
+    "dataforge.sync_call_logs_to_feishu": {
+        "name": "通话记录同步到飞书",
+        "description": "将云客外呼记录同步到飞书多维表格",
+        "category": "sync",
+        "params": [
+            {"name": "yunke_account_id", "type": "int", "required": True, "label": "云客账号ID"},
+            {"name": "feishu_client_id", "type": "int", "required": True, "label": "飞书客户端ID"},
+            {"name": "bitable_app_token", "type": "str", "required": True, "label": "多维表格 app_token"},
+            {"name": "table_name", "type": "str", "required": False, "label": "目标数据表名称", "default": "通话记录"},
+            {"name": "start_time", "type": "str", "required": False, "label": "开始时间"},
+            {"name": "end_time", "type": "str", "required": False, "label": "结束时间"},
+            {"name": "page_size", "type": "int", "required": False, "label": "每页记录数", "default": 50},
+            {"name": "call_type", "type": "str", "required": False, "label": "通话类型(s/i)", "default": "s"},
+            {"name": "only_with_record", "type": "bool", "required": False, "label": "只同步有录音的记录", "default": True},
+        ],
+    },
 }
 
 
@@ -111,9 +138,11 @@ __all__ = [
     # 任务函数
     "sync_accounts",
     "sync_call_logs",
+    "sync_call_logs_to_feishu",
     "cleanup_executions",
     "cleanup_stuck_tasks",
     "asr_transcribe",
+    "asr_text_replace",
     # 工具函数
     "get_registered_tasks",
     "get_task_by_name",
