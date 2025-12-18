@@ -61,7 +61,6 @@ import {
 } from '../api/accounts'
 import type {
   CreateAccountRequest,
-  CreateTagRequest,
   UpdateAccountRequest,
   UpdateTagRequest,
   WechatAccount,
@@ -405,7 +404,7 @@ interface TagManagerDialogProps {
 }
 
 function TagManagerDialog({ open, onOpenChange }: TagManagerDialogProps) {
-  const { data: tags, refetch } = useTags()
+  const { data: tags } = useTags()
   const createTag = useCreateTag()
   const updateTag = useUpdateTag()
   const deleteTag = useDeleteTag()
