@@ -1,128 +1,128 @@
-# DataForge 项目规则
+# DataForge Project Rules
 
-> 精简版规则文档 - 只包含每次会话都需要的核心信息
+> Simplified rules - core information needed for each session
 
-## 项目概述
+## Project Overview
 
-DataForge（数据熔炉）= FastAPI 后端 + React 前端，多源数据集成与管理平台。
+DataForge = FastAPI backend + React frontend, multi-source data integration and management platform.
 
-## 目录结构
+## Directory Structure
 
 ```
 backend/
-  ├── app/            # FastAPI 应用 (端口 8847)
-  │   ├── main.py     # 入口 + 中间件注册
-  │   ├── config.py   # 配置 + 环境变量
-  │   ├── api/v1/     # API 路由
-  │   ├── models/     # SQLModel 数据库模型
-  │   ├── scheduler/  # 任务调度器模块
-  │   ├── clients/    # 外部 API 客户端 (云客、AI)
-  │   └── utils/      # 工具函数
-  └── scripts/        # 定时任务脚本文件夹
+  ├── app/            # FastAPI application (port 8847)
+  │   ├── main.py     # Entry point + middleware registration
+  │   ├── config.py   # Configuration + environment variables
+  │   ├── api/v1/     # API routes
+  │   ├── models/     # SQLModel database models
+  │   ├── scheduler/  # Task scheduler module
+  │   ├── clients/    # External API clients (YunKe, AI)
+  │   └── utils/      # Utility functions
+  └── scripts/        # Scheduled task scripts folder
 
-frontend-react/src/   # React 应用 (端口 3692)
-  ├── components/     # shadcn/ui 组件
-  ├── features/       # 功能模块 (按业务划分)
-  ├── hooks/          # 自定义 Hooks
-  ├── lib/            # 工具库 (api-client, utils)
-  ├── styles/         # 全局样式
-  └── routes.tsx      # 路由配置
+frontend-react/src/   # React application (port 3692)
+  ├── components/     # shadcn/ui components
+  ├── features/       # Feature modules (by business logic)
+  ├── hooks/          # Custom Hooks
+  ├── lib/            # Utility libraries (api-client, utils)
+  ├── styles/         # Global styles
+  └── routes.tsx      # Route configuration
 ```
 
-## 技术栈
+## Tech Stack
 
-**后端**: Python 3.11 + FastAPI + SQLModel + PostgreSQL + httpx + APScheduler
-**前端**: React 18 + Vite + shadcn/ui + TanStack Query/Table + Tailwind CSS
-**工具**: ruff (后端格式化) + ESLint + Prettier (前端格式化)
+**Backend**: Python 3.11 + FastAPI + SQLModel + PostgreSQL + httpx + APScheduler
+**Frontend**: React 18 + Vite + shadcn/ui + TanStack Query/Table + Tailwind CSS
+**Tools**: ruff (backend formatter) + ESLint + Prettier (frontend formatter)
 
-## 核心规范
+## Core Specifications
 
-### 1. 统一响应格式（强制）
+### 1. Unified Response Format (MANDATORY)
 
-**所有 API 必须使用 `ResponseModel`，禁止使用 `HTTPException`！**
+**All APIs MUST use `ResponseModel`, DO NOT use `HTTPException`!**
 
 ```python
-# 成功响应
+# Success response
 ResponseModel(data={...})
-ResponseModel(message="创建成功", data={...})
+ResponseModel(message="Created successfully", data={...})
 
-# 错误响应 - 必须使用 ResponseModel.error()
-ResponseModel.error(code=400, message="参数错误")
-ResponseModel.error(code=404, message="资源不存在")
+# Error response - MUST use ResponseModel.error()
+ResponseModel.error(code=400, message="Invalid parameters")
+ResponseModel.error(code=404, message="Resource not found")
 
-# 禁止使用 HTTPException！它返回 {"detail": "..."} 格式
-# raise HTTPException(status_code=404, detail="不存在")  # 错误！
+# DO NOT use HTTPException! It returns {"detail": "..."} format
+# raise HTTPException(status_code=404, detail="Not found")  # WRONG!
 ```
 
-错误码: 200=成功, 400=请求错误, 401=无密钥, 403=密钥无效, 404=不存在, 500=服务器错误
+Error codes: 200=Success, 400=Bad Request, 401=No API Key, 403=Invalid API Key, 404=Not Found, 500=Server Error
 
-### 2. API 密钥验证
+### 2. API Key Authentication
 
-- **所有 API 需要**: `?api_key=YOUR_KEY`
-- **豁免路径**: `/` 和 `/api/v1/health`
-- **配置文件**: `backend/.env` 的 `API_KEYS`
-- **测试端点**: `GET /api/v1/auth/test?api_key=xxx`
+- **All APIs require**: `?api_key=YOUR_KEY`
+- **Exempt paths**: `/` and `/api/v1/health`
+- **Configuration**: `API_KEYS` in `backend/.env`
+- **Test endpoint**: `GET /api/v1/auth/test?api_key=xxx`
 
-### 3. 命名规范
+### 3. Naming Conventions
 
-| 语言 | 文件 | 类/组件 | 函数/变量 |
-|------|------|---------|-----------|
+| Language | Files | Classes/Components | Functions/Variables |
+|----------|-------|-------------------|---------------------|
 | Python | snake_case | PascalCase | snake_case |
 | TypeScript | camelCase | PascalCase | camelCase |
 
-### 4. 开发流程
+### 4. Development Workflow
 
-1. 查阅官方文档 → 2. 编写代码 → 3. 格式化 (`ruff`/`pnpm lint`) → 4. 测试验证
+1. Read official docs → 2. Write code → 3. Format (`ruff`/`pnpm lint`) → 4. Test and verify
 
-### 5. 启动服务
+### 5. Start Services
 
 ```bash
-# 一键启动
+# One-click start
 ./manage.sh start
 
-# 手动启动
+# Manual start
 cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8847
 cd frontend-react && pnpm dev --port 3692
 ```
 
-## 扩展文档
+## Extended Documentation
 
-详细规则和特定领域信息在以下文件,按需查阅:
+Detailed rules and domain-specific information in these files, refer as needed:
 
-- `docs/rules/backend.md` - 后端详细开发规范
-- `docs/rules/frontend.md` - 前端详细开发规范 (React + shadcn/ui)
-- `docs/rules/scheduler.md` - 定时任务系统规范
-- `docs/rules/celery-lock.md` - Celery 分布式任务锁规范
-- `docs/rules/yunke-api.md` - 云客 API 集成规范
-- `docs/rules/feishu.md` - 飞书多维表格集成规范
-- `docs/rules/data-sync.md` - 数据同步规范（飞书→本地数据库）
-- `docs/rules/ai-integration.md` - AI 集成规范（Kimi/DeepSeek）
-- `docs/rules/ai-tools.md` - AI 工具调用规范（Function Calling）
-- `docs/rules/auth.md` - 用户认证规范
-- `docs/rules/deploy.md` - **服务器部署和运维（涉及部署必读！）**
+- `docs/rules/backend.md` - Backend development specifications
+- `docs/rules/frontend.md` - Frontend development specifications (React + shadcn/ui)
+- `docs/rules/scheduler.md` - Scheduled task system specifications
+- `docs/rules/celery-lock.md` - Celery distributed task lock specifications
+- `docs/rules/yunke-api.md` - YunKe API integration specifications
+- `docs/rules/feishu.md` - Feishu multi-dimensional table integration
+- `docs/rules/data-sync.md` - Data synchronization (Feishu → local database)
+- `docs/rules/ai-integration.md` - AI integration (Kimi/DeepSeek)
+- `docs/rules/ai-tools.md` - AI tool calling (Function Calling)
+- `docs/rules/auth.md` - User authentication specifications
+- `docs/rules/deploy.md` - **Server deployment and operations (MUST READ for deployment!)**
 
-### 部署相关（强制）
+### Deployment Related (MANDATORY)
 
-**涉及服务器部署时，必须先阅读 `docs/rules/deploy.md`！**
+**For server deployment tasks, MUST read `docs/rules/deploy.md` first!**
 
-- SSH 密钥路径: `~/.ssh/dataforge_key.pem`（从项目根目录 claudeCode.pem 复制）
-- 服务器: `root@124.220.15.80`
-- 项目目录: `/www/wwwroot/yunke-transit`
+- SSH key path: `~/.ssh/dataforge_key.pem` (copy from project root claudeCode.pem)
+- Server: `root@124.220.15.80`
+- Project directory: `/www/wwwroot/yunke-transit`
 
-**SSH 连接命令（必须使用密钥）:**
+**SSH connection command (MUST use key):**
 ```bash
 ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80
 ```
 
-**部署命令示例:**
+**Deployment command example:**
 ```bash
 ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80 "cd /www/wwwroot/yunke-transit && git pull && docker compose restart"
 ```
 
-## 重要提醒
+## Important Reminders
 
-- 代码风格由工具保证,不需要手动检查格式
-- **所有 API 必须使用 `ResponseModel`，禁止使用 `HTTPException`**
-- 错误响应使用 `ResponseModel.error(code=xxx, message="...")`
-- 不要把 `.env` 提交到 Git
-- 生产环境必须使用 HTTPS
+- Code style is enforced by tools, no manual format checking needed
+- **All APIs MUST use `ResponseModel`, DO NOT use `HTTPException`**
+- Error responses use `ResponseModel.error(code=xxx, message="...")`
+- Do not commit `.env` to Git
+- Production environment MUST use HTTPS
