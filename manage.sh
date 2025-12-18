@@ -222,7 +222,7 @@ start_celery_worker() {
     source .venv/bin/activate
 
     ensure_log_dir
-    nohup celery -A app.celery_app worker --loglevel=info --pool=gevent --concurrency=4 > "$CELERY_WORKER_LOG" 2>&1 &
+    nohup celery -A app.celery_app worker --loglevel=info --pool=prefork --concurrency=2 > "$CELERY_WORKER_LOG" 2>&1 &
     local pid=$!
     echo $pid > "$CELERY_WORKER_PID_FILE"
 
