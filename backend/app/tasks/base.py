@@ -24,6 +24,100 @@ from app.config import settings
 from app.utils.task_lock import acquire_task_lock, extend_task_lock, release_task_lock
 
 
+# ============================================================================
+# 参数类型转换工具
+# ============================================================================
+
+
+def convert_value(value: Any, target_type: str) -> Any:
+    """转换单个值到目标类型
+
+    Args:
+        value: 原始值
+        target_type: 目标类型 (int, bool, float, str)
+
+    Returns:
+        转换后的值
+    """
+    if value is None:
+        return None
+
+    if target_type == "int":
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.strip():
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+        return 0
+    elif target_type == "bool":
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return bool(value)
+    elif target_type == "float":
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str) and value.strip():
+            try:
+                return float(value)
+            except ValueError:
+                return 0.0
+        return 0.0
+    else:
+        # 默认返回字符串
+        return str(value) if value is not None else ""
+
+
+def coerce_task_params(task_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """根据任务注册信息转换参数类型
+
+    从 REGISTERED_TASKS 获取参数元数据，将 kwargs 中的值转换为正确的类型。
+    这确保从 JSON 反序列化的字符串参数能正确转换为 int/bool 等类型。
+
+    Args:
+        task_name: Celery 任务名称
+        kwargs: 原始关键字参数
+
+    Returns:
+        类型转换后的参数字典
+    """
+    # 延迟导入避免循环依赖
+    try:
+        from app.tasks import REGISTERED_TASKS
+    except ImportError:
+        logger.warning("无法导入 REGISTERED_TASKS，跳过参数类型转换")
+        return kwargs
+
+    task_info = REGISTERED_TASKS.get(task_name)
+    if not task_info:
+        return kwargs
+
+    # 构建参数名到类型的映射
+    params_meta = {p["name"]: p for p in task_info.get("params", [])}
+    if not params_meta:
+        return kwargs
+
+    result = {}
+    for key, value in kwargs.items():
+        if key in params_meta:
+            param_type = params_meta[key].get("type", "str")
+            original_value = value
+            result[key] = convert_value(value, param_type)
+            # 仅在类型实际改变时记录日志
+            if type(original_value) != type(result[key]):
+                logger.debug(
+                    f"参数类型转换: {key}={original_value!r} ({type(original_value).__name__}) "
+                    f"-> {result[key]!r} ({type(result[key]).__name__})"
+                )
+        else:
+            result[key] = value
+
+    return result
+
+
 class TaskSkipped(Exception):
     """任务被跳过（锁未获取等情况）"""
 
@@ -94,6 +188,19 @@ class DataForgeTask(Task):
 
     # 任务开始时间
     _start_time = None
+
+    # ============================================================================
+    # 核心执行方法
+    # ============================================================================
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """执行任务前进行参数类型转换
+
+        确保从 JSON 反序列化的参数（如字符串 "100"）转换为正确的类型（int 100）。
+        这解决了 JSON 序列化导致的类型丢失问题。
+        """
+        kwargs = coerce_task_params(self.name, kwargs)
+        return super().__call__(*args, **kwargs)
 
     # ============================================================================
     # 生命周期方法
