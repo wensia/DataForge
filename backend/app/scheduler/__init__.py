@@ -1,17 +1,14 @@
-"""调度器模块（Celery 版本）
+"""调度器模块
 
 任务调度由 Celery Worker 和 Beat 处理，本模块提供：
-- 处理函数注册和发现
-- 任务执行器
+- 任务注册表查询
 - 任务日志功能
 """
 
-from app.scheduler.executor import execute_task, execute_task_with_execution
 from app.scheduler.registry import (
-    discover_handlers,
-    get_handler,
-    get_registered_handlers,
-    register_handler,
+    get_registered_tasks,
+    get_task_info,
+    is_task_registered,
 )
 from app.scheduler.task_logger import (
     is_execution_running,
@@ -19,12 +16,11 @@ from app.scheduler.task_logger import (
 )
 
 __all__ = [
-    "discover_handlers",
-    "execute_task",
-    "execute_task_with_execution",
-    "get_handler",
-    "get_registered_handlers",
+    # 注册表
+    "get_registered_tasks",
+    "get_task_info",
+    "is_task_registered",
+    # 日志
     "is_execution_running",
-    "register_handler",
     "task_log",
 ]

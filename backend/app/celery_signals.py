@@ -1,9 +1,7 @@
 """Celery 任务信号处理
 
-使用 Celery signals 自动管理任务执行记录，
-替代之前的 execute_task_with_execution 包装器。
-
-信号处理器在 Worker 进程中运行，每次任务执行时触发。
+统一的信号处理入口，管理任务执行记录。
+所有 dataforge.* 命名空间的任务都会经过这里。
 
 参考文档:
 - https://docs.celeryq.dev/en/stable/userguide/signals.html
@@ -14,37 +12,27 @@ from typing import Any
 
 from celery.signals import task_failure, task_postrun, task_prerun, task_success
 from loguru import logger
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.database import engine
 from app.models.task import ScheduledTask, TaskType
 from app.models.task_execution import ExecutionStatus, TaskExecution
 
 
-def _get_scheduled_task_by_name(session: Session, task_name: str) -> ScheduledTask | None:
-    """根据 task_name 查找 ScheduledTask
-
-    优先使用 task_name，如果没有则尝试使用 handler_path（向后兼容）
-    """
-    # 首先尝试 task_name
-    statement = select(ScheduledTask).where(ScheduledTask.task_name == task_name)
-    task = session.exec(statement).first()
-
-    if task:
-        return task
-
-    # 向后兼容：尝试从 task_name 推断 handler_path
-    # dataforge.sync_accounts -> scripts:sync_accounts
-    if task_name.startswith("dataforge."):
-        handler_path = "scripts:" + task_name.replace("dataforge.", "")
-        statement = select(ScheduledTask).where(ScheduledTask.handler_path == handler_path)
-        task = session.exec(statement).first()
-
-    return task
+# ============================================================================
+# 辅助函数
+# ============================================================================
 
 
-def _get_scheduled_task_id_from_kwargs(kwargs: dict[str, Any]) -> int | None:
+def _is_dataforge_task(task_name: str) -> bool:
+    """检查是否是 dataforge 任务"""
+    return task_name.startswith("dataforge.")
+
+
+def _get_scheduled_task_id(kwargs: dict[str, Any] | None) -> int | None:
     """从任务参数中获取 scheduled_task_id"""
+    if kwargs is None:
+        return None
     return kwargs.get("scheduled_task_id")
 
 
@@ -63,47 +51,38 @@ def on_task_prerun(
 ) -> None:
     """任务开始前创建执行记录
 
-    只处理 dataforge.* 命名空间的任务，创建 TaskExecution 记录。
+    只处理 dataforge.* 命名空间的任务。
     """
     if task is None or kwargs is None:
         return
 
-    # 只处理我们的任务
-    if not task.name.startswith("dataforge."):
+    if not _is_dataforge_task(task.name):
         return
 
-    # 获取 scheduled_task_id
-    scheduled_task_id = _get_scheduled_task_id_from_kwargs(kwargs)
+    scheduled_task_id = _get_scheduled_task_id(kwargs)
+    if not scheduled_task_id:
+        logger.debug(f"任务 {task.name} 没有 scheduled_task_id，跳过执行记录")
+        return
 
     try:
         with Session(engine) as session:
-            # 如果没有 scheduled_task_id，尝试从 task_name 查找
-            if not scheduled_task_id:
-                scheduled_task = _get_scheduled_task_by_name(session, task.name)
-                if scheduled_task:
-                    scheduled_task_id = scheduled_task.id
-
-            if not scheduled_task_id:
-                logger.debug(f"任务 {task.name} 没有关联的 ScheduledTask，跳过执行记录")
-                return
-
             # 创建执行记录
             execution = TaskExecution(
                 task_id=scheduled_task_id,
                 status=ExecutionStatus.RUNNING,
-                trigger_type="scheduled" if "scheduled_task_id" in kwargs else "manual",
+                trigger_type="scheduled",
                 started_at=datetime.now(),
             )
             session.add(execution)
             session.commit()
             session.refresh(execution)
 
-            # 将 execution_id 存储到任务请求中，供后续信号使用
+            # 将 execution_id 存储到任务请求中
             task.request.execution_id = execution.id
 
             logger.debug(
                 f"任务 {task.name} 开始执行, "
-                f"task_id={scheduled_task_id}, execution_id={execution.id}"
+                f"scheduled_task_id={scheduled_task_id}, execution_id={execution.id}"
             )
     except Exception as e:
         logger.warning(f"创建执行记录失败: {e}")
@@ -119,8 +98,7 @@ def on_task_success(
     if sender is None:
         return
 
-    # 只处理我们的任务
-    if not sender.name.startswith("dataforge."):
+    if not _is_dataforge_task(sender.name):
         return
 
     execution_id = getattr(sender.request, "execution_id", None)
@@ -138,9 +116,11 @@ def on_task_success(
                     execution.duration_ms = int(
                         (now - execution.started_at).total_seconds() * 1000
                     )
-                # 存储结果摘要（限制大小）
+
+                # 存储结果摘要
                 if result:
                     import json
+
                     try:
                         result_str = json.dumps(result, ensure_ascii=False, default=str)
                         if len(result_str) > 10000:
@@ -178,8 +158,7 @@ def on_task_failure(
     if sender is None:
         return
 
-    # 只处理我们的任务
-    if not sender.name.startswith("dataforge."):
+    if not _is_dataforge_task(sender.name):
         return
 
     execution_id = getattr(sender.request, "execution_id", None)
@@ -198,6 +177,14 @@ def on_task_failure(
                         (now - execution.started_at).total_seconds() * 1000
                     )
                 execution.error_message = str(exception) if exception else "Unknown error"
+
+                # 存储完整堆栈
+                if traceback:
+                    try:
+                        execution.error_traceback = str(traceback)
+                    except Exception:
+                        pass
+
                 session.add(execution)
                 session.commit()
 
@@ -234,21 +221,10 @@ def on_task_postrun(
     if task is None or kwargs is None:
         return
 
-    # 只处理我们的任务
-    if not task.name.startswith("dataforge."):
+    if not _is_dataforge_task(task.name):
         return
 
-    scheduled_task_id = _get_scheduled_task_id_from_kwargs(kwargs)
-    if not scheduled_task_id:
-        # 尝试从 task_name 查找
-        try:
-            with Session(engine) as session:
-                scheduled_task = _get_scheduled_task_by_name(session, task.name)
-                if scheduled_task:
-                    scheduled_task_id = scheduled_task.id
-        except Exception:
-            pass
-
+    scheduled_task_id = _get_scheduled_task_id(kwargs)
     if not scheduled_task_id:
         return
 
