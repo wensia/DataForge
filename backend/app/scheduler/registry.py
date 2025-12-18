@@ -16,9 +16,10 @@ def get_registered_tasks() -> list[dict[str, Any]]:
 
     Returns:
         list: 任务信息列表，每个任务包含:
-            - task_name: Celery 任务名称
+            - path: Celery 任务名称（前端使用此字段匹配 handler_path）
             - name: 显示名称
             - description: 任务描述
+            - doc: 文档（可选）
             - category: 任务分类
             - params: 参数列表
     """
@@ -29,9 +30,10 @@ def get_registered_tasks() -> list[dict[str, Any]]:
         for task_name, info in REGISTERED_TASKS.items():
             tasks.append(
                 {
-                    "task_name": task_name,
+                    "path": task_name,  # 前端使用 path 字段
                     "name": info.get("name", task_name),
                     "description": info.get("description", ""),
+                    "doc": info.get("doc", ""),
                     "category": info.get("category", "default"),
                     "params": info.get("params", []),
                 }

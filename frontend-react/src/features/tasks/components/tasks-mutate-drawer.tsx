@@ -51,7 +51,7 @@ const formSchema = z
     cron_expression: z.string().optional(),
     interval_seconds: z.number().optional(),
     run_date: z.string().optional(),
-    handler_path: z.string().min(1, '请选择处理函数'),
+    task_name: z.string().min(1, '请选择处理函数'),
     handler_kwargs: z.string().optional(),
     category: z.string().optional(),
     notify_on_success: z.boolean(),
@@ -127,7 +127,7 @@ export function TasksMutateDrawer({
       cron_expression: '',
       interval_seconds: 3600,
       run_date: '',
-      handler_path: '',
+      task_name: '',
       handler_kwargs: '',
       category: '',
       notify_on_success: false,
@@ -139,6 +139,8 @@ export function TasksMutateDrawer({
   // 当编辑或复制时，填充表单
   useEffect(() => {
     if (currentRow && open) {
+      // 优先使用 task_name，向后兼容 handler_path
+      const taskNameValue = currentRow.task_name || currentRow.handler_path || ''
       form.reset({
         // 复制模式下，给名称添加"(副本)"后缀
         name: isCopy ? `${currentRow.name} (副本)` : currentRow.name,
@@ -147,7 +149,7 @@ export function TasksMutateDrawer({
         cron_expression: currentRow.cron_expression || '',
         interval_seconds: currentRow.interval_seconds || 3600,
         run_date: currentRow.run_date || '',
-        handler_path: currentRow.handler_path,
+        task_name: taskNameValue,
         handler_kwargs: currentRow.handler_kwargs || '',
         category: currentRow.category || '',
         notify_on_success: currentRow.notify_on_success || false,
@@ -170,20 +172,20 @@ export function TasksMutateDrawer({
   }, [currentRow, open, form, isCopy])
 
   const taskType = form.watch('task_type')
-  const handlerPath = form.watch('handler_path')
+  const taskName = form.watch('task_name')
 
   // 获取当前选中处理函数的参数列表
   const currentHandlerParams = useMemo(() => {
-    const handler = handlers.find((h) => h.path === handlerPath)
+    const handler = handlers.find((h) => h.path === taskName)
     return handler?.params || []
-  }, [handlers, handlerPath])
+  }, [handlers, taskName])
 
-  // 当 handler_path 变化时，重置参数值（仅在创建模式）
+  // 当 task_name 变化时，重置参数值（仅在创建模式）
   useEffect(() => {
-    if (!isUpdate && handlerPath) {
+    if (!isUpdate && taskName) {
       setParamsValue({})
     }
-  }, [handlerPath, isUpdate])
+  }, [taskName, isUpdate])
 
   const onSubmit = async (data: TaskForm) => {
     try {
@@ -222,7 +224,7 @@ export function TasksMutateDrawer({
           interval_seconds:
             data.task_type === 'interval' ? data.interval_seconds : undefined,
           run_date: data.task_type === 'date' ? data.run_date : undefined,
-          handler_path: data.handler_path,
+          task_name: data.task_name,
           handler_kwargs: handlerKwargsJson,
           category: data.category || undefined,
           notify_on_success: data.notify_on_success,
@@ -326,7 +328,7 @@ export function TasksMutateDrawer({
 
                 <FormField
                   control={form.control}
-                  name='handler_path'
+                  name='task_name'
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>处理函数</FormLabel>
@@ -335,6 +337,7 @@ export function TasksMutateDrawer({
                         onValueChange={field.onChange}
                         placeholder='选择函数'
                         disabled={isUpdate}
+                        isControlled
                         items={handlers.map((h) => ({
                           label: h.name,
                           value: h.path,
@@ -346,9 +349,9 @@ export function TasksMutateDrawer({
                 />
               </div>
 
-              {handlers.find((h) => h.path === form.watch('handler_path'))?.description && (
+              {handlers.find((h) => h.path === form.watch('task_name'))?.description && (
                 <p className='text-muted-foreground text-xs'>
-                  {handlers.find((h) => h.path === form.watch('handler_path'))?.description}
+                  {handlers.find((h) => h.path === form.watch('task_name'))?.description}
                 </p>
               )}
 
@@ -449,7 +452,7 @@ export function TasksMutateDrawer({
               )}
 
               {/* 处理函数参数 - 动态表单 */}
-              {handlerPath && currentHandlerParams.length > 0 && (
+              {taskName && currentHandlerParams.length > 0 && (
                 <div className='space-y-2'>
                   <Label className='text-sm font-medium'>函数参数</Label>
                   <div className='rounded-md border p-4'>
