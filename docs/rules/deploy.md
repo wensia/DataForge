@@ -7,9 +7,9 @@
 | 项目 | 值 |
 |------|-----|
 | IP 地址 | `124.220.15.80` |
-| 用户名 | `ubuntu` |
+| 用户名 | `root` |
 | 登录方式 | SSH 密钥登录 |
-| 密钥文件 | 项目根目录 `./claudeCode.pem` |
+| 密钥文件 | `~/.ssh/dataforge_key.pem` |
 | 系统 | Ubuntu 22.04 |
 | 面板 | 1Panel |
 
@@ -35,13 +35,23 @@
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  dataforge-backend (:8847)                              │    │
 │  │  └── FastAPI → PostgreSQL (host.docker.internal:5432)   │    │
+│  │              → Redis (host.docker.internal:6379)        │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  dataforge-frontend (内部 :80)                          │    │
 │  │  └── Nginx 静态文件服务                                  │    │
 │  └─────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  dataforge-celery-worker                                │    │
+│  │  └── Celery Worker (任务执行器, gevent, 4并发)           │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  dataforge-celery-beat                                  │    │
+│  │  └── Celery Beat (定时任务调度器)                        │    │
+│  └─────────────────────────────────────────────────────────┘    │
 ├─────────────────────────────────────────────────────────────────┤
 │  PostgreSQL 16 (:5432) - 原生安装，非容器化                       │
+│  Redis (:6379) - 原生安装，非容器化                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -68,8 +78,8 @@
 | Secret 名称 | 说明 |
 |-------------|------|
 | `SERVER_HOST` | 服务器 IP: `124.220.15.80` |
-| `SERVER_USER` | SSH 用户名: `ubuntu` |
-| `SERVER_SSH_KEY` | SSH 私钥内容（claudeCode.pem 的完整内容） |
+| `SERVER_USER` | SSH 用户名: `root` |
+| `SERVER_SSH_KEY` | SSH 私钥内容（dataforge_key.pem 的完整内容） |
 | `ACR_USERNAME` | 阿里云 ACR 用户名 |
 | `ACR_PASSWORD` | 阿里云 ACR 密码 |
 
@@ -125,6 +135,9 @@ services:
       - ./docker/.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - backend-logs:/app/logs
+      - backend-uploads:/app/uploads
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8847/api/v1/health"]
 
@@ -132,21 +145,48 @@ services:
     image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost/health || exit 1"]
+
+  celery-worker:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    command: celery -A app.celery_app worker --loglevel=info --pool=gevent --concurrency=4
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  celery-beat:
+    image: registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+    command: celery -A app.celery_app beat --loglevel=info --scheduler app.celery_scheduler:DatabaseScheduler
+    env_file:
+      - ./docker/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend-logs:
+    name: dataforge-backend-logs
+  backend-uploads:
+    name: dataforge-backend-uploads
+  celery-logs:
+    name: dataforge-celery-logs
 ```
 
 ## SSH 连接
 
-**SSH 密钥绝对路径**: `/Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem`
+**SSH 密钥路径**: `~/.ssh/dataforge_key.pem`
 
 ```bash
-# 使用绝对路径连接（推荐）
-ssh -i /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem ubuntu@124.220.15.80
-
-# 或在项目根目录执行
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80
+# 连接服务器
+ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80
 
 # 确保密钥权限正确
-chmod 600 /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
+chmod 600 ~/.ssh/dataforge_key.pem
 ```
 
 ### SSH 别名配置（可选）
@@ -156,8 +196,8 @@ chmod 600 /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
 ```bash
 Host dataforge
   HostName 124.220.15.80
-  User ubuntu
-  IdentityFile /Users/panyuhang/我的项目/编程/网站/DataForge/claudeCode.pem
+  User root
+  IdentityFile ~/.ssh/dataforge_key.pem
 ```
 
 配置后可直接使用 `ssh dataforge` 连接。
@@ -171,39 +211,41 @@ Host dataforge
 cd /www/wwwroot/yunke-transit
 
 # 查看容器状态
-sudo docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 
 # 查看容器日志
-sudo docker compose -f docker-compose.prod.yml logs -f
-sudo docker compose -f docker-compose.prod.yml logs -f backend
-sudo docker compose -f docker-compose.prod.yml logs -f frontend
-sudo docker compose -f docker-compose.prod.yml logs -f nginx
+docker compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml logs -f frontend
+docker compose -f docker-compose.prod.yml logs -f nginx
+docker compose -f docker-compose.prod.yml logs -f celery-worker
+docker compose -f docker-compose.prod.yml logs -f celery-beat
 
 # 重启所有服务
-sudo docker compose -f docker-compose.prod.yml restart
+docker compose -f docker-compose.prod.yml restart
 
 # 重启单个服务
-sudo docker compose -f docker-compose.prod.yml restart backend
+docker compose -f docker-compose.prod.yml restart backend
 
 # 停止所有服务
-sudo docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml down
 
 # 启动所有服务
-sudo docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # 强制重新拉取镜像并重启
-sudo docker compose -f docker-compose.prod.yml pull
-sudo docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 
 # 清理旧镜像
-sudo docker image prune -f
+docker image prune -f
 ```
 
 ### 手动部署（不使用 CI/CD）
 
 ```bash
 # SSH 到服务器
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80
+ssh -i ~/.ssh/dataforge_key.pem root@124.220.15.80
 
 cd /www/wwwroot/yunke-transit
 
@@ -211,15 +253,15 @@ cd /www/wwwroot/yunke-transit
 git pull origin main
 
 # 登录阿里云 ACR
-sudo docker login registry.cn-hangzhou.aliyuncs.com
+docker login registry.cn-hangzhou.aliyuncs.com
 
 # 拉取最新镜像
-sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
-sudo docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
+docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-backend:latest
+docker pull registry.cn-hangzhou.aliyuncs.com/pandw/dataforge-frontend:latest
 
 # 重启服务
-sudo docker compose -f docker-compose.prod.yml down
-sudo docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml down
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### 健康检查
@@ -232,7 +274,10 @@ curl http://124.220.15.80/api/v1/health
 curl -I http://124.220.15.80/
 
 # 检查容器健康状态
-sudo docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
+
+# 检查 Celery Worker
+docker exec dataforge-celery-worker celery -A app.celery_app inspect ping
 ```
 
 ## 端口配置
@@ -251,6 +296,7 @@ sudo docker compose -f docker-compose.prod.yml ps
 |------|------|
 | 8847 | 后端服务端口（Docker 内部） |
 | 5432 | PostgreSQL 端口 |
+| 6379 | Redis 端口 |
 
 ## 首次部署
 
@@ -259,13 +305,6 @@ sudo docker compose -f docker-compose.prod.yml ps
 ```bash
 # 安装 Docker
 curl -fsSL https://get.docker.com | sh
-
-# 添加用户到 docker 组
-sudo usermod -aG docker ubuntu
-
-# 重新登录使权限生效
-exit
-ssh -i ./claudeCode.pem ubuntu@124.220.15.80
 
 # 验证 Docker
 docker --version
@@ -276,16 +315,16 @@ docker compose version
 
 ```bash
 # 添加 PostgreSQL 官方源
-sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-sudo apt update
+sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+apt update
 
 # 安装 PostgreSQL 16
-sudo apt install postgresql-16 -y
+apt install postgresql-16 -y
 
 # 启动服务
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+systemctl start postgresql
+systemctl enable postgresql
 
 # 配置数据库
 sudo -u postgres psql
@@ -294,7 +333,18 @@ CREATE DATABASE production;
 \q
 ```
 
-### 3. 克隆代码
+### 3. 安装 Redis
+
+```bash
+apt install redis-server -y
+systemctl start redis-server
+systemctl enable redis-server
+
+# 验证
+redis-cli ping
+```
+
+### 4. 克隆代码
 
 ```bash
 cd /www/wwwroot
@@ -302,7 +352,7 @@ git clone https://github.com/wensia/DataForge.git yunke-transit
 cd yunke-transit
 ```
 
-### 4. 配置环境变量
+### 5. 配置环境变量
 
 ```bash
 cp docker/.env.example docker/.env
@@ -310,9 +360,10 @@ vim docker/.env
 
 # 配置数据库连接
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@host.docker.internal:5432/production
+REDIS_URL=redis://host.docker.internal:6379/0
 ```
 
-### 5. 配置 Nginx
+### 6. 配置 Nginx
 
 ```bash
 # 创建 SSL 目录（即使不用 HTTPS 也需要）
@@ -322,25 +373,25 @@ mkdir -p docker/nginx/ssl
 ls docker/nginx/
 ```
 
-### 6. 停止系统 Nginx（如果有）
+### 7. 停止系统 Nginx（如果有）
 
 ```bash
-sudo systemctl stop nginx
-sudo systemctl disable nginx
+systemctl stop nginx
+systemctl disable nginx
 ```
 
-### 7. 首次启动
+### 8. 首次启动
 
 ```bash
 # 登录阿里云 ACR
-sudo docker login registry.cn-hangzhou.aliyuncs.com
+docker login registry.cn-hangzhou.aliyuncs.com
 
 # 拉取镜像并启动
-sudo docker compose -f docker-compose.prod.yml pull
-sudo docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 
 # 检查状态
-sudo docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml ps
 ```
 
 ## 故障排查
@@ -349,45 +400,61 @@ sudo docker compose -f docker-compose.prod.yml ps
 
 ```bash
 # 查看详细日志
-sudo docker compose -f docker-compose.prod.yml logs --tail=100
+docker compose -f docker-compose.prod.yml logs --tail=100
 
 # 检查容器状态
-sudo docker ps -a
+docker ps -a
 
 # 进入容器调试
-sudo docker exec -it dataforge-backend /bin/bash
+docker exec -it dataforge-backend /bin/bash
 ```
 
 ### 端口被占用
 
 ```bash
 # 查看端口占用
-sudo lsof -i :80
-sudo netstat -tlnp | grep :80
+lsof -i :80
+netstat -tlnp | grep :80
 
 # 强制释放端口
-sudo fuser -k 80/tcp
+fuser -k 80/tcp
 ```
 
 ### 健康检查失败
 
 ```bash
 # 检查容器内部服务
-sudo docker exec dataforge-backend curl -f http://localhost:8847/api/v1/health
-sudo docker exec dataforge-frontend curl -f http://localhost/health
+docker exec dataforge-backend curl -f http://localhost:8847/api/v1/health
+docker exec dataforge-frontend curl -f http://localhost/health
 ```
 
 ### 数据库连接问题
 
 ```bash
 # 检查 PostgreSQL 服务
-sudo systemctl status postgresql
+systemctl status postgresql
 
 # 测试数据库连接
 sudo -u postgres psql -c "SELECT 1"
 
 # 检查后端日志
-sudo docker compose -f docker-compose.prod.yml logs backend | grep -i error
+docker compose -f docker-compose.prod.yml logs backend | grep -i error
+```
+
+### Celery 任务问题
+
+```bash
+# 检查 Celery Worker 状态
+docker logs dataforge-celery-worker --tail=50
+
+# 检查 Celery Beat 状态
+docker logs dataforge-celery-beat --tail=50
+
+# 检查 Redis 连接
+redis-cli ping
+
+# 重启 Celery 服务
+docker compose -f docker-compose.prod.yml restart celery-worker celery-beat
 ```
 
 ## 备份策略
@@ -399,7 +466,7 @@ sudo docker compose -f docker-compose.prod.yml logs backend | grep -i error
 sudo -u postgres pg_dump production > ~/backup/production_$(date +%Y%m%d).sql
 
 # 下载到本地
-scp -i ./claudeCode.pem ubuntu@124.220.15.80:~/backup/production_*.sql ./backup/
+scp -i ~/.ssh/dataforge_key.pem root@124.220.15.80:~/backup/production_*.sql ./backup/
 ```
 
 ### 自动备份（cron）
@@ -408,15 +475,15 @@ scp -i ./claudeCode.pem ubuntu@124.220.15.80:~/backup/production_*.sql ./backup/
 crontab -e
 
 # 每日凌晨2点备份
-0 2 * * * sudo -u postgres pg_dump production > /home/ubuntu/backup/production_$(date +\%Y\%m\%d).sql
+0 2 * * * sudo -u postgres pg_dump production > /root/backup/production_$(date +\%Y\%m\%d).sql
 
 # 清理 7 天前的备份
-0 3 * * * find /home/ubuntu/backup -name "production_*.sql" -mtime +7 -delete
+0 3 * * * find /root/backup -name "production_*.sql" -mtime +7 -delete
 ```
 
 ## 安全注意事项
 
-1. **密钥安全**: `claudeCode.pem` 不要提交到代码仓库
+1. **密钥安全**: `dataforge_key.pem` 不要提交到代码仓库
 2. **Secrets 安全**: GitHub Secrets 中的密码定期更换
 3. **端口暴露**: 仅暴露必要端口（22、80、443）
 4. **ACR 安全**: 阿里云 ACR 使用独立的 RAM 子账号
