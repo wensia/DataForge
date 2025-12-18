@@ -231,6 +231,11 @@ class YunkeApiClient(ABC):
 
         Returns:
             dict: 响应数据
+
+        Note:
+            不使用 `async with` 上下文管理器来避免 gevent + anyio 兼容性问题。
+            错误: "Attempted to exit cancel scope in a different task than it was entered in"
+            原因: gevent greenlet 切换时，anyio 的 cancel scope 会混淆当前任务。
         """
         request_headers = self._get_headers()
         if headers:
@@ -244,12 +249,15 @@ class YunkeApiClient(ABC):
             f"请求cookies: {list(self.cookies.keys()) if self.cookies else 'None'}"
         )
 
-        async with httpx.AsyncClient(
+        # 不使用 async with 上下文管理器，手动管理客户端生命周期
+        # 这样可以避免 gevent + anyio cancel scope 的兼容性问题
+        client = httpx.AsyncClient(
             base_url=self.domain,
             timeout=DEFAULT_TIMEOUT,
             verify=False,
             cookies=self.cookies,
-        ) as client:
+        )
+        try:
             response = await client.request(
                 method,
                 path,
@@ -258,6 +266,8 @@ class YunkeApiClient(ABC):
             )
             response.raise_for_status()
             return response.json()
+        finally:
+            await client.aclose()
 
     async def _request(
         self,
