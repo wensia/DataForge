@@ -65,16 +65,11 @@ async def lifespan(app: FastAPI):
     # 配置安全审计日志
     setup_security_logging()
 
-    # 发现处理函数（用于 API 参数校验）
-    from app.scheduler import discover_handlers
-
-    discover_handlers()
-
-    # 初始化默认系统任务
+    # 初始化默认系统任务（任务通过 Celery 装饰器自动注册）
     from app.services.task_service import init_default_tasks
 
     init_default_tasks()
-    logger.info("任务处理函数加载完成")
+    logger.info("默认系统任务初始化完成")
 
     yield
 

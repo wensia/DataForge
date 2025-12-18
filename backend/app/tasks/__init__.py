@@ -107,6 +107,32 @@ REGISTERED_TASKS = {
     },
 }
 
+# 默认系统任务配置（启动时自动创建到数据库）
+DEFAULT_TASKS = [
+    {
+        "name": "清理执行历史",
+        "description": "每天清理30天前的执行记录",
+        "task_type": "cron",
+        "cron_expression": "0 3 * * *",  # 每天凌晨3点
+        "task_name": "dataforge.cleanup_executions",
+        "handler_kwargs": '{"days": 30}',
+        "status": "active",
+        "is_system": True,
+        "category": "cleanup",
+    },
+    {
+        "name": "清理卡住任务",
+        "description": "每30分钟检查并清理卡住的任务",
+        "task_type": "interval",
+        "interval_seconds": 1800,  # 30分钟
+        "task_name": "dataforge.cleanup_stuck_tasks",
+        "handler_kwargs": '{"max_running_minutes": 60}',
+        "status": "active",
+        "is_system": True,
+        "category": "cleanup",
+    },
+]
+
 
 def get_registered_tasks() -> dict:
     """获取所有已注册的任务信息
@@ -147,4 +173,5 @@ __all__ = [
     "get_registered_tasks",
     "get_task_by_name",
     "REGISTERED_TASKS",
+    "DEFAULT_TASKS",
 ]
