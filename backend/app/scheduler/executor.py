@@ -165,6 +165,11 @@ async def execute_task_with_execution(
         # 执行处理函数（使用过滤后的参数）
         result = await handler(**filtered_kwargs)
 
+        # 检查返回值中的 status 字段，如果是 failed 则视为任务失败
+        if isinstance(result, dict) and result.get("status") == "failed":
+            error_msg = result.get("message", "任务返回失败状态")
+            raise RuntimeError(error_msg)
+
         # 获取任务日志
         log_output = get_log_output()
 
