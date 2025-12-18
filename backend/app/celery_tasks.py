@@ -183,6 +183,8 @@ def execute_scheduled_task(
     from app.utils.task_lock import acquire_task_lock, release_task_lock
 
     kwargs = handler_kwargs or {}
+    # 移除内部参数，避免与显式传递的参数冲突
+    kwargs.pop("_lock_key", None)
     task_timeout = timeout or settings.celery_task_default_timeout
     lock_key = f"task_lock:{task_id}"
     lock_acquired = False
