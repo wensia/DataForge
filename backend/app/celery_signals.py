@@ -17,6 +17,7 @@ from sqlmodel import Session
 from app.database import engine
 from app.models.task import ScheduledTask, TaskType
 from app.models.task_execution import ExecutionStatus, TaskExecution
+from app.scheduler.task_logger import clear_log_context, init_log_context
 
 
 # ============================================================================
@@ -80,6 +81,9 @@ def on_task_prerun(
             # 将 execution_id 存储到任务请求中
             task.request.execution_id = execution.id
 
+            # 初始化日志上下文（使 task_log 能正确写入 Redis）
+            init_log_context(execution.id)
+
             logger.debug(
                 f"任务 {task.name} 开始执行, "
                 f"scheduled_task_id={scheduled_task_id}, execution_id={execution.id}"
@@ -142,6 +146,9 @@ def on_task_success(
                     session.commit()
 
             logger.debug(f"任务 {sender.name} 执行成功, execution_id={execution_id}")
+
+            # 清理日志上下文并刷新日志到数据库
+            clear_log_context("completed")
     except Exception as e:
         logger.warning(f"更新执行记录失败: {e}")
 
@@ -198,6 +205,9 @@ def on_task_failure(
                     session.commit()
 
             logger.debug(f"任务 {sender.name} 执行失败, execution_id={execution_id}")
+
+            # 清理日志上下文并刷新日志到数据库
+            clear_log_context("failed")
     except Exception as e:
         logger.warning(f"更新执行记录失败: {e}")
 
