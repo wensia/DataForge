@@ -378,6 +378,7 @@ def asr_transcribe(
     correct_table_name: str = "",
     qps: int = 20,
     scheduled_task_id: int | None = None,
+    **kwargs,
 ) -> dict:
     """ASR 语音识别任务
 
@@ -676,6 +677,7 @@ def asr_text_replace(
     batch_size: int = 500,
     dry_run: bool = False,
     scheduled_task_id: int | None = None,
+    **kwargs,
 ) -> dict:
     """ASR 转写文本替换
 

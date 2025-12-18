@@ -34,7 +34,7 @@ from app.utils.async_helper import run_async
     max_retries=3,
     default_retry_delay=60,
 )
-def sync_accounts(self) -> dict:
+def sync_accounts(self, **kwargs) -> dict:
     """同步所有云客账号
 
     检查所有账号的登录状态，自动刷新过期的会话。
@@ -212,6 +212,7 @@ def sync_call_logs(
     page_size: int = 50,
     call_type: str = "s",
     scheduled_task_id: int | None = None,
+    **kwargs,
 ) -> dict:
     """同步云客通话记录到 PostgreSQL
 
@@ -903,6 +904,7 @@ def sync_call_logs_to_feishu(
     call_type: str = "s",
     only_with_record: bool = True,
     scheduled_task_id: int | None = None,
+    **kwargs,
 ) -> dict:
     """云客通话记录同步到飞书多维表格
 

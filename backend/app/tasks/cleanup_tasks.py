@@ -23,7 +23,7 @@ from app.tasks.base import DataForgeTask
     max_retries=2,
     default_retry_delay=60,
 )
-def cleanup_executions(self, days: int | None = None) -> dict:
+def cleanup_executions(self, days: int | None = None, **kwargs) -> dict:
     """清理过期的任务执行历史记录
 
     Args:
@@ -88,7 +88,7 @@ def cleanup_executions(self, days: int | None = None) -> dict:
     bind=True,
     max_retries=1,
 )
-def cleanup_stuck_tasks(self, max_running_minutes: int = 60) -> dict:
+def cleanup_stuck_tasks(self, max_running_minutes: int = 60, **kwargs) -> dict:
     """清理卡住的任务
 
     将长时间处于 RUNNING 状态的任务标记为 FAILED。
