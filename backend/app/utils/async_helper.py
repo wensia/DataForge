@@ -18,6 +18,7 @@
 """
 
 import asyncio
+import contextvars
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Coroutine, TypeVar
 
@@ -43,39 +44,48 @@ def _get_executor() -> ThreadPoolExecutor:
     return _executor
 
 
-def _run_in_new_loop(coro: Coroutine[Any, Any, T]) -> T:
-    """在新的事件循环中运行协程
+def _run_in_new_loop_with_context(
+    coro: Coroutine[Any, Any, T], ctx: contextvars.Context
+) -> T:
+    """在捕获的上下文中运行协程
 
-    此函数在线程池的线程中执行，创建独立的事件循环。
+    此函数在线程池的线程中执行，创建独立的事件循环，
+    并在捕获的上下文中运行，确保 ContextVar 值正确传播。
 
     Args:
         coro: 要执行的协程
+        ctx: 从调用线程捕获的上下文
 
     Returns:
         协程的返回值
     """
-    # 创建新的事件循环
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
 
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        # 清理事件循环
+    def _execute() -> T:
+        # 创建新的事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         try:
-            # 取消所有待处理的任务
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            # 等待任务取消完成
-            if pending:
-                loop.run_until_complete(
-                    asyncio.gather(*pending, return_exceptions=True)
-                )
-            loop.run_until_complete(loop.shutdown_asyncgens())
+            return loop.run_until_complete(coro)
         finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+            # 清理事件循环
+            try:
+                # 取消所有待处理的任务
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                # 等待任务取消完成
+                if pending:
+                    loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+
+    # 在捕获的上下文中运行 - 使 ContextVar 值可用
+    return ctx.run(_execute)
 
 
 def run_async(coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
@@ -104,8 +114,11 @@ def run_async(coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
     """
     executor = _get_executor()
 
+    # 捕获当前上下文，确保 ContextVar 值能正确传播到线程中
+    ctx = contextvars.copy_context()
+
     try:
-        future = executor.submit(_run_in_new_loop, coro)
+        future = executor.submit(_run_in_new_loop_with_context, coro, ctx)
         return future.result(timeout=timeout)
     except TimeoutError:
         logger.error(f"异步操作超时: {coro}")
