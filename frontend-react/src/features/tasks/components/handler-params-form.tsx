@@ -16,7 +16,7 @@ interface HandlerParamsFormProps {
  * 解析默认值字符串为实际类型
  */
 function parseDefaultValue(
-  defaultStr: string | null | undefined,
+  defaultStr: string | number | boolean | null | undefined,
   type: string
 ): unknown {
   if (defaultStr === null || defaultStr === undefined || defaultStr === 'None') {
@@ -26,8 +26,13 @@ function parseDefaultValue(
     return ''
   }
 
-  // 去除引号
-  const trimmed = defaultStr.trim()
+  // 如果已经是目标类型，直接返回
+  if (type === 'int' && typeof defaultStr === 'number') return Math.floor(defaultStr)
+  if (type === 'float' && typeof defaultStr === 'number') return defaultStr
+  if (type === 'bool' && typeof defaultStr === 'boolean') return defaultStr
+
+  // 转换为字符串并去除空白
+  const trimmed = String(defaultStr).trim()
 
   switch (type) {
     case 'int':
