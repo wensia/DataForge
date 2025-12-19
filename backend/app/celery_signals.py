@@ -10,7 +10,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from celery.signals import task_failure, task_postrun, task_prerun, task_success
+from celery.signals import task_failure, task_postrun, task_prerun, task_rejected, task_success
 from loguru import logger
 from sqlmodel import Session
 
@@ -208,6 +208,52 @@ def on_task_failure(
 
             # 清理日志上下文并刷新日志到数据库
             clear_log_context("failed")
+    except Exception as e:
+        logger.warning(f"更新执行记录失败: {e}")
+
+
+@task_rejected.connect
+def on_task_rejected(
+    sender: Any = None,
+    task_id: str | None = None,
+    args: tuple = (),
+    kwargs: dict | None = None,
+    **extra: Any,
+) -> None:
+    """任务被拒绝时更新执行记录（通常是锁冲突导致）
+
+    当任务在 before_start 中因无法获取锁而抛出 Reject 异常时，
+    task_failure 信号不会触发，需要通过此信号来更新执行记录。
+    """
+    if sender is None:
+        return
+
+    if not _is_dataforge_task(sender.name):
+        return
+
+    execution_id = getattr(sender.request, "execution_id", None)
+    if not execution_id:
+        return
+
+    try:
+        with Session(engine) as session:
+            execution = session.get(TaskExecution, execution_id)
+            if execution:
+                now = datetime.now()
+                execution.status = ExecutionStatus.CANCELLED
+                execution.finished_at = now
+                if execution.started_at:
+                    execution.duration_ms = int(
+                        (now - execution.started_at).total_seconds() * 1000
+                    )
+                execution.error_message = "任务被跳过：另一个相同任务正在执行中（锁冲突）"
+                session.add(execution)
+                session.commit()
+
+            logger.info(f"任务 {sender.name} 被拒绝（锁冲突）, execution_id={execution_id}")
+
+            # 清理日志上下文
+            clear_log_context("cancelled")
     except Exception as e:
         logger.warning(f"更新执行记录失败: {e}")
 

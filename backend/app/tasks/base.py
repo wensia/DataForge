@@ -21,6 +21,7 @@ from celery.exceptions import Reject
 from loguru import logger
 
 from app.config import settings
+from app.scheduler.task_logger import task_log
 from app.utils.task_lock import acquire_task_lock, extend_task_lock, release_task_lock
 
 
@@ -305,6 +306,8 @@ class DataForgeTask(Task):
 
         if not self._lock_acquired:
             logger.info(f"任务 {self.name} 无法获取锁 {self._lock_key}，跳过执行")
+            # 记录到任务日志，便于用户在前端查看
+            task_log(f"任务被跳过：另一个相同任务正在执行中（锁: {self._lock_key}）")
             # 使用 Reject 拒绝任务，不重新入队
             raise Reject(f"任务正在执行中: {self._lock_key}", requeue=False)
 
