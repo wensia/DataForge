@@ -43,6 +43,8 @@ import {
   ChevronRight,
   GripVertical,
   Layers,
+  Zap,
+  Send,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -91,6 +93,8 @@ export const iconMap: Record<string, LucideIcon> = {
   ChevronRight,
   GripVertical,
   Layers,
+  Zap,
+  Send,
 }
 
 export function getIcon(name: string): LucideIcon | undefined {

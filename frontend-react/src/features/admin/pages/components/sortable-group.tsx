@@ -13,27 +13,32 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import type { NavGroupConfig, NavItemConfig } from '../types'
+import type { Page, PageGroup } from '../types'
 import { SortableItem } from './sortable-item'
 
 interface SortableGroupProps {
-  group: NavGroupConfig
-  onToggleItemVisibility: (groupId: string, itemId: string) => void
-  onEditItem: (item: NavItemConfig, groupId: string) => void
-  onEditGroup: (group: NavGroupConfig) => void
-  onDeleteGroup: (groupId: string) => void
-  onAddItem: (groupId: string) => void
+  group: PageGroup
+  pages: Page[]
+  onEditPage: (page: Page) => void
+  onEditGroup: (group: PageGroup) => void
+  onDeletePage: (id: number) => void
+  onDeleteGroup: (id: number) => void
+  onAddPage: (groupId: number | null) => void
+  onTogglePageActive: (page: Page) => void
 }
 
 export function SortableGroup({
   group,
-  onToggleItemVisibility,
-  onEditItem,
+  pages,
+  onEditPage,
   onEditGroup,
+  onDeletePage,
   onDeleteGroup,
-  onAddItem,
+  onAddPage,
+  onTogglePageActive,
 }: SortableGroupProps) {
-  const [isOpen, setIsOpen] = useState(!group.isCollapsed)
+  const [isOpen, setIsOpen] = useState(true)
+  const isUngrouped = group.id === 0
 
   const {
     attributes,
@@ -42,14 +47,14 @@ export function SortableGroup({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: group.id })
+  } = useSortable({ id: `group-${group.id}`, disabled: isUngrouped })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   }
 
-  const sortedItems = [...group.items].sort((a, b) => a.order - b.order)
+  const activePages = pages.filter(p => p.is_active)
 
   return (
     <div
@@ -62,13 +67,15 @@ export function SortableGroup({
     >
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <div className="flex items-center gap-2 p-3 border-b">
-          <button
-            className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="h-5 w-5" />
-          </button>
+          {!isUngrouped && (
+            <button
+              className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-5 w-5" />
+            </button>
+          )}
 
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -83,56 +90,59 @@ export function SortableGroup({
           <span className="flex-1 font-medium">{group.title}</span>
 
           <span className="text-xs text-muted-foreground">
-            {group.items.filter(i => i.isVisible).length}/{group.items.length} 项
+            {activePages.length}/{pages.length} 项
           </span>
 
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => onAddItem(group.id)}
+            onClick={() => onAddPage(group.id)}
           >
             <Plus className="h-4 w-4" />
           </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => onEditGroup(group)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
+          {!isUngrouped && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onEditGroup(group)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => onDeleteGroup(group.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={() => onDeleteGroup(group.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
 
         <CollapsibleContent>
           <div className="p-3 space-y-2">
             <SortableContext
-              items={sortedItems.map(i => i.id)}
+              items={pages.map(p => `page-${p.id}`)}
               strategy={verticalListSortingStrategy}
             >
-              {sortedItems.map((item) => (
+              {pages.map((page) => (
                 <SortableItem
-                  key={item.id}
-                  item={item}
-                  onToggleVisibility={(itemId) =>
-                    onToggleItemVisibility(group.id, itemId)
-                  }
-                  onEdit={(item) => onEditItem(item, group.id)}
+                  key={page.id}
+                  page={page}
+                  onEdit={onEditPage}
+                  onDelete={onDeletePage}
+                  onToggleActive={onTogglePageActive}
                 />
               ))}
             </SortableContext>
 
-            {group.items.length === 0 && (
+            {pages.length === 0 && (
               <div className="text-center py-4 text-muted-foreground text-sm">
                 暂无页面项，点击 + 添加
               </div>

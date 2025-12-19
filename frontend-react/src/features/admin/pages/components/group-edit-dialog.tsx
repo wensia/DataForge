@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -9,15 +10,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import type { NavGroupConfig } from '../types'
+import type { PageGroup, PageGroupCreate, PageGroupUpdate } from '../types'
 
 interface GroupEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  group: NavGroupConfig | null
+  group: PageGroup | null
   isNew?: boolean
-  onSave: (group: NavGroupConfig) => void
+  onSave: (data: PageGroupCreate | PageGroupUpdate) => void
+  isSaving?: boolean
 }
 
 export function GroupEditDialog({
@@ -26,33 +27,36 @@ export function GroupEditDialog({
   group,
   isNew = false,
   onSave,
+  isSaving = false,
 }: GroupEditDialogProps) {
-  const [formData, setFormData] = useState<NavGroupConfig>({
-    id: '',
+  const [formData, setFormData] = useState({
     title: '',
     order: 0,
-    isCollapsed: false,
-    items: [],
   })
 
   useEffect(() => {
     if (group) {
-      setFormData(group)
+      setFormData({
+        title: group.title,
+        order: group.order,
+      })
     } else {
       setFormData({
-        id: `group-${Date.now()}`,
         title: '',
         order: 999,
-        isCollapsed: false,
-        items: [],
       })
     }
   }, [group, open])
 
   const handleSave = () => {
     if (!formData.title.trim()) return
-    onSave(formData)
-    onOpenChange(false)
+
+    const data: PageGroupCreate | PageGroupUpdate = {
+      title: formData.title,
+      order: formData.order,
+    }
+
+    onSave(data)
   }
 
   return (
@@ -74,29 +78,16 @@ export function GroupEditDialog({
               placeholder="如: 系统设置"
             />
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="collapsed">默认折叠</Label>
-              <p className="text-xs text-muted-foreground">
-                在侧边栏中默认收起此分组
-              </p>
-            </div>
-            <Switch
-              id="collapsed"
-              checked={formData.isCollapsed}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, isCollapsed: checked })
-              }
-            />
-          </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             取消
           </Button>
-          <Button onClick={handleSave}>保存</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            保存
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -14,6 +14,7 @@ from app.api.v1 import (
     feishu_config,
     health,
     organization,
+    pages,
     prompts,
     record_proxy,
     robot,
@@ -52,3 +53,5 @@ router.include_router(robot.router)
 router.include_router(wechat_account_tag.router)
 router.include_router(wechat_account.router)
 router.include_router(wechat_article.router)
+router.include_router(pages.router)
+router.include_router(pages.group_router)

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { RefreshCw, Plus, RotateCcw, Save, Loader2 } from 'lucide-react'
+import { RefreshCw, Plus, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { Search } from '@/components/search'
@@ -9,131 +9,143 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { useNavConfig, useSaveNavConfig, useResetNavConfig } from './api'
+import {
+  usePages,
+  useGroups,
+  useCreatePage,
+  useUpdatePage,
+  useDeletePage,
+  useCreateGroup,
+  useUpdateGroup,
+  useDeleteGroup,
+  useReorderPages,
+} from './api'
 import { PageList } from './components/page-list'
 import { PageEditDialog } from './components/page-edit-dialog'
 import { GroupEditDialog } from './components/group-edit-dialog'
-import type { NavPageConfig, NavGroupConfig, NavItemConfig } from './types'
+import type { Page, PageGroup, PageCreate, PageUpdate, PageGroupCreate, PageGroupUpdate } from './types'
 
 export default function PagesManagement() {
-  const { data: config, isLoading, refetch } = useNavConfig()
-  const saveConfigMutation = useSaveNavConfig()
-  const resetConfigMutation = useResetNavConfig()
+  const { data: pages = [], isLoading: loadingPages, refetch: refetchPages } = usePages()
+  const { data: groups = [], isLoading: loadingGroups, refetch: refetchGroups } = useGroups()
 
-  const [localConfig, setLocalConfig] = useState<NavPageConfig | null>(null)
-  const [hasChanges, setHasChanges] = useState(false)
+  const createPageMutation = useCreatePage()
+  const updatePageMutation = useUpdatePage()
+  const deletePageMutation = useDeletePage()
+  const createGroupMutation = useCreateGroup()
+  const updateGroupMutation = useUpdateGroup()
+  const deleteGroupMutation = useDeleteGroup()
+  const reorderMutation = useReorderPages()
 
   // 编辑对话框状态
-  const [editingItem, setEditingItem] = useState<NavItemConfig | null>(null)
-  const [editingItemGroupId, setEditingItemGroupId] = useState<string | null>(null)
-  const [isNewItem, setIsNewItem] = useState(false)
-  const [itemDialogOpen, setItemDialogOpen] = useState(false)
+  const [editingPage, setEditingPage] = useState<Page | null>(null)
+  const [isNewPage, setIsNewPage] = useState(false)
+  const [pageDialogOpen, setPageDialogOpen] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
 
-  const [editingGroup, setEditingGroup] = useState<NavGroupConfig | null>(null)
+  const [editingGroup, setEditingGroup] = useState<PageGroup | null>(null)
   const [isNewGroup, setIsNewGroup] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
 
-  const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null)
-  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [deletePageId, setDeletePageId] = useState<number | null>(null)
+  const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null)
 
-  // 使用本地配置或服务器配置
-  const currentConfig = localConfig || config
+  const isLoading = loadingPages || loadingGroups
+  const isSaving = createPageMutation.isPending ||
+    updatePageMutation.isPending ||
+    deletePageMutation.isPending ||
+    createGroupMutation.isPending ||
+    updateGroupMutation.isPending ||
+    deleteGroupMutation.isPending ||
+    reorderMutation.isPending
 
-  const handleConfigChange = (newConfig: NavPageConfig) => {
-    setLocalConfig(newConfig)
-    setHasChanges(true)
-  }
+  // 按分组组织页面
+  const groupedPages = useMemo(() => {
+    const sortedGroups = [...groups].sort((a, b) => a.order - b.order)
+    const result: { group: PageGroup; pages: Page[] }[] = []
 
-  const handleSave = async () => {
-    if (!currentConfig) return
-    try {
-      await saveConfigMutation.mutateAsync(currentConfig)
-      setHasChanges(false)
-      setLocalConfig(null)
-      toast.success('配置已保存')
-    } catch {
-      toast.error('保存失败')
+    for (const group of sortedGroups) {
+      const groupPages = pages
+        .filter(p => p.group_id === group.id)
+        .sort((a, b) => a.order - b.order)
+      result.push({ group, pages: groupPages })
     }
-  }
 
-  const handleReset = async () => {
-    try {
-      await resetConfigMutation.mutateAsync()
-      setLocalConfig(null)
-      setHasChanges(false)
-      setResetDialogOpen(false)
-      toast.success('已重置为默认配置')
-    } catch {
-      toast.error('重置失败')
+    // 未分组的页面
+    const ungroupedPages = pages
+      .filter(p => p.group_id === null)
+      .sort((a, b) => a.order - b.order)
+    if (ungroupedPages.length > 0) {
+      result.push({
+        group: { id: 0, title: '未分组', order: 999, is_active: true, created_at: '', updated_at: '' },
+        pages: ungroupedPages,
+      })
     }
-  }
+
+    return result
+  }, [pages, groups])
 
   const handleRefresh = () => {
-    setLocalConfig(null)
-    setHasChanges(false)
-    refetch()
+    refetchPages()
+    refetchGroups()
   }
 
-  // 页面项操作
-  const handleEditItem = (item: NavItemConfig, groupId: string) => {
-    setEditingItem(item)
-    setEditingItemGroupId(groupId)
-    setIsNewItem(false)
-    setItemDialogOpen(true)
+  // 页面操作
+  const handleEditPage = (page: Page) => {
+    setEditingPage(page)
+    setSelectedGroupId(page.group_id)
+    setIsNewPage(false)
+    setPageDialogOpen(true)
   }
 
-  const handleAddItem = (groupId: string) => {
-    setEditingItem(null)
-    setEditingItemGroupId(groupId)
-    setIsNewItem(true)
-    setItemDialogOpen(true)
+  const handleAddPage = (groupId: number | null) => {
+    setEditingPage(null)
+    setSelectedGroupId(groupId === 0 ? null : groupId)
+    setIsNewPage(true)
+    setPageDialogOpen(true)
   }
 
-  const handleSaveItem = (item: NavItemConfig) => {
-    if (!currentConfig || !editingItemGroupId) return
-
-    const newGroups = currentConfig.groups.map(g => {
-      if (g.id === editingItemGroupId) {
-        if (isNewItem) {
-          // 添加新项
-          const maxOrder = Math.max(...g.items.map(i => i.order), -1)
-          return {
-            ...g,
-            items: [...g.items, { ...item, order: maxOrder + 1 }],
-          }
-        } else {
-          // 更新现有项
-          return {
-            ...g,
-            items: g.items.map(i => (i.id === item.id ? item : i)),
-          }
-        }
+  const handleSavePage = async (data: PageCreate | PageUpdate) => {
+    try {
+      if (isNewPage) {
+        await createPageMutation.mutateAsync(data as PageCreate)
+        toast.success('页面创建成功')
+      } else if (editingPage) {
+        await updatePageMutation.mutateAsync({ id: editingPage.id, data: data as PageUpdate })
+        toast.success('页面更新成功')
       }
-      return g
-    })
-
-    handleConfigChange({ ...currentConfig, groups: newGroups })
+      setPageDialogOpen(false)
+    } catch {
+      toast.error(isNewPage ? '创建失败' : '更新失败')
+    }
   }
 
-  const handleDeleteItem = () => {
-    if (!currentConfig || !editingItem || !editingItemGroupId) return
+  const handleDeletePage = async () => {
+    if (!deletePageId) return
+    try {
+      await deletePageMutation.mutateAsync(deletePageId)
+      toast.success('页面删除成功')
+      setDeletePageId(null)
+    } catch {
+      toast.error('删除失败')
+    }
+  }
 
-    const newGroups = currentConfig.groups.map(g => {
-      if (g.id === editingItemGroupId) {
-        return {
-          ...g,
-          items: g.items.filter(i => i.id !== editingItem.id),
-        }
-      }
-      return g
-    })
-
-    handleConfigChange({ ...currentConfig, groups: newGroups })
-    setItemDialogOpen(false)
+  const handleTogglePageActive = async (page: Page) => {
+    try {
+      await updatePageMutation.mutateAsync({
+        id: page.id,
+        data: { is_active: !page.is_active },
+      })
+      toast.success(page.is_active ? '页面已禁用' : '页面已启用')
+    } catch {
+      toast.error('操作失败')
+    }
   }
 
   // 分组操作
-  const handleEditGroup = (group: NavGroupConfig) => {
+  const handleEditGroup = (group: PageGroup) => {
+    if (group.id === 0) return // 不能编辑未分组
     setEditingGroup(group)
     setIsNewGroup(false)
     setGroupDialogOpen(true)
@@ -145,37 +157,46 @@ export default function PagesManagement() {
     setGroupDialogOpen(true)
   }
 
-  const handleSaveGroup = (group: NavGroupConfig) => {
-    if (!currentConfig) return
-
-    if (isNewGroup) {
-      // 添加新分组
-      const maxOrder = Math.max(...currentConfig.groups.map(g => g.order), -1)
-      handleConfigChange({
-        ...currentConfig,
-        groups: [...currentConfig.groups, { ...group, order: maxOrder + 1 }],
-      })
-    } else {
-      // 更新现有分组
-      handleConfigChange({
-        ...currentConfig,
-        groups: currentConfig.groups.map(g => (g.id === group.id ? group : g)),
-      })
+  const handleSaveGroup = async (data: PageGroupCreate | PageGroupUpdate) => {
+    try {
+      if (isNewGroup) {
+        await createGroupMutation.mutateAsync(data as PageGroupCreate)
+        toast.success('分组创建成功')
+      } else if (editingGroup) {
+        await updateGroupMutation.mutateAsync({ id: editingGroup.id, data: data as PageGroupUpdate })
+        toast.success('分组更新成功')
+      }
+      setGroupDialogOpen(false)
+    } catch {
+      toast.error(isNewGroup ? '创建失败' : '更新失败')
     }
   }
 
-  const handleDeleteGroup = (groupId: string) => {
-    setDeleteGroupId(groupId)
+  const handleDeleteGroupConfirm = async () => {
+    if (!deleteGroupId) return
+    try {
+      await deleteGroupMutation.mutateAsync(deleteGroupId)
+      toast.success('分组删除成功')
+      setDeleteGroupId(null)
+    } catch {
+      toast.error('删除失败')
+    }
   }
 
-  const confirmDeleteGroup = () => {
-    if (!currentConfig || !deleteGroupId) return
-
-    handleConfigChange({
-      ...currentConfig,
-      groups: currentConfig.groups.filter(g => g.id !== deleteGroupId),
-    })
-    setDeleteGroupId(null)
+  // 拖拽排序
+  const handleReorder = async (
+    type: 'page' | 'group',
+    items: { id: number; order: number; group_id?: number | null }[]
+  ) => {
+    try {
+      if (type === 'page') {
+        await reorderMutation.mutateAsync({ pages: items })
+      } else {
+        await reorderMutation.mutateAsync({ groups: items.map(i => ({ id: i.id, order: i.order })) })
+      }
+    } catch {
+      toast.error('排序更新失败')
+    }
   }
 
   if (isLoading) {
@@ -218,7 +239,7 @@ export default function PagesManagement() {
           <div>
             <h1 className="text-2xl font-bold">页面导航管理</h1>
             <p className="text-muted-foreground">
-              管理侧边栏导航和页面排序，拖拽调整顺序
+              管理侧边栏导航页面，配置访问权限
             </p>
           </div>
 
@@ -227,7 +248,7 @@ export default function PagesManagement() {
               variant="outline"
               size="sm"
               onClick={handleRefresh}
-              disabled={saveConfigMutation.isPending}
+              disabled={isSaving}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               刷新
@@ -236,57 +257,50 @@ export default function PagesManagement() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setResetDialogOpen(true)}
-              disabled={resetConfigMutation.isPending}
+              onClick={handleAddGroup}
+              disabled={isSaving}
             >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              重置默认
+              <Plus className="mr-2 h-4 w-4" />
+              添加分组
             </Button>
 
-            {hasChanges && (
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={saveConfigMutation.isPending}
-              >
-                {saveConfigMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                保存更改
-              </Button>
-            )}
+            <Button
+              size="sm"
+              onClick={() => handleAddPage(null)}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              添加页面
+            </Button>
           </div>
         </div>
 
-        <div className="mb-4">
-          <Button variant="outline" onClick={handleAddGroup}>
-            <Plus className="mr-2 h-4 w-4" />
-            添加分组
-          </Button>
-        </div>
-
-        {currentConfig && (
-          <PageList
-            config={currentConfig}
-            onConfigChange={handleConfigChange}
-            onEditItem={handleEditItem}
-            onEditGroup={handleEditGroup}
-            onDeleteGroup={handleDeleteGroup}
-            onAddItem={handleAddItem}
-          />
-        )}
+        <PageList
+          groupedPages={groupedPages}
+          onEditPage={handleEditPage}
+          onEditGroup={handleEditGroup}
+          onDeletePage={(id) => setDeletePageId(id)}
+          onDeleteGroup={(id) => setDeleteGroupId(id)}
+          onAddPage={handleAddPage}
+          onTogglePageActive={handleTogglePageActive}
+          onReorder={handleReorder}
+        />
       </Main>
 
       {/* 页面编辑对话框 */}
       <PageEditDialog
-        open={itemDialogOpen}
-        onOpenChange={setItemDialogOpen}
-        item={editingItem}
-        isNew={isNewItem}
-        onSave={handleSaveItem}
-        onDelete={handleDeleteItem}
+        open={pageDialogOpen}
+        onOpenChange={setPageDialogOpen}
+        page={editingPage}
+        isNew={isNewPage}
+        groups={groups}
+        defaultGroupId={selectedGroupId}
+        onSave={handleSavePage}
+        isSaving={createPageMutation.isPending || updatePageMutation.isPending}
       />
 
       {/* 分组编辑对话框 */}
@@ -296,6 +310,18 @@ export default function PagesManagement() {
         group={editingGroup}
         isNew={isNewGroup}
         onSave={handleSaveGroup}
+        isSaving={createGroupMutation.isPending || updateGroupMutation.isPending}
+      />
+
+      {/* 删除页面确认 */}
+      <ConfirmDialog
+        open={!!deletePageId}
+        onOpenChange={(open) => !open && setDeletePageId(null)}
+        title="删除页面"
+        desc="确定要删除这个页面吗？删除后用户将无法在侧边栏看到此页面。"
+        confirmText="删除"
+        handleConfirm={handleDeletePage}
+        destructive
       />
 
       {/* 删除分组确认 */}
@@ -303,20 +329,9 @@ export default function PagesManagement() {
         open={!!deleteGroupId}
         onOpenChange={(open) => !open && setDeleteGroupId(null)}
         title="删除分组"
-        desc="确定要删除这个分组吗？分组内的所有页面项也会被删除。"
+        desc="确定要删除这个分组吗？分组内的页面会变成未分组状态。"
         confirmText="删除"
-        handleConfirm={confirmDeleteGroup}
-        destructive
-      />
-
-      {/* 重置确认 */}
-      <ConfirmDialog
-        open={resetDialogOpen}
-        onOpenChange={setResetDialogOpen}
-        title="重置为默认配置"
-        desc="确定要重置导航配置吗？您的所有自定义排序和分类将被清除。"
-        confirmText="重置"
-        handleConfirm={handleReset}
+        handleConfirm={handleDeleteGroupConfirm}
         destructive
       />
     </>

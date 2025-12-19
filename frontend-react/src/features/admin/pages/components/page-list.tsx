@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -16,24 +16,28 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { SortableGroup } from './sortable-group'
-import type { NavPageConfig, NavGroupConfig, NavItemConfig } from '../types'
+import type { Page, PageGroup } from '../types'
 
 interface PageListProps {
-  config: NavPageConfig
-  onConfigChange: (config: NavPageConfig) => void
-  onEditItem: (item: NavItemConfig, groupId: string) => void
-  onEditGroup: (group: NavGroupConfig) => void
-  onDeleteGroup: (groupId: string) => void
-  onAddItem: (groupId: string) => void
+  groupedPages: { group: PageGroup; pages: Page[] }[]
+  onEditPage: (page: Page) => void
+  onEditGroup: (group: PageGroup) => void
+  onDeletePage: (id: number) => void
+  onDeleteGroup: (id: number) => void
+  onAddPage: (groupId: number | null) => void
+  onTogglePageActive: (page: Page) => void
+  onReorder: (type: 'page' | 'group', items: { id: number; order: number; group_id?: number | null }[]) => void
 }
 
 export function PageList({
-  config,
-  onConfigChange,
-  onEditItem,
+  groupedPages,
+  onEditPage,
   onEditGroup,
+  onDeletePage,
   onDeleteGroup,
-  onAddItem,
+  onAddPage,
+  onTogglePageActive,
+  onReorder,
 }: PageListProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -46,11 +50,6 @@ export function PageList({
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
-  )
-
-  const sortedGroups = useMemo(
-    () => [...config.groups].sort((a, b) => a.order - b.order),
-    [config.groups]
   )
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -67,62 +66,74 @@ export function PageList({
     const overIdStr = over.id as string
 
     // 检查是否是分组拖拽
-    const isGroupDrag = config.groups.some(g => g.id === activeIdStr)
+    const isGroupDrag = activeIdStr.startsWith('group-')
 
     if (isGroupDrag) {
       // 分组排序
-      const oldIndex = sortedGroups.findIndex(g => g.id === activeIdStr)
-      const newIndex = sortedGroups.findIndex(g => g.id === overIdStr)
+      const activeGroupId = parseInt(activeIdStr.replace('group-', ''))
+      const overGroupId = parseInt(overIdStr.replace('group-', ''))
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newGroups = [...config.groups]
-        // 更新 order
-        const movedGroup = newGroups.find(g => g.id === activeIdStr)!
-        const targetGroup = newGroups.find(g => g.id === overIdStr)!
-        const tempOrder = movedGroup.order
-        movedGroup.order = targetGroup.order
-        targetGroup.order = tempOrder
+      const activeIndex = groupedPages.findIndex(g => g.group.id === activeGroupId)
+      const overIndex = groupedPages.findIndex(g => g.group.id === overGroupId)
 
-        onConfigChange({ ...config, groups: newGroups })
+      if (activeIndex !== -1 && overIndex !== -1) {
+        // 计算新的排序
+        const newOrders = groupedPages.map((g, i) => ({
+          id: g.group.id,
+          order: i,
+        }))
+        // 交换排序
+        const temp = newOrders[activeIndex].order
+        newOrders[activeIndex].order = newOrders[overIndex].order
+        newOrders[overIndex].order = temp
+
+        onReorder('group', newOrders.filter(g => g.id !== 0))
       }
     } else {
-      // 页面项排序（在同一分组内）
-      const sourceGroup = config.groups.find(g =>
-        g.items.some(i => i.id === activeIdStr)
-      )
-      const targetGroup = config.groups.find(g =>
-        g.items.some(i => i.id === overIdStr)
-      )
+      // 页面排序
+      const activePageId = parseInt(activeIdStr.replace('page-', ''))
+      const overPageId = parseInt(overIdStr.replace('page-', ''))
 
-      if (sourceGroup && targetGroup && sourceGroup.id === targetGroup.id) {
-        const items = [...sourceGroup.items]
-        const activeItem = items.find(i => i.id === activeIdStr)!
-        const overItem = items.find(i => i.id === overIdStr)!
-        const tempOrder = activeItem.order
-        activeItem.order = overItem.order
-        overItem.order = tempOrder
+      // 找到页面所在的分组
+      const activeGroup = groupedPages.find(g => g.pages.some(p => p.id === activePageId))
+      const overGroup = groupedPages.find(g => g.pages.some(p => p.id === overPageId))
 
-        const newGroups = config.groups.map(g =>
-          g.id === sourceGroup.id ? { ...g, items } : g
-        )
-        onConfigChange({ ...config, groups: newGroups })
+      if (activeGroup && overGroup && activeGroup.group.id === overGroup.group.id) {
+        // 同一分组内排序
+        const pages = activeGroup.pages
+        const activeIndex = pages.findIndex(p => p.id === activePageId)
+        const overIndex = pages.findIndex(p => p.id === overPageId)
+
+        if (activeIndex !== -1 && overIndex !== -1) {
+          const newOrders = pages.map((p, i) => ({
+            id: p.id,
+            order: i,
+            group_id: p.group_id,
+          }))
+          const temp = newOrders[activeIndex].order
+          newOrders[activeIndex].order = newOrders[overIndex].order
+          newOrders[overIndex].order = temp
+
+          onReorder('page', newOrders)
+        }
       }
     }
   }
 
-  const handleToggleItemVisibility = (groupId: string, itemId: string) => {
-    const newGroups = config.groups.map(g => {
-      if (g.id === groupId) {
-        return {
-          ...g,
-          items: g.items.map(i =>
-            i.id === itemId ? { ...i, isVisible: !i.isVisible } : i
-          ),
-        }
+  // 查找正在拖动的项目
+  const getActiveItem = () => {
+    if (!activeId) return null
+    if (activeId.startsWith('group-')) {
+      const groupId = parseInt(activeId.replace('group-', ''))
+      return groupedPages.find(g => g.group.id === groupId)?.group.title
+    } else {
+      const pageId = parseInt(activeId.replace('page-', ''))
+      for (const g of groupedPages) {
+        const page = g.pages.find(p => p.id === pageId)
+        if (page) return page.title
       }
-      return g
-    })
-    onConfigChange({ ...config, groups: newGroups })
+    }
+    return null
   }
 
   return (
@@ -133,19 +144,21 @@ export function PageList({
       onDragEnd={handleDragEnd}
     >
       <SortableContext
-        items={sortedGroups.map(g => g.id)}
+        items={groupedPages.map(g => `group-${g.group.id}`)}
         strategy={verticalListSortingStrategy}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sortedGroups.map((group) => (
+          {groupedPages.map(({ group, pages }) => (
             <SortableGroup
               key={group.id}
               group={group}
-              onToggleItemVisibility={handleToggleItemVisibility}
-              onEditItem={onEditItem}
+              pages={pages}
+              onEditPage={onEditPage}
               onEditGroup={onEditGroup}
+              onDeletePage={onDeletePage}
               onDeleteGroup={onDeleteGroup}
-              onAddItem={onAddItem}
+              onAddPage={onAddPage}
+              onTogglePageActive={onTogglePageActive}
             />
           ))}
         </div>
@@ -154,10 +167,7 @@ export function PageList({
       <DragOverlay>
         {activeId && (
           <div className="rounded-lg border bg-card p-3 shadow-lg opacity-80">
-            {config.groups.find(g => g.id === activeId)?.title ||
-              config.groups
-                .flatMap(g => g.items)
-                .find(i => i.id === activeId)?.title}
+            {getActiveItem()}
           </div>
         )}
       </DragOverlay>
