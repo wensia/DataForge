@@ -94,7 +94,7 @@ function ParamField({
           <Input
             type='number'
             step='1'
-            value={value ?? 0}
+            value={String(value ?? 0)}
             onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -112,7 +112,7 @@ function ParamField({
           <Input
             type='number'
             step='0.01'
-            value={value ?? 0}
+            value={String(value ?? 0)}
             onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -128,7 +128,7 @@ function ParamField({
             {required && <span className='text-destructive ml-1'>*</span>}
           </Label>
           <Switch
-            checked={value ?? false}
+            checked={Boolean(value)}
             onCheckedChange={onChange}
             disabled={disabled}
           />
@@ -144,7 +144,7 @@ function ParamField({
           </Label>
           <Input
             type='text'
-            value={value ?? ''}
+            value={String(value ?? '')}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -173,7 +173,7 @@ function ParamField({
           </Label>
           <Input
             type='text'
-            value={value ?? ''}
+            value={String(value ?? '')}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             placeholder='2025-12-01 或 datetime.now()'
