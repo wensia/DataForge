@@ -26,6 +26,7 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { StyleSwitch } from '@/components/style-switch'
 import { ThemeSwitch } from '@/components/theme-switch'
 
 // 获取仪表板统计数据
@@ -124,6 +125,7 @@ export function Dashboard() {
       <Header>
         <Search />
         <div className='ms-auto flex items-center space-x-4'>
+          <StyleSwitch />
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />

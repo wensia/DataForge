@@ -7,6 +7,7 @@ import { showSubmittedData } from '@/lib/show-submitted-data'
 import { cn } from '@/lib/utils'
 import { useFont } from '@/context/font-provider'
 import { useTheme } from '@/context/theme-provider'
+import { useStyle } from '@/context/style-provider'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   Form,
@@ -18,6 +19,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { StyleSwitcher } from './style-switcher'
 
 const appearanceFormSchema = z.object({
   theme: z.enum(['light', 'dark']),
@@ -29,6 +31,7 @@ type AppearanceFormValues = z.infer<typeof appearanceFormSchema>
 export function AppearanceForm() {
   const { font, setFont } = useFont()
   const { theme, setTheme } = useTheme()
+  const { currentConfig } = useStyle()
 
   // This can come from your database or API.
   const defaultValues: Partial<AppearanceFormValues> = {
@@ -51,46 +54,62 @@ export function AppearanceForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-8'>
-        <FormField
-          control={form.control}
-          name='font'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Font</FormLabel>
-              <div className='relative w-max'>
-                <FormControl>
-                  <select
-                    className={cn(
-                      buttonVariants({ variant: 'outline' }),
-                      'w-[200px] appearance-none font-normal capitalize',
-                      'dark:bg-background dark:hover:bg-background'
-                    )}
-                    {...field}
-                  >
-                    {fonts.map((font) => (
-                      <option key={font} value={font}>
-                        {font}
-                      </option>
-                    ))}
-                  </select>
-                </FormControl>
-                <ChevronDownIcon className='absolute end-3 top-2.5 h-4 w-4 opacity-50' />
-              </div>
-              <FormDescription className='font-manrope'>
-                Set the font you want to use in the dashboard.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {/* Style Switcher */}
+        <StyleSwitcher />
+
+        {/* Font Field - hidden when style forces a font */}
+        {!currentConfig.forceFont && (
+          <FormField
+            control={form.control}
+            name='font'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>字体</FormLabel>
+                <div className='relative w-max'>
+                  <FormControl>
+                    <select
+                      className={cn(
+                        buttonVariants({ variant: 'outline' }),
+                        'w-[200px] appearance-none font-normal capitalize',
+                        'dark:bg-background dark:hover:bg-background'
+                      )}
+                      {...field}
+                    >
+                      {fonts.map((font) => (
+                        <option key={font} value={font}>
+                          {font}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <ChevronDownIcon className='absolute end-3 top-2.5 h-4 w-4 opacity-50' />
+                </div>
+                <FormDescription>
+                  设置仪表盘使用的字体
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {/* Note when style forces a font */}
+        {currentConfig.forceFont && (
+          <div className='rounded-md border border-muted p-4'>
+            <p className='text-sm text-muted-foreground'>
+              {currentConfig.name} 风格使用 {currentConfig.font === 'jetbrains-mono' ? 'JetBrains Mono' : currentConfig.font} 字体。
+              切换到其他风格可自定义字体。
+            </p>
+          </div>
+        )}
         <FormField
           control={form.control}
           name='theme'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Theme</FormLabel>
+              <FormLabel>主题</FormLabel>
               <FormDescription>
-                Select the theme for the dashboard.
+                选择仪表盘的颜色主题
               </FormDescription>
               <FormMessage />
               <RadioGroup

@@ -1,6 +1,6 @@
 :root {
-  /* Maia 风格：更大的圆角 (12px) */
-  --radius: 0.75rem;
+  /* Lyra 风格：最小圆角 (4px) - 默认风格 */
+  --radius: 0.25rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
@@ -64,14 +64,17 @@
 @theme inline {
   --font-inter: 'Inter', 'sans-serif';
   --font-manrope: 'Manrope', 'sans-serif';
+  --font-jetbrains-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
-  /* Maia 风格圆角层级 */
-  --radius-sm: calc(var(--radius) - 4px);   /* 8px */
-  --radius-md: calc(var(--radius) - 2px);   /* 10px */
-  --radius-lg: var(--radius);                /* 12px */
-  --radius-xl: calc(var(--radius) + 4px);   /* 16px */
-  --radius-2xl: calc(var(--radius) + 8px);  /* 20px */
-  --radius-3xl: calc(var(--radius) + 12px); /* 24px */
+  /* 圆角层级 - 基于 --radius 变量计算 */
+  /* Tailwind v4 border-radius scale overrides */
+  --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-md: max(0px, calc(var(--radius) - 2px));
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-full: 9999px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -103,4 +106,71 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ===== Visual Style Classes ===== */
+
+/* Lyra: Sharp & Technical (default) */
+.style-lyra {
+  --radius: 0.25rem; /* 4px */
+  font-family: var(--font-jetbrains-mono);
+}
+
+/* Lyra: Force monospace font inheritance */
+.style-lyra body,
+.style-lyra button,
+.style-lyra input,
+.style-lyra select,
+.style-lyra textarea {
+  font-family: inherit;
+}
+
+/* Vega: Classic & Balanced */
+.style-vega {
+  --radius: 0.5rem; /* 8px */
+}
+
+/* Nova: Compact Layout */
+.style-nova {
+  --radius: 0.375rem; /* 6px */
+}
+
+/* Maia: Soft & Rounded */
+.style-maia {
+  --radius: 0.75rem; /* 12px */
+}
+
+/* Mira: Dense & Compact */
+.style-mira {
+  --radius: 0.25rem; /* 4px */
+}
+
+/* ===== Dynamic Border Radius Overrides ===== */
+/* Override Tailwind's static rounded utilities to use dynamic --radius variable */
+.rounded-sm {
+  border-radius: max(0px, calc(var(--radius) - 4px)) !important;
+}
+
+.rounded-md {
+  border-radius: max(0px, calc(var(--radius) - 2px)) !important;
+}
+
+.rounded {
+  border-radius: var(--radius) !important;
+}
+
+.rounded-lg {
+  border-radius: var(--radius) !important;
+}
+
+.rounded-xl {
+  border-radius: calc(var(--radius) + 4px) !important;
+}
+
+.rounded-2xl {
+  border-radius: calc(var(--radius) + 8px) !important;
+}
+
+.rounded-3xl {
+  border-radius: calc(var(--radius) + 12px) !important;
 }

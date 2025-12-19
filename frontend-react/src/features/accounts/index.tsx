@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { StyleSwitch } from '@/components/style-switch'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { AccountsDialogs } from './components/accounts-dialogs'
 import { AccountsPrimaryButtons } from './components/accounts-primary-buttons'
@@ -15,6 +16,7 @@ export function Accounts() {
       <Header fixed>
         <Search />
         <div className='ms-auto flex items-center space-x-4'>
+          <StyleSwitch />
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />
