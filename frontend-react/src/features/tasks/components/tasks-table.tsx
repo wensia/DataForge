@@ -273,11 +273,7 @@ export function TasksTable() {
       </div>
 
       <div className='overflow-hidden rounded-md border'>
-        <Table
-          style={{
-            width: table.getCenterTotalSize(),
-          }}
-        >
+        <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -291,9 +287,6 @@ export function TasksTable() {
                         header.column.columnDef.meta?.className,
                         header.column.columnDef.meta?.thClassName
                       )}
-                      style={{
-                        width: header.getSize(),
-                      }}
                     >
                       {header.isPlaceholder
                         ? null
@@ -324,9 +317,6 @@ export function TasksTable() {
                         cell.column.columnDef.meta?.className,
                         cell.column.columnDef.meta?.tdClassName
                       )}
-                      style={{
-                        width: cell.column.getSize(),
-                      }}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

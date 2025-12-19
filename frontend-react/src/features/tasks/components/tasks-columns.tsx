@@ -95,7 +95,7 @@ export const tasksColumns: ColumnDef<Task>[] = [
       if (!status) return null
 
       return (
-        <div className='flex w-[80px] items-center gap-2'>
+        <div className='flex items-center gap-2'>
           {status.icon && (
             <status.icon
               className={`size-4 ${
