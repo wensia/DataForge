@@ -350,6 +350,9 @@ export function TaskExecutions() {
     {
       id: 'actions',
       header: '操作',
+      meta: {
+        className: 'sticky right-0 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]',
+      },
       cell: ({ row }) => {
         const execution = row.original
         const canCancel =
@@ -555,8 +558,13 @@ export function TaskExecutions() {
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
+                      const meta = header.column.columnDef.meta as { className?: string } | undefined
                       return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
+                        <TableHead
+                          key={header.id}
+                          colSpan={header.colSpan}
+                          className={cn(meta?.className)}
+                        >
                           {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -577,14 +585,17 @@ export function TaskExecutions() {
                       className='cursor-pointer hover:bg-muted/50'
                       onClick={() => handleRowClick(row.original)}
                     >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
+                      {row.getVisibleCells().map((cell) => {
+                        const meta = cell.column.columnDef.meta as { className?: string } | undefined
+                        return (
+                          <TableCell key={cell.id} className={cn(meta?.className)}>
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext()
+                            )}
+                          </TableCell>
+                        )
+                      })}
                     </TableRow>
                   ))
                 ) : (
