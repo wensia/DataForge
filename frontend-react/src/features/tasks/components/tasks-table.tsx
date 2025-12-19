@@ -33,7 +33,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table'
@@ -260,14 +259,15 @@ export function TasksTable() {
         />
         <Button
           variant='outline'
+          size='sm'
           onClick={() => refetch()}
           disabled={isRefetching}
-          className='ml-2 space-x-1'
+          className='ml-2'
         >
           <RefreshCw
-            className={cn('h-[18px] w-[18px]', isRefetching && 'animate-spin')}
+            className={cn('size-4', isRefetching && 'animate-spin')}
           />
-          <span>刷新</span>
+          刷新
         </Button>
       </div>
 
@@ -354,7 +354,7 @@ export function TasksTable() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' className='w-[160px]'>
           <DropdownMenuItem onClick={handleRun}>
-            <Play className='mr-2 h-4 w-4' />
+            <Play />
             立即执行
           </DropdownMenuItem>
 
@@ -363,7 +363,7 @@ export function TasksTable() {
               onClick={handlePause}
               disabled={pauseTask.isPending}
             >
-              <Pause className='mr-2 h-4 w-4' />
+              <Pause />
               暂停任务
             </DropdownMenuItem>
           ) : contextTask?.status === 'paused' ? (
@@ -371,7 +371,7 @@ export function TasksTable() {
               onClick={handleResume}
               disabled={resumeTask.isPending}
             >
-              <PlayCircle className='mr-2 h-4 w-4' />
+              <PlayCircle />
               恢复任务
             </DropdownMenuItem>
           ) : null}
@@ -379,12 +379,12 @@ export function TasksTable() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem onClick={handleEdit}>
-            <Edit className='mr-2 h-4 w-4' />
+            <Edit />
             编辑
           </DropdownMenuItem>
 
           <DropdownMenuItem onClick={handleCopy}>
-            <Copy className='mr-2 h-4 w-4' />
+            <Copy />
             复制
           </DropdownMenuItem>
 
@@ -392,13 +392,11 @@ export function TasksTable() {
 
           <DropdownMenuItem
             onClick={handleDelete}
-            className='text-destructive focus:text-destructive'
+            variant='destructive'
             disabled={contextTask?.is_system}
           >
+            <Trash2 />
             删除
-            <DropdownMenuShortcut>
-              <Trash2 size={16} />
-            </DropdownMenuShortcut>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

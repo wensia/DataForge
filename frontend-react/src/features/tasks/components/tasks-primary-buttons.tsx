@@ -8,15 +8,15 @@ export function TasksPrimaryButtons() {
     <div className='flex gap-2'>
       <Button
         variant='outline'
-        className='space-x-1'
+        size='sm'
         onClick={() => setOpen('import')}
       >
-        <span>导入</span>
-        <Download size={18} />
+        <Download className='size-4' />
+        导入
       </Button>
-      <Button className='space-x-1' onClick={() => setOpen('create')}>
-        <span>新建</span>
-        <Plus size={18} />
+      <Button size='sm' onClick={() => setOpen('create')}>
+        <Plus className='size-4' />
+        新建
       </Button>
     </div>
   )

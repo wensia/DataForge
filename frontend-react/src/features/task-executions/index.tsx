@@ -529,10 +529,7 @@ export function TaskExecutions() {
                     disabled={isRefetching}
                   >
                     <RefreshCw
-                      className={cn(
-                        'mr-2 h-4 w-4',
-                        isRefetching && 'animate-spin'
-                      )}
+                      className={cn('size-4', isRefetching && 'animate-spin')}
                     />
                     刷新
                   </Button>
