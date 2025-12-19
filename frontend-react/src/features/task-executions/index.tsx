@@ -25,6 +25,7 @@ import { Main } from '@/components/layout/main'
 import { DataPageContent } from '@/components/layout/data-page-layout'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { StyleSwitch } from '@/components/style-switch'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -452,6 +453,7 @@ export function TaskExecutions() {
       <Header fixed>
         <Search />
         <div className='ms-auto flex items-center space-x-4'>
+          <StyleSwitch />
           <ThemeSwitch />
           <ConfigDrawer />
           <ProfileDropdown />
@@ -459,6 +461,15 @@ export function TaskExecutions() {
       </Header>
 
       <Main fixed className='min-h-0'>
+        <div className='flex min-h-0 flex-1 flex-col gap-4 overflow-hidden'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <div>
+              <h2 className='text-2xl font-bold tracking-tight'>执行记录</h2>
+              <p className='text-muted-foreground'>
+                查看任务执行历史和运行状态
+              </p>
+            </div>
+          </div>
         {isLoading ? (
           loadingContent
         ) : (
@@ -590,6 +601,7 @@ export function TaskExecutions() {
             </Table>
           </DataPageContent>
         )}
+        </div>
       </Main>
 
       {/* 日志跟踪面板 */}
