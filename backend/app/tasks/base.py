@@ -75,7 +75,10 @@ def auto_convert_value(value: Any) -> Any:
     """自动检测并转换字符串值到合适的类型
 
     用于未在 REGISTERED_TASKS 中注册的参数。
-    尝试将字符串转换为 int、float 或 bool。
+    支持：
+    - datetime 表达式求值（如 datetime.combine(date.today(), time.min)）
+    - 布尔值转换
+    - 整数/浮点数转换
 
     Args:
         value: 原始值
@@ -89,6 +92,18 @@ def auto_convert_value(value: Any) -> Any:
     stripped = value.strip()
     if not stripped:
         return value
+
+    # 检测是否为 datetime 表达式，使用 safe_eval 求值
+    datetime_keywords = ['datetime', 'date.today', 'timedelta', 'time.min', 'time.max']
+    if any(keyword in stripped for keyword in datetime_keywords):
+        try:
+            from app.utils.safe_eval import safe_eval
+            result = safe_eval(stripped)
+            logger.debug(f"表达式求值成功: {stripped!r} -> {result!r}")
+            return result
+        except Exception as e:
+            logger.warning(f"表达式求值失败，保持原值: {stripped!r}, 错误: {e}")
+            # 求值失败，继续尝试其他转换
 
     # 尝试转换为布尔值
     if stripped.lower() in ("true", "false"):
@@ -139,13 +154,18 @@ def coerce_task_params(task_name: str, kwargs: dict[str, Any]) -> dict[str, Any]
     result = {}
     for key, value in kwargs.items():
         original_value = value
-        if key in params_meta:
-            # 已注册参数：按指定类型转换
+
+        # 第一步：对所有字符串值尝试自动转换（包括表达式求值）
+        if isinstance(value, str):
+            value = auto_convert_value(value)
+
+        # 第二步：如果参数已注册且值仍为字符串，按指定类型转换
+        if key in params_meta and isinstance(value, str):
             param_type = params_meta[key].get("type", "str")
-            result[key] = convert_value(value, param_type)
-        else:
-            # 未注册参数：自动检测类型并转换
-            result[key] = auto_convert_value(value)
+            if param_type != "str":
+                value = convert_value(value, param_type)
+
+        result[key] = value
 
         # 仅在类型实际改变时记录日志
         if type(original_value) != type(result[key]):
