@@ -199,7 +199,9 @@ class DataForgeTask(Task):
         确保从 JSON 反序列化的参数（如字符串 "100"）转换为正确的类型（int 100）。
         这解决了 JSON 序列化导致的类型丢失问题。
         """
+        logger.info(f"[DataForgeTask] __call__ 被调用，任务: {self.name}, 原始参数: {kwargs}")
         kwargs = coerce_task_params(self.name, kwargs)
+        logger.info(f"[DataForgeTask] 类型转换后参数: {kwargs}")
         return super().__call__(*args, **kwargs)
 
     # ============================================================================
