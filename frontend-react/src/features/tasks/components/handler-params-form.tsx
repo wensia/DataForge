@@ -16,10 +16,10 @@ interface HandlerParamsFormProps {
  * 解析默认值字符串为实际类型
  */
 function parseDefaultValue(
-  defaultStr: string | null,
+  defaultStr: string | null | undefined,
   type: string
 ): unknown {
-  if (defaultStr === null || defaultStr === 'None') {
+  if (defaultStr === null || defaultStr === undefined || defaultStr === 'None') {
     if (type === 'bool') return false
     if (type === 'int' || type === 'float') return 0
     if (type === 'datetime') return '' // datetime 默认为空字符串
