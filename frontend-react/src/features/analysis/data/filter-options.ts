@@ -32,9 +32,3 @@ export const callResultOptions: FilterOption[] = [
   { label: '无人接听', value: '4', icon: PhoneMissed },
   { label: '已挂断', value: '5', icon: XCircle },
 ]
-
-// 数据来源筛选选项
-export const sourceOptions: FilterOption[] = [
-  { label: '飞书', value: 'feishu' },
-  { label: '云客', value: 'yunke' },
-]

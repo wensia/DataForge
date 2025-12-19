@@ -5,7 +5,6 @@ import { DataAnalysis } from '@/features/analysis'
 const analysisSearchSchema = z.object({
   page: z.number().optional(),
   pageSize: z.number().optional(),
-  source: z.array(z.string()).optional(),
   callType: z.array(z.string()).optional(),
   callResult: z.array(z.string()).optional(),
   startDate: z.string().optional(),

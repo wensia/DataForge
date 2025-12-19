@@ -73,7 +73,7 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
-import { callTypeOptions, callResultOptions, sourceOptions, type FilterOption } from '../data/filter-options'
+import { callTypeOptions, callResultOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
 const route = getRouteApi('/_authenticated/analysis/')
@@ -112,7 +112,6 @@ export function AnalysisTable() {
   const [filters, setFilters] = useState<RecordsParams>(() => ({
     page: search.page ?? 1,
     page_size: search.pageSize ?? 20,
-    source: search.source?.length === 1 ? search.source[0] : undefined,
     call_type: search.callType?.length === 1 ? search.callType[0] : undefined,
     call_result: search.callResult?.length === 1 ? search.callResult[0] : undefined,
     start_time: search.startDate ?? undefined,
@@ -327,7 +326,6 @@ export function AnalysisTable() {
       search: {
         page: 1,
         pageSize: newFilters.page_size,
-        source: newFilters.source ? [newFilters.source] : undefined,
         callType: newFilters.call_type ? [newFilters.call_type] : undefined,
         callResult: newFilters.call_result ? [newFilters.call_result] : undefined,
         startDate: newFilters.start_time,
@@ -406,7 +404,6 @@ export function AnalysisTable() {
 
   // 渲染筛选工具栏
   const isFiltered = !!(
-    filters.source ||
     filters.call_type ||
     filters.call_result ||
     filters.start_time ||
@@ -487,21 +484,6 @@ export function AnalysisTable() {
                   ...prev,
                   page: 1,
                   callResult: value ? [value] : undefined,
-                }),
-              })
-            }}
-          />
-          <ServerSideFilter
-            title='数据来源'
-            value={filters.source}
-            options={sourceOptions}
-            onChange={(value) => {
-              setFilters((prev) => ({ ...prev, page: 1, source: value }))
-              navigate({
-                search: (prev) => ({
-                  ...prev,
-                  page: 1,
-                  source: value ? [value] : undefined,
                 }),
               })
             }}
