@@ -224,6 +224,9 @@ def on_task_rejected(
 
     当任务在 before_start 中因无法获取锁而抛出 Reject 异常时，
     task_failure 信号不会触发，需要通过此信号来更新执行记录。
+
+    注意：由于 before_start 在 task_prerun 之前执行，execution_id 可能未设置，
+    因此需要通过 scheduled_task_id 查找最近的 RUNNING 状态执行记录。
     """
     if sender is None:
         return
@@ -231,13 +234,34 @@ def on_task_rejected(
     if not _is_dataforge_task(sender.name):
         return
 
+    # 优先使用 execution_id，否则通过 scheduled_task_id 查找
     execution_id = getattr(sender.request, "execution_id", None)
-    if not execution_id:
-        return
+    scheduled_task_id = _get_scheduled_task_id(kwargs)
 
     try:
         with Session(engine) as session:
-            execution = session.get(TaskExecution, execution_id)
+            execution = None
+
+            if execution_id:
+                execution = session.get(TaskExecution, execution_id)
+            elif scheduled_task_id:
+                # 查找该任务最近的 RUNNING 状态执行记录
+                from sqlmodel import select
+                statement = (
+                    select(TaskExecution)
+                    .where(
+                        TaskExecution.task_id == scheduled_task_id,
+                        TaskExecution.status == ExecutionStatus.RUNNING,
+                    )
+                    .order_by(TaskExecution.started_at.desc())
+                    .limit(1)
+                )
+                execution = session.exec(statement).first()
+                if execution:
+                    logger.debug(
+                        f"通过 scheduled_task_id={scheduled_task_id} 找到执行记录 {execution.id}"
+                    )
+
             if execution:
                 now = datetime.now()
                 execution.status = ExecutionStatus.CANCELLED
@@ -250,7 +274,14 @@ def on_task_rejected(
                 session.add(execution)
                 session.commit()
 
-            logger.info(f"任务 {sender.name} 被拒绝（锁冲突）, execution_id={execution_id}")
+                logger.info(
+                    f"任务 {sender.name} 被拒绝（锁冲突）, execution_id={execution.id}"
+                )
+            else:
+                logger.warning(
+                    f"任务 {sender.name} 被拒绝，但未找到对应的执行记录 "
+                    f"(execution_id={execution_id}, scheduled_task_id={scheduled_task_id})"
+                )
 
             # 清理日志上下文
             clear_log_context("cancelled")
