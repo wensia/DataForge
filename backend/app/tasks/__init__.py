@@ -43,6 +43,7 @@ REGISTERED_TASKS = {
             {"name": "yunke_account_id", "type": "int", "required": True, "label": "云客账号ID"},
             {"name": "start_time", "type": "str", "required": False, "label": "开始时间"},
             {"name": "end_time", "type": "str", "required": False, "label": "结束时间"},
+            {"name": "page_size", "type": "int", "required": False, "label": "每页记录数", "default": 50},
             {"name": "call_type", "type": "str", "required": False, "label": "通话类型", "default": "s"},
         ],
     },

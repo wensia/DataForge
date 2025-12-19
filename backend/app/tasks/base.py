@@ -71,11 +71,51 @@ def convert_value(value: Any, target_type: str) -> Any:
         return str(value) if value is not None else ""
 
 
+def auto_convert_value(value: Any) -> Any:
+    """自动检测并转换字符串值到合适的类型
+
+    用于未在 REGISTERED_TASKS 中注册的参数。
+    尝试将字符串转换为 int、float 或 bool。
+
+    Args:
+        value: 原始值
+
+    Returns:
+        转换后的值
+    """
+    if not isinstance(value, str):
+        return value
+
+    stripped = value.strip()
+    if not stripped:
+        return value
+
+    # 尝试转换为布尔值
+    if stripped.lower() in ("true", "false"):
+        return stripped.lower() == "true"
+
+    # 尝试转换为整数
+    try:
+        return int(stripped)
+    except ValueError:
+        pass
+
+    # 尝试转换为浮点数
+    try:
+        return float(stripped)
+    except ValueError:
+        pass
+
+    return value
+
+
 def coerce_task_params(task_name: str, kwargs: dict[str, Any]) -> dict[str, Any]:
     """根据任务注册信息转换参数类型
 
     从 REGISTERED_TASKS 获取参数元数据，将 kwargs 中的值转换为正确的类型。
     这确保从 JSON 反序列化的字符串参数能正确转换为 int/bool 等类型。
+
+    对于未注册的参数，会自动检测并转换看起来像数字或布尔值的字符串。
 
     Args:
         task_name: Celery 任务名称
@@ -92,28 +132,27 @@ def coerce_task_params(task_name: str, kwargs: dict[str, Any]) -> dict[str, Any]
         return kwargs
 
     task_info = REGISTERED_TASKS.get(task_name)
-    if not task_info:
-        return kwargs
-
-    # 构建参数名到类型的映射
-    params_meta = {p["name"]: p for p in task_info.get("params", [])}
-    if not params_meta:
-        return kwargs
+    params_meta = {}
+    if task_info:
+        params_meta = {p["name"]: p for p in task_info.get("params", [])}
 
     result = {}
     for key, value in kwargs.items():
+        original_value = value
         if key in params_meta:
+            # 已注册参数：按指定类型转换
             param_type = params_meta[key].get("type", "str")
-            original_value = value
             result[key] = convert_value(value, param_type)
-            # 仅在类型实际改变时记录日志
-            if type(original_value) != type(result[key]):
-                logger.debug(
-                    f"参数类型转换: {key}={original_value!r} ({type(original_value).__name__}) "
-                    f"-> {result[key]!r} ({type(result[key]).__name__})"
-                )
         else:
-            result[key] = value
+            # 未注册参数：自动检测类型并转换
+            result[key] = auto_convert_value(value)
+
+        # 仅在类型实际改变时记录日志
+        if type(original_value) != type(result[key]):
+            logger.debug(
+                f"参数类型转换: {key}={original_value!r} ({type(original_value).__name__}) "
+                f"-> {result[key]!r} ({type(result[key]).__name__})"
+            )
 
     return result
 
