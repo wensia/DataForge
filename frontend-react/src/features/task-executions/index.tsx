@@ -120,8 +120,8 @@ export function TaskExecutions() {
     isRefetching,
   } = useAllExecutions(
     {
-      task_id: taskFilter ? Number(taskFilter) : undefined,
-      status: statusFilter || undefined,
+      task_id: taskFilter && taskFilter !== 'all' ? Number(taskFilter) : undefined,
+      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
       page,
       size: pageSize,
     },
