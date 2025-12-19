@@ -94,6 +94,7 @@ class ScheduledTaskCreate(SQLModel):
 class ScheduledTaskUpdate(SQLModel):
     """更新任务请求"""
 
+    name: str | None = None
     description: str | None = None
     task_type: TaskType | None = None
     cron_expression: str | None = None

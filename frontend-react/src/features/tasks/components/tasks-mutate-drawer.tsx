@@ -199,6 +199,7 @@ export function TasksMutateDrawer({
         await updateTask.mutateAsync({
           id: currentRow.id,
           data: {
+            name: data.name,
             description: data.description,
             task_type: data.task_type,
             cron_expression:
@@ -282,7 +283,6 @@ export function TasksMutateDrawer({
                       <Input
                         {...field}
                         placeholder='输入任务名称'
-                        disabled={isUpdate}
                       />
                     </FormControl>
                     <FormMessage />
