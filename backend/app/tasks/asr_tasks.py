@@ -246,9 +246,11 @@ async def _run_asr_batch(
     # 验证 ASR 配置
     asr_config = asr_service.get_config(asr_config_id)
     if not asr_config:
+        task_log(f"错误: ASR 配置不存在: {asr_config_id}")
         return {"status": "failed", "message": f"ASR 配置不存在: {asr_config_id}"}
 
     if not asr_config.is_active:
+        task_log(f"错误: ASR 配置未启用: {asr_config_id}")
         return {"status": "failed", "message": f"ASR 配置未启用: {asr_config_id}"}
 
     task_log(f"使用 ASR 配置: {asr_config.name} ({asr_config.provider})")
@@ -403,6 +405,7 @@ def asr_transcribe(
         start_dt = _normalize_time_param(start_time, "00:00")
         end_dt = _normalize_time_param(end_time, "23:59")
     except ValueError as e:
+        task_log(f"错误: 时间参数解析失败 - {e}")
         return {"status": "failed", "message": str(e)}
 
     task_log("开始 ASR 语音识别任务")
@@ -701,12 +704,14 @@ def asr_text_replace(
         try:
             start_dt = _normalize_time_param(start_time, "00:00")
         except ValueError as e:
+            task_log(f"错误: 开始时间格式错误 - {e}")
             return {"status": "failed", "message": f"开始时间格式错误: {e}"}
 
     if end_time:
         try:
             end_dt = _normalize_time_param(end_time, "23:59")
         except ValueError as e:
+            task_log(f"错误: 结束时间格式错误 - {e}")
             return {"status": "failed", "message": f"结束时间格式错误: {e}"}
 
     task_log("开始 ASR 文本替换任务")
