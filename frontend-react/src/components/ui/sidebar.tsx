@@ -50,6 +50,14 @@ function useSidebar() {
   return context
 }
 
+/**
+ * 可选的 Sidebar hook，当没有 SidebarProvider 时返回 null
+ * 用于在可能没有 SidebarProvider 的页面中安全使用
+ */
+function useSidebarOptional() {
+  return React.useContext(SidebarContext)
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -725,4 +733,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  useSidebarOptional,
 }

@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -172,6 +173,9 @@ export function ExecutionDetailDialog({
               </Badge>
             )}
           </DialogTitle>
+          <DialogDescription className='sr-only'>
+            查看任务执行的详细信息和日志
+          </DialogDescription>
         </DialogHeader>
 
         {/* 基本信息 */}

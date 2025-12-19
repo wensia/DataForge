@@ -25,16 +25,16 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
-import { useSidebar } from './ui/sidebar'
+import { useSidebarOptional } from './ui/sidebar'
 
 export function ConfigDrawer() {
-  const { setOpen } = useSidebar()
+  const sidebar = useSidebarOptional()
   const { resetDir } = useDirection()
   const { resetTheme } = useTheme()
   const { resetLayout } = useLayout()
 
   const handleReset = () => {
-    setOpen(true)
+    sidebar?.setOpen(true)
     resetDir()
     resetTheme()
     resetLayout()
@@ -255,9 +255,13 @@ function SidebarConfig() {
 }
 
 function LayoutConfig() {
-  const { open, setOpen } = useSidebar()
+  const sidebar = useSidebarOptional()
   const { defaultCollapsible, collapsible, setCollapsible } = useLayout()
 
+  // 如果没有 SidebarProvider，不渲染 Layout 配置
+  if (!sidebar) return null
+
+  const { open, setOpen } = sidebar
   const radioState = open ? 'default' : collapsible
 
   return (
