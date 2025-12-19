@@ -308,6 +308,34 @@ class DataForgeTask(Task):
             logger.info(f"任务 {self.name} 无法获取锁 {self._lock_key}，跳过执行")
             # 记录到任务日志，便于用户在前端查看
             task_log(f"任务被跳过：另一个相同任务正在执行中（锁: {self._lock_key}）")
+
+            # 直接更新执行记录状态为 CANCELLED（不依赖 task_rejected 信号）
+            execution_id = getattr(self.request, "execution_id", None)
+            if execution_id:
+                try:
+                    from sqlmodel import Session
+
+                    from app.database import engine
+                    from app.models.task_execution import ExecutionStatus, TaskExecution
+
+                    with Session(engine) as session:
+                        execution = session.get(TaskExecution, execution_id)
+                        if execution and execution.status == ExecutionStatus.RUNNING:
+                            execution.status = ExecutionStatus.CANCELLED
+                            execution.finished_at = datetime.now()
+                            execution.error_message = (
+                                f"任务被跳过：另一个相同任务正在执行中（锁: {self._lock_key}）"
+                            )
+                            if execution.started_at:
+                                execution.duration_ms = int(
+                                    (datetime.now() - execution.started_at).total_seconds() * 1000
+                                )
+                            session.add(execution)
+                            session.commit()
+                            logger.debug(f"已将执行记录 {execution_id} 状态更新为 CANCELLED")
+                except Exception as e:
+                    logger.warning(f"更新执行记录状态失败: {e}")
+
             # 使用 Reject 拒绝任务，不重新入队
             raise Reject(f"任务正在执行中: {self._lock_key}", requeue=False)
 
