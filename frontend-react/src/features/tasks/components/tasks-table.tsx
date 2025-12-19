@@ -260,15 +260,14 @@ export function TasksTable() {
         />
         <Button
           variant='outline'
-          size='sm'
           onClick={() => refetch()}
           disabled={isRefetching}
-          className='ml-2'
+          className='ml-2 space-x-1'
         >
           <RefreshCw
-            className={cn('mr-2 h-4 w-4', isRefetching && 'animate-spin')}
+            className={cn('h-[18px] w-[18px]', isRefetching && 'animate-spin')}
           />
-          刷新
+          <span>刷新</span>
         </Button>
       </div>
 
