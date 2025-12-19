@@ -94,7 +94,7 @@ function ParamField({
           <Input
             type='number'
             step='1'
-            value={value as number}
+            value={value ?? 0}
             onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -112,7 +112,7 @@ function ParamField({
           <Input
             type='number'
             step='0.01'
-            value={value as number}
+            value={value ?? 0}
             onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -128,7 +128,7 @@ function ParamField({
             {required && <span className='text-destructive ml-1'>*</span>}
           </Label>
           <Switch
-            checked={value as boolean}
+            checked={value ?? false}
             onCheckedChange={onChange}
             disabled={disabled}
           />
@@ -144,7 +144,7 @@ function ParamField({
           </Label>
           <Input
             type='text'
-            value={value as string}
+            value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             placeholder={`输入 ${name}`}
@@ -173,7 +173,7 @@ function ParamField({
           </Label>
           <Input
             type='text'
-            value={value as string}
+            value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             placeholder='2025-12-01 或 datetime.now()'
@@ -185,10 +185,14 @@ function ParamField({
 
     case 'dict':
     case 'list':
-    default:
+    default: {
       // 复杂类型保留 JSON 格式
       const strValue =
-        typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+        value === undefined || value === null
+          ? ''
+          : typeof value === 'string'
+            ? value
+            : JSON.stringify(value, null, 2)
       return (
         <div className='space-y-2'>
           <Label>
@@ -214,6 +218,7 @@ function ParamField({
           />
         </div>
       )
+    }
   }
 }
 
