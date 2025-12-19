@@ -25,7 +25,13 @@ export function Tasks() {
 
       <Main fixed className='min-h-0'>
         <div className='flex min-h-0 flex-1 flex-col gap-4 overflow-hidden'>
-          <div className='flex flex-wrap items-end justify-between gap-2'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <div>
+              <h2 className='text-2xl font-bold tracking-tight'>定时任务</h2>
+              <p className='text-muted-foreground'>
+                管理系统中的定时任务和调度配置
+              </p>
+            </div>
             <TasksPrimaryButtons />
           </div>
           <TasksTable />
