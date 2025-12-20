@@ -12,7 +12,7 @@ from loguru import logger
 from app.api.v1 import router as api_v1_router
 from app.config import settings
 from app.database import init_db
-from app.middleware import APIKeyMiddleware
+from app.middleware import APIKeyMiddleware, PageAPIPermissionMiddleware
 from app.middleware.jwt_auth import JWTAuthMiddleware
 from app.models import (  # noqa: F401 确保模型被导入
     ApiKey,
@@ -98,7 +98,8 @@ app.add_middleware(
 )
 
 # 添加中间件 (注意顺序: 后添加的先执行)
-# JWT 中间件在 API 密钥中间件之前执行
+# 执行顺序: JWT -> APIKey -> PageAPIPermission -> 路由处理
+app.add_middleware(PageAPIPermissionMiddleware)
 app.add_middleware(APIKeyMiddleware)
 app.add_middleware(JWTAuthMiddleware)
 

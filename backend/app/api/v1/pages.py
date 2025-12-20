@@ -28,6 +28,7 @@ from app.models import (
     UserRole,
 )
 from app.schemas.response import ResponseModel
+from app.utils.page_api_cache import page_api_cache
 
 router = APIRouter(prefix="/pages", tags=["页面配置"])
 group_router = APIRouter(prefix="/page-groups", tags=["页面分组"])
@@ -215,6 +216,9 @@ def create_page(
     session.commit()
     session.refresh(page)
 
+    # 清除缓存
+    page_api_cache.invalidate_all()
+
     logger.info(f"创建页面: {page.title} ({page.key})")
     return ResponseModel(message="创建成功", data=PageResponse.model_validate(page).model_dump())
 
@@ -250,6 +254,9 @@ def update_page(
     session.commit()
     session.refresh(page)
 
+    # 清除缓存
+    page_api_cache.invalidate_all()
+
     logger.info(f"更新页面: {page.title} ({page.key})")
     return ResponseModel(message="更新成功", data=PageResponse.model_validate(page).model_dump())
 
@@ -270,6 +277,9 @@ def delete_page(
 
     session.delete(page)
     session.commit()
+
+    # 清除缓存
+    page_api_cache.invalidate_all()
 
     logger.info(f"删除页面: {page.title} ({page.key})")
     return ResponseModel(message="删除成功")

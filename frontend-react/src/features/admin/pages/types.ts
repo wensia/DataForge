@@ -22,6 +22,7 @@ export interface Page {
   is_public: boolean
   is_admin_only: boolean
   allowed_user_ids: number[] | null
+  api_paths: string[] | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -39,6 +40,7 @@ export interface PageCreate {
   is_public?: boolean
   is_admin_only?: boolean
   allowed_user_ids?: number[] | null
+  api_paths?: string[] | null
 }
 
 // 更新页面请求
@@ -51,6 +53,7 @@ export interface PageUpdate {
   is_public?: boolean
   is_admin_only?: boolean
   allowed_user_ids?: number[] | null
+  api_paths?: string[] | null
   is_active?: boolean
 }
 

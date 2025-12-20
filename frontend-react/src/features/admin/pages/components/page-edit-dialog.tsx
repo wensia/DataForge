@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X, Plus } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -63,6 +63,8 @@ export function PageEditDialog({
 
   const [permissionType, setPermissionType] = useState<PermissionType>('public')
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
+  const [apiPaths, setApiPaths] = useState<string[]>([])
+  const [newApiPath, setNewApiPath] = useState('')
 
   // 获取用户列表
   const { data: users = [] } = useQuery({
@@ -91,6 +93,7 @@ export function PageEditDialog({
         setPermissionType('specific_users')
       }
       setSelectedUserIds(page.allowed_user_ids || [])
+      setApiPaths(page.api_paths || [])
     } else {
       setFormData({
         key: '',
@@ -101,6 +104,8 @@ export function PageEditDialog({
       })
       setPermissionType('public')
       setSelectedUserIds([])
+      setApiPaths([])
+      setNewApiPath('')
     }
   }, [page, open, defaultGroupId])
 
@@ -117,9 +122,22 @@ export function PageEditDialog({
       is_public: permissionType === 'public',
       is_admin_only: permissionType === 'admin_only',
       allowed_user_ids: permissionType === 'specific_users' ? selectedUserIds : null,
+      api_paths: apiPaths.length > 0 ? apiPaths : null,
     }
 
     onSave(data)
+  }
+
+  const handleAddApiPath = () => {
+    const path = newApiPath.trim()
+    if (!path) return
+    if (apiPaths.includes(path)) return
+    setApiPaths([...apiPaths, path])
+    setNewApiPath('')
+  }
+
+  const handleRemoveApiPath = (path: string) => {
+    setApiPaths(apiPaths.filter((p) => p !== path))
   }
 
   const handleUserToggle = (userId: number) => {
@@ -293,6 +311,59 @@ export function PageEditDialog({
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <Label>关联 API 路径</Label>
+              <p className="text-xs text-muted-foreground">
+                配置此页面关联的 API 路径，无页面权限的用户将无法调用这些 API。
+                支持精确匹配和前缀匹配（以 /* 结尾）。
+              </p>
+
+              {apiPaths.length > 0 && (
+                <div className="space-y-1">
+                  {apiPaths.map((path) => (
+                    <div
+                      key={path}
+                      className="flex items-center justify-between bg-muted px-3 py-1.5 rounded-md text-sm"
+                    >
+                      <code className="font-mono text-xs">{path}</code>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleRemoveApiPath(path)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  value={newApiPath}
+                  onChange={(e) => setNewApiPath(e.target.value)}
+                  placeholder="/api/v1/your-api/*"
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddApiPath()
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleAddApiPath}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </ScrollArea>

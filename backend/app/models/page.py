@@ -53,6 +53,13 @@ class Page(SQLModel, table=True):
         description="允许访问的用户ID列表",
     )
 
+    # API 权限控制
+    api_paths: list[str] | None = Field(
+        default=None,
+        sa_column=Column(JSON),
+        description="关联的 API 路径列表，支持精确匹配和前缀匹配（以 /* 结尾）",
+    )
+
     # 元数据
     is_active: bool = Field(default=True, description="是否启用")
     created_at: datetime = Field(default_factory=datetime.now)
@@ -110,6 +117,7 @@ class PageCreate(SQLModel):
     is_public: bool = False
     is_admin_only: bool = False
     allowed_user_ids: list[int] | None = None
+    api_paths: list[str] | None = None
 
 
 class PageUpdate(SQLModel):
@@ -123,6 +131,7 @@ class PageUpdate(SQLModel):
     is_public: bool | None = None
     is_admin_only: bool | None = None
     allowed_user_ids: list[int] | None = None
+    api_paths: list[str] | None = None
     is_active: bool | None = None
 
 
@@ -139,6 +148,7 @@ class PageResponse(SQLModel):
     is_public: bool
     is_admin_only: bool
     allowed_user_ids: list[int] | None
+    api_paths: list[str] | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
