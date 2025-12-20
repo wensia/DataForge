@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2, X, Plus } from 'lucide-react'
+import { Loader2, X, Plus, Search } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ import { availableIcons, getIcon, defaultIcon } from '../utils/icons'
 interface User {
   id: number
   name: string
+  username: string
   email: string
 }
 
@@ -63,6 +64,7 @@ export function PageEditDialog({
 
   const [permissionType, setPermissionType] = useState<PermissionType>('public')
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
+  const [userSearch, setUserSearch] = useState('')
   const [apiPaths, setApiPaths] = useState<string[]>([])
   const [newApiPath, setNewApiPath] = useState('')
 
@@ -107,8 +109,19 @@ export function PageEditDialog({
       setSelectedUserIds([])
       setApiPaths([])
       setNewApiPath('')
+      setUserSearch('')
     }
   }, [page, open, defaultGroupId])
+
+  // 根据搜索词筛选用户
+  const filteredUsers = users.filter((user) => {
+    if (!userSearch.trim()) return true
+    const search = userSearch.toLowerCase()
+    return (
+      user.name?.toLowerCase().includes(search) ||
+      user.username?.toLowerCase().includes(search)
+    )
+  })
 
   const handleSave = () => {
     if (!formData.title.trim() || !formData.url.trim()) return
@@ -284,11 +297,22 @@ export function PageEditDialog({
               {permissionType === 'specific_users' && (
                 <div className="ml-6 space-y-2">
                   <Label className="text-sm text-muted-foreground">选择可访问的用户：</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="搜索用户名或姓名..."
+                      className="pl-8 h-9"
+                    />
+                  </div>
                   <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
                     {users.length === 0 ? (
                       <p className="text-sm text-muted-foreground">暂无用户</p>
+                    ) : filteredUsers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">未找到匹配的用户</p>
                     ) : (
-                      users.map((user) => (
+                      filteredUsers.map((user) => (
                         <div key={user.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`user-${user.id}`}
@@ -299,7 +323,7 @@ export function PageEditDialog({
                             htmlFor={`user-${user.id}`}
                             className="font-normal cursor-pointer text-sm"
                           >
-                            {user.name} ({user.email})
+                            {user.name} ({user.username})
                           </Label>
                         </div>
                       ))
