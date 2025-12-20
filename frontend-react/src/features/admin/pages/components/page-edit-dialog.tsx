@@ -70,9 +70,9 @@ export function PageEditDialog({
   const { data: users = [] } = useQuery({
     queryKey: ['users-list'],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<User[]>>('/users')
-      const data = response.data.data
-      return Array.isArray(data) ? data : []
+      const response = await apiClient.get<ApiResponse<{ items: User[]; total: number }>>('/users')
+      const items = response.data.data?.items
+      return Array.isArray(items) ? items : []
     },
     enabled: open,
   })
