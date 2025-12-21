@@ -84,11 +84,6 @@ export const sidebarData: SidebarData = {
           icon: BarChart3,
         },
         {
-          title: 'AI 分析',
-          url: '/analysis/ai',
-          icon: Bot,
-        },
-        {
           title: '智能问答',
           url: '/analysis/chat',
           icon: MessageSquare,
