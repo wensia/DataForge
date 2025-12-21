@@ -7,15 +7,23 @@ import { cn } from '@/lib/utils'
 import type { Page } from '../types'
 import { getPermissionType, permissionLabels, permissionColors } from '../types'
 import { getIcon, defaultIcon } from '../utils/icons'
+import { AllowedUsersDisplay } from './allowed-users-display'
+
+interface User {
+  id: number
+  name: string
+  username: string
+}
 
 interface SortableItemProps {
   page: Page
+  usersMap: Map<number, User>
   onEdit: (page: Page) => void
   onDelete: (id: number) => void
   onToggleActive: (page: Page) => void
 }
 
-export function SortableItem({ page, onEdit, onDelete, onToggleActive }: SortableItemProps) {
+export function SortableItem({ page, usersMap, onEdit, onDelete, onToggleActive }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -73,11 +81,17 @@ export function SortableItem({ page, onEdit, onDelete, onToggleActive }: Sortabl
           <span className={cn('text-sm font-medium truncate', !page.is_active && 'line-through')}>
             {page.title}
           </span>
-          <span className={cn('rounded px-1.5 py-0.5 text-xs shrink-0', permissionColors[permissionType])}>
-            {permissionType === 'specific_users' && page.allowed_user_ids
-              ? `${page.allowed_user_ids.length}人可见`
-              : permissionLabels[permissionType]}
-          </span>
+          {permissionType === 'specific_users' && page.allowed_user_ids ? (
+            <AllowedUsersDisplay
+              userIds={page.allowed_user_ids}
+              usersMap={usersMap}
+              className="shrink-0"
+            />
+          ) : (
+            <span className={cn('rounded px-1.5 py-0.5 text-xs shrink-0', permissionColors[permissionType])}>
+              {permissionLabels[permissionType]}
+            </span>
+          )}
         </div>
         <span className="text-xs text-muted-foreground truncate block">{page.url}</span>
       </div>

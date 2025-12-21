@@ -16,9 +16,16 @@ import { cn } from '@/lib/utils'
 import type { Page, PageGroup } from '../types'
 import { SortableItem } from './sortable-item'
 
+interface User {
+  id: number
+  name: string
+  username: string
+}
+
 interface SortableGroupProps {
   group: PageGroup
   pages: Page[]
+  usersMap: Map<number, User>
   onEditPage: (page: Page) => void
   onEditGroup: (group: PageGroup) => void
   onDeletePage: (id: number) => void
@@ -30,6 +37,7 @@ interface SortableGroupProps {
 export function SortableGroup({
   group,
   pages,
+  usersMap,
   onEditPage,
   onEditGroup,
   onDeletePage,
@@ -135,6 +143,7 @@ export function SortableGroup({
                 <SortableItem
                   key={page.id}
                   page={page}
+                  usersMap={usersMap}
                   onEdit={onEditPage}
                   onDelete={onDeletePage}
                   onToggleActive={onTogglePageActive}

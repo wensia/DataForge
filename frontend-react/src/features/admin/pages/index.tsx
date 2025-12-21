@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { RefreshCw, Plus, Loader2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
@@ -9,6 +10,8 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import apiClient from '@/lib/api-client'
+import type { ApiResponse } from '@/lib/types'
 import {
   usePages,
   useGroups,
@@ -25,9 +28,32 @@ import { PageEditDialog } from './components/page-edit-dialog'
 import { GroupEditDialog } from './components/group-edit-dialog'
 import type { Page, PageGroup, PageCreate, PageUpdate, PageGroupCreate, PageGroupUpdate } from './types'
 
+interface User {
+  id: number
+  name: string
+  username: string
+}
+
 export default function PagesManagement() {
   const { data: pages = [], isLoading: loadingPages, refetch: refetchPages } = usePages()
   const { data: groups = [], isLoading: loadingGroups, refetch: refetchGroups } = useGroups()
+
+  // 获取用户列表用于显示允许访问的用户名
+  const { data: users = [] } = useQuery({
+    queryKey: ['users-for-pages'],
+    queryFn: async () => {
+      const response = await apiClient.get<ApiResponse<{ items: User[]; total: number }>>('/users')
+      const items = response.data.data?.items
+      return Array.isArray(items) ? items : []
+    },
+  })
+
+  // 创建用户ID到用户信息的映射
+  const usersMap = useMemo(() => {
+    const map = new Map<number, User>()
+    users.forEach((user) => map.set(user.id, user))
+    return map
+  }, [users])
 
   const createPageMutation = useCreatePage()
   const updatePageMutation = useUpdatePage()
@@ -281,6 +307,7 @@ export default function PagesManagement() {
 
         <PageList
           groupedPages={groupedPages}
+          usersMap={usersMap}
           onEditPage={handleEditPage}
           onEditGroup={handleEditGroup}
           onDeletePage={(id) => setDeletePageId(id)}

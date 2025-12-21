@@ -18,8 +18,15 @@ import {
 import { SortableGroup } from './sortable-group'
 import type { Page, PageGroup } from '../types'
 
+interface User {
+  id: number
+  name: string
+  username: string
+}
+
 interface PageListProps {
   groupedPages: { group: PageGroup; pages: Page[] }[]
+  usersMap: Map<number, User>
   onEditPage: (page: Page) => void
   onEditGroup: (group: PageGroup) => void
   onDeletePage: (id: number) => void
@@ -31,6 +38,7 @@ interface PageListProps {
 
 export function PageList({
   groupedPages,
+  usersMap,
   onEditPage,
   onEditGroup,
   onDeletePage,
@@ -153,6 +161,7 @@ export function PageList({
               key={group.id}
               group={group}
               pages={pages}
+              usersMap={usersMap}
               onEditPage={onEditPage}
               onEditGroup={onEditGroup}
               onDeletePage={onDeletePage}
