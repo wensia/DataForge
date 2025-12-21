@@ -1,5 +1,4 @@
 import { Users } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import {
   Popover,
   PopoverContent,
@@ -18,14 +17,12 @@ interface AllowedUsersDisplayProps {
   userIds: number[]
   usersMap: Map<number, User>
   className?: string
-  maxDisplay?: number
 }
 
 export function AllowedUsersDisplay({
   userIds,
   usersMap,
   className,
-  maxDisplay = 2,
 }: AllowedUsersDisplayProps) {
   if (!userIds || userIds.length === 0) {
     return (
@@ -38,9 +35,6 @@ export function AllowedUsersDisplay({
   const users = userIds
     .map((id) => usersMap.get(id))
     .filter((u): u is User => !!u)
-
-  const displayUsers = users.slice(0, maxDisplay)
-  const remainingCount = users.length - maxDisplay
 
   return (
     <Popover>

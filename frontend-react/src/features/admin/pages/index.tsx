@@ -34,12 +34,21 @@ interface User {
   username: string
 }
 
+// 稳定的空数组引用，避免每次渲染创建新引用
+const EMPTY_USERS: User[] = []
+const EMPTY_PAGES: Page[] = []
+const EMPTY_GROUPS: PageGroup[] = []
+
 export default function PagesManagement() {
-  const { data: pages = [], isLoading: loadingPages, refetch: refetchPages } = usePages()
-  const { data: groups = [], isLoading: loadingGroups, refetch: refetchGroups } = useGroups()
+  const { data: pagesData, isLoading: loadingPages, refetch: refetchPages } = usePages()
+  const { data: groupsData, isLoading: loadingGroups, refetch: refetchGroups } = useGroups()
+
+  // 使用稳定的引用
+  const pages = pagesData ?? EMPTY_PAGES
+  const groups = groupsData ?? EMPTY_GROUPS
 
   // 获取用户列表用于显示允许访问的用户名
-  const { data: users = [] } = useQuery({
+  const { data: usersData } = useQuery({
     queryKey: ['users-for-pages'],
     queryFn: async () => {
       const response = await apiClient.get<ApiResponse<{ items: User[]; total: number }>>('/users')
@@ -47,6 +56,9 @@ export default function PagesManagement() {
       return Array.isArray(items) ? items : []
     },
   })
+
+  // 使用稳定的引用
+  const users = usersData ?? EMPTY_USERS
 
   // 创建用户ID到用户信息的映射
   const usersMap = useMemo(() => {
