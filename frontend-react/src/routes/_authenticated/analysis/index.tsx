@@ -14,6 +14,7 @@ const analysisSearchSchema = z.object({
   callee: z.string().optional(),
   durationMin: z.number().optional(),
   durationMax: z.number().optional(),
+  isInvalidCall: z.boolean().optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/analysis/')({

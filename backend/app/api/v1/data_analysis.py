@@ -164,6 +164,7 @@ async def get_records(
     callee: str | None = None,
     duration_min: int | None = Query(None, ge=0, description="最小通话时长（秒）"),
     duration_max: int | None = Query(None, ge=0, description="最大通话时长（秒）"),
+    is_invalid_call: bool | None = Query(None, description="筛选无效通话（转写为空但时长>30秒）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
     user: User = Depends(require_analysis_access),
@@ -191,6 +192,7 @@ async def get_records(
         callee: 被叫号码筛选（模糊匹配）
         duration_min: 最小通话时长（秒）
         duration_max: 最大通话时长（秒）
+        is_invalid_call: 筛选无效通话（转写为空但时长>30秒）
         page: 页码
         page_size: 每页数量
 
@@ -249,6 +251,7 @@ async def get_records(
         callee=callee,
         duration_min=duration_min,
         duration_max=duration_max,
+        is_invalid_call=is_invalid_call,
         limit=page_size,
         offset=offset,
         allowed_departments=allowed_departments,

@@ -2,7 +2,7 @@
  * 数据表格列定义
  */
 import { type ColumnDef } from '@tanstack/react-table'
-import { Mic, FileCheck, Minus } from 'lucide-react'
+import { Mic, FileCheck, Minus, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader, createSelectColumn } from '@/components/data-table'
 import {
@@ -11,6 +11,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { callTypeMap, callResultMap, formatDate, type CallRecord } from '../types'
+
+// 无效通话时长阈值（秒）
+const INVALID_CALL_DURATION_THRESHOLD = 30
+
+// 判断是否为无效通话（转写为空但时长>30秒）
+function isInvalidCall(record: CallRecord): boolean {
+  const hasNoTranscript =
+    !record.transcript ||
+    record.transcript.length === 0 ||
+    record.transcript_status === 'empty'
+
+  return (record.duration ?? 0) > INVALID_CALL_DURATION_THRESHOLD && hasNoTranscript
+}
 
 interface ColumnOptions {
   onOpenRecordModal: (record: CallRecord) => void
@@ -111,11 +124,31 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title='时长' />
       ),
-      cell: ({ row }) =>
-        row.original.duration ? `${row.original.duration}秒` : '-',
+      cell: ({ row }) => {
+        const duration = row.original.duration
+        const invalid = isInvalidCall(row.original)
+
+        if (!duration) return '-'
+
+        return (
+          <div className='flex items-center gap-1'>
+            <span>{duration}秒</span>
+            {invalid && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertTriangle className='h-4 w-4 text-amber-500' />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>疑似无效通话：时长 &gt;30秒但无转写内容</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        )
+      },
       enableSorting: true,
       enableHiding: true,
-      size: 80,
+      size: 100,
     },
     {
       accessorKey: 'call_type',

@@ -73,7 +73,7 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
-import { callTypeOptions, callResultOptions, type FilterOption } from '../data/filter-options'
+import { callTypeOptions, callResultOptions, invalidCallOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
 const route = getRouteApi('/_authenticated/analysis/')
@@ -121,6 +121,7 @@ export function AnalysisTable() {
     callee: search.callee ?? undefined,
     duration_min: search.durationMin ?? undefined,
     duration_max: search.durationMax ?? undefined,
+    is_invalid_call: search.isInvalidCall ?? undefined,
   }))
 
   // 日期状态
@@ -335,6 +336,7 @@ export function AnalysisTable() {
         callee: newFilters.callee,
         durationMin: newFilters.duration_min,
         durationMax: newFilters.duration_max,
+        isInvalidCall: newFilters.is_invalid_call,
       },
     })
   }, [filters, dateRange, durationMin, durationMax, navigate])
@@ -412,7 +414,8 @@ export function AnalysisTable() {
     filters.department ||
     filters.callee ||
     filters.duration_min ||
-    filters.duration_max
+    filters.duration_max ||
+    filters.is_invalid_call !== undefined
   )
 
   return (
@@ -505,6 +508,22 @@ export function AnalysisTable() {
               }}
             />
           )}
+          <ServerSideFilter
+            title='通话质量'
+            value={filters.is_invalid_call?.toString()}
+            options={invalidCallOptions}
+            onChange={(value) => {
+              const boolValue = value === 'true' ? true : value === 'false' ? false : undefined
+              setFilters((prev) => ({ ...prev, page: 1, is_invalid_call: boolValue }))
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  page: 1,
+                  isInvalidCall: boolValue,
+                }),
+              })
+            }}
+          />
 
           {/* 时长范围 */}
           <div className='flex items-center gap-1'>

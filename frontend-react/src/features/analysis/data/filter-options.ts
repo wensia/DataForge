@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -31,4 +32,10 @@ export const callResultOptions: FilterOption[] = [
   { label: '忙线', value: '3', icon: XCircle },
   { label: '无人接听', value: '4', icon: PhoneMissed },
   { label: '已挂断', value: '5', icon: XCircle },
+]
+
+// 无效通话筛选选项（转写为空但时长>30秒）
+export const invalidCallOptions: FilterOption[] = [
+  { label: '疑似无效', value: 'true', icon: AlertTriangle },
+  { label: '正常通话', value: 'false', icon: CheckCircle2 },
 ]

@@ -46,6 +46,7 @@ export interface CallRecordStats {
   by_source: Record<string, number>
   by_call_type: Record<string, number>
   by_department: Record<string, number>
+  invalid_call_count: number
 }
 
 export interface AnalysisResult {
@@ -110,6 +111,7 @@ export interface RecordsParams {
   callee?: string
   duration_min?: number
   duration_max?: number
+  is_invalid_call?: boolean
   page?: number
   page_size?: number
 }

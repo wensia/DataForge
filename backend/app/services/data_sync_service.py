@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import distinct
+from sqlalchemy import and_, distinct, or_
 from sqlmodel import Session, select
 
 from app.models.call_record import CallRecord, DataSource
@@ -324,6 +324,10 @@ def get_unique_staff_names(session: Session) -> list[str]:
     return [name for name in session.exec(statement).all() if name]
 
 
+# 无效通话时长阈值（秒）
+INVALID_CALL_DURATION_THRESHOLD = 30
+
+
 def get_call_records(
     session: Session,
     source: str | None = None,
@@ -336,6 +340,7 @@ def get_call_records(
     callee: str | None = None,
     duration_min: int | None = None,
     duration_max: int | None = None,
+    is_invalid_call: bool | None = None,
     limit: int = 100,
     offset: int = 0,
     allowed_departments: list[str] | None = None,
@@ -355,6 +360,7 @@ def get_call_records(
         callee: 被叫号码筛选（模糊匹配）
         duration_min: 最小通话时长（秒）
         duration_max: 最大通话时长（秒）
+        is_invalid_call: 是否为无效通话（转写为空但时长>30秒）
         limit: 返回数量限制
         offset: 偏移量
         allowed_departments: 允许的部门列表（用于用户权限控制）
@@ -386,6 +392,32 @@ def get_call_records(
         query = query.where(CallRecord.duration >= duration_min)
     if duration_max is not None:
         query = query.where(CallRecord.duration <= duration_max)
+
+    # 无效通话筛选: 转写为空但时长 > 30秒
+    if is_invalid_call is True:
+        query = query.where(
+            and_(
+                CallRecord.duration > INVALID_CALL_DURATION_THRESHOLD,
+                or_(
+                    CallRecord.transcript.is_(None),
+                    CallRecord.transcript == [],
+                    CallRecord.transcript_status == "empty",
+                ),
+            )
+        )
+    elif is_invalid_call is False:
+        # 排除无效通话（只看正常通话）
+        query = query.where(
+            or_(
+                CallRecord.duration <= INVALID_CALL_DURATION_THRESHOLD,
+                CallRecord.duration.is_(None),
+                and_(
+                    CallRecord.transcript.isnot(None),
+                    CallRecord.transcript != [],
+                    CallRecord.transcript_status != "empty",
+                ),
+            )
+        )
 
     # 应用权限控制筛选（用户只能看特定部门/员工的数据）
     if allowed_departments:
@@ -468,6 +500,18 @@ def get_call_record_stats(
         if r.department:
             by_department[r.department] = by_department.get(r.department, 0) + 1
 
+    # 统计无效通话数量（转写为空但时长 > 30秒）
+    invalid_call_count = sum(
+        1
+        for r in records
+        if (r.duration or 0) > INVALID_CALL_DURATION_THRESHOLD
+        and (
+            r.transcript is None
+            or r.transcript == []
+            or r.transcript_status == "empty"
+        )
+    )
+
     return {
         "total_count": total_count,
         "total_duration": total_duration,
@@ -475,6 +519,7 @@ def get_call_record_stats(
         "by_source": by_source,
         "by_call_type": by_call_type,
         "by_department": by_department,
+        "invalid_call_count": invalid_call_count,
     }
 
 
