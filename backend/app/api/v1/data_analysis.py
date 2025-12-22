@@ -343,6 +343,25 @@ async def delete_records(
     )
 
 
+@router.get("/transcript-stats/monthly", response_model=ResponseModel)
+async def get_monthly_transcript_stats(
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """获取按月份统计的录音转写状态
+
+    返回每个月的：
+    - 总通话数量
+    - 待转写数量（status 为 null 或 pending）
+    - 已转写数量（status 为 completed）
+    - 空音频数量（status 为 empty）
+
+    Returns:
+        ResponseModel: 月度转写统计列表
+    """
+    stats = sync_svc.get_monthly_transcript_stats(session)
+    return ResponseModel(data=stats)
+
+
 # ============ 数据同步接口 ============
 
 

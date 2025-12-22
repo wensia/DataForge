@@ -553,6 +553,73 @@ def delete_call_records(session: Session, record_ids: list[int]) -> int:
     return deleted_count
 
 
+def get_monthly_transcript_stats(session: Session) -> list[dict[str, Any]]:
+    """按月份统计录音转写状态
+
+    Returns:
+        list: 每月的转写统计数据
+        [
+            {
+                "month": "2024-12",
+                "total": 1500,
+                "pending": 200,
+                "completed": 1250,
+                "empty": 50
+            },
+            ...
+        ]
+    """
+    from sqlalchemy import extract, func, case
+
+    # 使用 SQL 聚合按月份分组统计
+    query = (
+        select(
+            func.to_char(CallRecord.call_time, "YYYY-MM").label("month"),
+            func.count().label("total"),
+            func.sum(
+                case(
+                    (
+                        or_(
+                            CallRecord.transcript_status.is_(None),
+                            CallRecord.transcript_status == "pending",
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("pending"),
+            func.sum(
+                case(
+                    (CallRecord.transcript_status == "completed", 1),
+                    else_=0,
+                )
+            ).label("completed"),
+            func.sum(
+                case(
+                    (CallRecord.transcript_status == "empty", 1),
+                    else_=0,
+                )
+            ).label("empty"),
+        )
+        .where(CallRecord.call_time.isnot(None))
+        .group_by(func.to_char(CallRecord.call_time, "YYYY-MM"))
+        .order_by(func.to_char(CallRecord.call_time, "YYYY-MM").desc())
+    )
+
+    results = session.exec(query).all()
+
+    return [
+        {
+            "month": row.month,
+            "total": row.total or 0,
+            "pending": row.pending or 0,
+            "completed": row.completed or 0,
+            "empty": row.empty or 0,
+        }
+        for row in results
+    ]
+
+
 # ============ 云客数据同步 ============
 
 

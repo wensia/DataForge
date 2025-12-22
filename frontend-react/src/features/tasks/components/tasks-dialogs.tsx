@@ -4,6 +4,7 @@ import { useDeleteTask, useRunTask } from '../api'
 import { TasksImportDialog } from './tasks-import-dialog'
 import { TasksMutateDrawer } from './tasks-mutate-drawer'
 import { useTasks } from './tasks-provider'
+import { TranscriptStatsDialog } from './transcript-stats-dialog'
 
 export function TasksDialogs() {
   const { open, setOpen, currentRow, setCurrentRow } = useTasks()
@@ -56,6 +57,11 @@ export function TasksDialogs() {
         key='tasks-import'
         open={open === 'import'}
         onOpenChange={() => setOpen('import')}
+      />
+
+      <TranscriptStatsDialog
+        open={open === 'transcript-stats'}
+        onOpenChange={(isOpen) => setOpen(isOpen ? 'transcript-stats' : null)}
       />
 
       {currentRow && (
