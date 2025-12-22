@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, BarChart3 } from 'lucide-react'
 import apiClient from '@/lib/api-client'
@@ -17,6 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface MonthlyTranscriptStats {
   month: string
@@ -35,12 +38,17 @@ export function TranscriptStatsDialog({
   open,
   onOpenChange,
 }: TranscriptStatsDialogProps) {
+  const [durationMin, setDurationMin] = useState<number | undefined>(undefined)
+
   const { data, isLoading } = useQuery({
-    queryKey: ['transcript-stats', 'monthly'],
+    queryKey: ['transcript-stats', 'monthly', durationMin],
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<MonthlyTranscriptStats[]>>(
-        '/analysis/transcript-stats/monthly'
-      )
+      const params = new URLSearchParams()
+      if (durationMin !== undefined) {
+        params.set('duration_min', String(durationMin))
+      }
+      const url = `/analysis/transcript-stats/monthly${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await apiClient.get<ApiResponse<MonthlyTranscriptStats[]>>(url)
       return response.data.data
     },
     enabled: open,
@@ -67,6 +75,30 @@ export function TranscriptStatsDialog({
           </DialogTitle>
           <DialogDescription>按月份统计录音转写状态</DialogDescription>
         </DialogHeader>
+
+        {/* 筛选条件 */}
+        <div className='flex items-center gap-4 py-2'>
+          <div className='flex items-center gap-2'>
+            <Label htmlFor='duration-min' className='whitespace-nowrap text-sm'>
+              最小时长
+            </Label>
+            <Input
+              id='duration-min'
+              type='number'
+              placeholder='秒'
+              className='h-8 w-24'
+              min={0}
+              value={durationMin ?? ''}
+              onChange={(e) => {
+                const val = e.target.value
+                setDurationMin(val ? parseInt(val, 10) : undefined)
+              }}
+            />
+            <span className='text-muted-foreground text-xs'>
+              仅统计时长 ≥ 此值的通话
+            </span>
+          </div>
+        </div>
 
         {isLoading ? (
           <div className='flex h-40 items-center justify-center'>

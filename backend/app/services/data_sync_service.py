@@ -568,8 +568,15 @@ def delete_call_records(session: Session, record_ids: list[int]) -> int:
     return deleted_count
 
 
-def get_monthly_transcript_stats(session: Session) -> list[dict[str, Any]]:
+def get_monthly_transcript_stats(
+    session: Session,
+    duration_min: int | None = None,
+) -> list[dict[str, Any]]:
     """按月份统计录音转写状态
+
+    Args:
+        session: 数据库会话
+        duration_min: 最小通话时长筛选（秒），用于排除短时长通话
 
     Returns:
         list: 每月的转写统计数据
@@ -584,7 +591,7 @@ def get_monthly_transcript_stats(session: Session) -> list[dict[str, Any]]:
             ...
         ]
     """
-    from sqlalchemy import extract, func, case
+    from sqlalchemy import func, case
 
     # 使用 SQL 聚合按月份分组统计
     query = (
@@ -617,8 +624,14 @@ def get_monthly_transcript_stats(session: Session) -> list[dict[str, Any]]:
             ).label("empty"),
         )
         .where(CallRecord.call_time.isnot(None))
-        .group_by(func.to_char(CallRecord.call_time, "YYYY-MM"))
-        .order_by(func.to_char(CallRecord.call_time, "YYYY-MM").desc())
+    )
+
+    # 添加时长筛选
+    if duration_min is not None:
+        query = query.where(CallRecord.duration >= duration_min)
+
+    query = query.group_by(func.to_char(CallRecord.call_time, "YYYY-MM")).order_by(
+        func.to_char(CallRecord.call_time, "YYYY-MM").desc()
     )
 
     results = session.exec(query).all()

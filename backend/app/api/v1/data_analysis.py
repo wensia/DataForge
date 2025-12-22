@@ -347,9 +347,13 @@ async def delete_records(
 
 @router.get("/transcript-stats/monthly", response_model=ResponseModel)
 async def get_monthly_transcript_stats(
+    duration_min: int | None = Query(None, ge=0, description="最小通话时长筛选（秒）"),
     session: Session = Depends(get_session),
 ) -> ResponseModel:
     """获取按月份统计的录音转写状态
+
+    Args:
+        duration_min: 最小通话时长筛选（秒），用于排除短时长通话
 
     返回每个月的：
     - 总通话数量
@@ -360,7 +364,7 @@ async def get_monthly_transcript_stats(
     Returns:
         ResponseModel: 月度转写统计列表
     """
-    stats = sync_svc.get_monthly_transcript_stats(session)
+    stats = sync_svc.get_monthly_transcript_stats(session, duration_min=duration_min)
     return ResponseModel(data=stats)
 
 
