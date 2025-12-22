@@ -112,6 +112,7 @@ export interface RecordsParams {
   duration_min?: number
   duration_max?: number
   is_invalid_call?: boolean
+  transcript_status?: string
   page?: number
   page_size?: number
 }

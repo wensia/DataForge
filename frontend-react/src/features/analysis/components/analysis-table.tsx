@@ -74,7 +74,7 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
-import { callTypeOptions, callResultOptions, invalidCallOptions, type FilterOption } from '../data/filter-options'
+import { callTypeOptions, callResultOptions, invalidCallOptions, transcriptStatusOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
 const route = getRouteApi('/_authenticated/analysis/')
@@ -123,6 +123,7 @@ export function AnalysisTable() {
     duration_min: search.durationMin ?? undefined,
     duration_max: search.durationMax ?? undefined,
     is_invalid_call: search.isInvalidCall ?? undefined,
+    transcript_status: search.transcriptStatus ?? undefined,
   }))
 
   // 日期状态
@@ -338,6 +339,7 @@ export function AnalysisTable() {
         durationMin: newFilters.duration_min,
         durationMax: newFilters.duration_max,
         isInvalidCall: newFilters.is_invalid_call,
+        transcriptStatus: newFilters.transcript_status,
       },
     })
   }, [filters, dateRange, durationMin, durationMax, navigate])
@@ -416,7 +418,8 @@ export function AnalysisTable() {
     filters.callee ||
     filters.duration_min ||
     filters.duration_max ||
-    filters.is_invalid_call !== undefined
+    filters.is_invalid_call !== undefined ||
+    filters.transcript_status
   )
 
   return (
@@ -521,6 +524,21 @@ export function AnalysisTable() {
                   ...prev,
                   page: 1,
                   isInvalidCall: boolValue,
+                }),
+              })
+            }}
+          />
+          <ServerSideFilter
+            title='转写状态'
+            value={filters.transcript_status}
+            options={transcriptStatusOptions}
+            onChange={(value) => {
+              setFilters((prev) => ({ ...prev, page: 1, transcript_status: value }))
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  page: 1,
+                  transcriptStatus: value,
                 }),
               })
             }}

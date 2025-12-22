@@ -341,6 +341,7 @@ def get_call_records(
     duration_min: int | None = None,
     duration_max: int | None = None,
     is_invalid_call: bool | None = None,
+    transcript_status: str | None = None,
     limit: int = 100,
     offset: int = 0,
     allowed_departments: list[str] | None = None,
@@ -418,6 +419,20 @@ def get_call_records(
                 ),
             )
         )
+
+    # 转写状态筛选
+    if transcript_status:
+        if transcript_status == "pending":
+            # 待转写：status 为 null 或 'pending'
+            query = query.where(
+                or_(
+                    CallRecord.transcript_status.is_(None),
+                    CallRecord.transcript_status == "pending",
+                )
+            )
+        else:
+            # completed 或 empty
+            query = query.where(CallRecord.transcript_status == transcript_status)
 
     # 应用权限控制筛选（用户只能看特定部门/员工的数据）
     if allowed_departments:

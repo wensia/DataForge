@@ -15,6 +15,7 @@ const analysisSearchSchema = z.object({
   durationMin: z.number().optional(),
   durationMax: z.number().optional(),
   isInvalidCall: z.boolean().optional(),
+  transcriptStatus: z.string().optional(),
 })
 
 export const Route = createFileRoute('/_authenticated/analysis/')({

@@ -39,3 +39,10 @@ export const invalidCallOptions: FilterOption[] = [
   { label: '疑似无效', value: 'true', icon: AlertTriangle },
   { label: '正常通话', value: 'false', icon: CheckCircle2 },
 ]
+
+// 转写状态筛选选项
+export const transcriptStatusOptions: FilterOption[] = [
+  { label: '待转写', value: 'pending', icon: Clock },
+  { label: '已转写', value: 'completed', icon: CheckCircle2 },
+  { label: '空音频', value: 'empty', icon: XCircle },
+]

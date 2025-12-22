@@ -35,6 +35,7 @@ export const analysisKeys = {
       params?.duration_min,
       params?.duration_max,
       params?.is_invalid_call,
+      params?.transcript_status,
     ] as const,
   stats: (params?: { start_time?: string; end_time?: string }) =>
     [...analysisKeys.all, 'stats', params?.start_time, params?.end_time] as const,
