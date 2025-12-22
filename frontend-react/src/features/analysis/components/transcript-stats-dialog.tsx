@@ -38,7 +38,7 @@ export function TranscriptStatsDialog({
   open,
   onOpenChange,
 }: TranscriptStatsDialogProps) {
-  const [durationMin, setDurationMin] = useState<number | undefined>(undefined)
+  const [durationMin, setDurationMin] = useState<number | undefined>(3)
 
   const { data, isLoading } = useQuery({
     queryKey: ['transcript-stats', 'monthly', durationMin],
