@@ -1,5 +1,6 @@
 import { useAnalysis } from './analysis-provider'
 import { RecordDetailModal } from './record-detail-modal'
+import { TranscriptStatsDialog } from './transcript-stats-dialog'
 
 export function AnalysisDialogs() {
   const {
@@ -27,6 +28,12 @@ export function AnalysisDialogs() {
         record={currentRow}
         audioUrl={audioUrl}
         audioLoading={audioLoading}
+      />
+
+      {/* 转写统计弹窗 */}
+      <TranscriptStatsDialog
+        open={open === 'transcript-stats'}
+        onOpenChange={(isOpen) => setOpen(isOpen ? 'transcript-stats' : null)}
       />
     </>
   )

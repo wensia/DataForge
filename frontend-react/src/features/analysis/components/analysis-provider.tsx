@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import type { CallRecord } from '../types'
 
-type AnalysisDialogType = 'detail' | 'delete' | 'bulk-delete'
+type AnalysisDialogType = 'detail' | 'delete' | 'bulk-delete' | 'transcript-stats'
 
 type AnalysisContextType = {
   open: AnalysisDialogType | null

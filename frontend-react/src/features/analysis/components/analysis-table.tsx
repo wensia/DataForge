@@ -20,6 +20,7 @@ import {
   CalendarIcon,
   Check,
   PlusCircle,
+  BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -581,6 +582,16 @@ export function AnalysisTable() {
               </Button>
             </>
           )}
+
+          {/* 转写统计按钮 */}
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => setOpen('transcript-stats')}
+          >
+            <BarChart3 className='mr-2 h-4 w-4' />
+            转写统计
+          </Button>
 
           {/* 刷新按钮 */}
           <Button
