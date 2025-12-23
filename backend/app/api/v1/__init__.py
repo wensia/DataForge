@@ -13,6 +13,7 @@ from app.api.v1 import (
     data_analysis,
     feishu_config,
     health,
+    html_template,
     organization,
     pages,
     prompts,
@@ -55,3 +56,5 @@ router.include_router(wechat_account.router)
 router.include_router(wechat_article.router)
 router.include_router(pages.router)
 router.include_router(pages.group_router)
+router.include_router(html_template.router)
+router.include_router(html_template.category_router)

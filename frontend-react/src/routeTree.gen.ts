@@ -49,6 +49,7 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_authenticated/settings/api-keys'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedMediaTemplatesRouteImport } from './routes/_authenticated/media/templates'
 import { Route as AuthenticatedMediaTagsRouteImport } from './routes/_authenticated/media/tags'
 import { Route as AuthenticatedMediaPublishRouteImport } from './routes/_authenticated/media/publish'
 import { Route as AuthenticatedMediaEditorRouteImport } from './routes/_authenticated/media/editor'
@@ -277,6 +278,12 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedMediaTemplatesRoute =
+  AuthenticatedMediaTemplatesRouteImport.update({
+    id: '/templates',
+    path: '/templates',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
 const AuthenticatedMediaTagsRoute = AuthenticatedMediaTagsRouteImport.update({
   id: '/tags',
   path: '/tags',
@@ -364,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/media/editor': typeof AuthenticatedMediaEditorRoute
   '/media/publish': typeof AuthenticatedMediaPublishRoute
   '/media/tags': typeof AuthenticatedMediaTagsRoute
+  '/media/templates': typeof AuthenticatedMediaTemplatesRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -413,6 +421,7 @@ export interface FileRoutesByTo {
   '/media/editor': typeof AuthenticatedMediaEditorRoute
   '/media/publish': typeof AuthenticatedMediaPublishRoute
   '/media/tags': typeof AuthenticatedMediaTagsRoute
+  '/media/templates': typeof AuthenticatedMediaTemplatesRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -466,6 +475,7 @@ export interface FileRoutesById {
   '/_authenticated/media/editor': typeof AuthenticatedMediaEditorRoute
   '/_authenticated/media/publish': typeof AuthenticatedMediaPublishRoute
   '/_authenticated/media/tags': typeof AuthenticatedMediaTagsRoute
+  '/_authenticated/media/templates': typeof AuthenticatedMediaTemplatesRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/_authenticated/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/media/editor'
     | '/media/publish'
     | '/media/tags'
+    | '/media/templates'
     | '/settings/account'
     | '/settings/ai'
     | '/settings/api-keys'
@@ -568,6 +579,7 @@ export interface FileRouteTypes {
     | '/media/editor'
     | '/media/publish'
     | '/media/tags'
+    | '/media/templates'
     | '/settings/account'
     | '/settings/ai'
     | '/settings/api-keys'
@@ -620,6 +632,7 @@ export interface FileRouteTypes {
     | '/_authenticated/media/editor'
     | '/_authenticated/media/publish'
     | '/_authenticated/media/tags'
+    | '/_authenticated/media/templates'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/ai'
     | '/_authenticated/settings/api-keys'
@@ -942,6 +955,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/media/templates': {
+      id: '/_authenticated/media/templates'
+      path: '/templates'
+      fullPath: '/media/templates'
+      preLoaderRoute: typeof AuthenticatedMediaTemplatesRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
     '/_authenticated/media/tags': {
       id: '/_authenticated/media/tags'
       path: '/tags'
@@ -1022,6 +1042,7 @@ interface AuthenticatedMediaRouteRouteChildren {
   AuthenticatedMediaEditorRoute: typeof AuthenticatedMediaEditorRoute
   AuthenticatedMediaPublishRoute: typeof AuthenticatedMediaPublishRoute
   AuthenticatedMediaTagsRoute: typeof AuthenticatedMediaTagsRoute
+  AuthenticatedMediaTemplatesRoute: typeof AuthenticatedMediaTemplatesRoute
   AuthenticatedMediaIndexRoute: typeof AuthenticatedMediaIndexRoute
 }
 
@@ -1033,6 +1054,7 @@ const AuthenticatedMediaRouteRouteChildren: AuthenticatedMediaRouteRouteChildren
     AuthenticatedMediaEditorRoute: AuthenticatedMediaEditorRoute,
     AuthenticatedMediaPublishRoute: AuthenticatedMediaPublishRoute,
     AuthenticatedMediaTagsRoute: AuthenticatedMediaTagsRoute,
+    AuthenticatedMediaTemplatesRoute: AuthenticatedMediaTemplatesRoute,
     AuthenticatedMediaIndexRoute: AuthenticatedMediaIndexRoute,
   }
 

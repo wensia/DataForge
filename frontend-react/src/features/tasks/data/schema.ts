@@ -65,6 +65,7 @@ export type TaskCreate = z.infer<typeof taskCreateSchema>
 
 /** 更新任务参数 */
 export const taskUpdateSchema = z.object({
+  name: z.string().optional(),
   description: z.string().optional(),
   task_type: taskTypeEnum.optional(),
   cron_expression: z.string().optional(),

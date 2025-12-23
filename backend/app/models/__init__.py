@@ -189,6 +189,20 @@ from app.models.yunke_company import (
     YunkeCompanyCreate,
     YunkeCompanyResponse,
 )
+from app.models.html_template import (
+    ExtractVariablesRequest,
+    HtmlTemplate,
+    HtmlTemplateCreate,
+    HtmlTemplateResponse,
+    HtmlTemplateUpdate,
+    RenderTemplateRequest,
+    RenderTemplateResponse,
+    TemplateCategory,
+    TemplateCategoryCreate,
+    TemplateCategoryResponse,
+    TemplateCategoryUpdate,
+    TemplateVariableInfo,
+)
 
 __all__ = [
     "AIProvider",
@@ -337,4 +351,16 @@ __all__ = [
     "PageWithGroup",
     "ReorderItem",
     "ReorderRequest",
+    "ExtractVariablesRequest",
+    "HtmlTemplate",
+    "HtmlTemplateCreate",
+    "HtmlTemplateResponse",
+    "HtmlTemplateUpdate",
+    "RenderTemplateRequest",
+    "RenderTemplateResponse",
+    "TemplateCategory",
+    "TemplateCategoryCreate",
+    "TemplateCategoryResponse",
+    "TemplateCategoryUpdate",
+    "TemplateVariableInfo",
 ]

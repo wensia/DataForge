@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Home,
   ImageIcon,
+  LayoutTemplate,
   PenTool,
   Send,
   Tags,
@@ -62,6 +63,11 @@ const navGroups: NavGroup[] = [
         title: '素材库',
         href: '/media/assets',
         icon: ImageIcon,
+      },
+      {
+        title: 'HTML 模板',
+        href: '/media/templates',
+        icon: LayoutTemplate,
       },
       {
         title: '发布管理',
