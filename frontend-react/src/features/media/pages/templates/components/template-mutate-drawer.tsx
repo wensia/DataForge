@@ -287,13 +287,7 @@ export function TemplateMutateDrawer({
     }
 
     try {
-      // 预处理：将中文引号转换为转义的 ASCII 引号
-      // 避免中文引号 "" 破坏 JSON 结构
-      const preprocessed = jsonImportValue
-        .replace(/"/g, '\\"') // 左中文引号
-        .replace(/"/g, '\\"') // 右中文引号
-
-      const importedValues = JSON.parse(preprocessed) as Record<string, unknown>
+      const importedValues = JSON.parse(jsonImportValue) as Record<string, unknown>
       if (typeof importedValues !== 'object' || importedValues === null || Array.isArray(importedValues)) {
         toast.error('JSON 格式错误，请输入对象格式 {...}')
         return
@@ -336,7 +330,12 @@ export function TemplateMutateDrawer({
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '未知错误'
-      toast.error(`JSON 解析失败：${message}`)
+      // 检查是否包含中文引号
+      if (jsonImportValue.includes('"') || jsonImportValue.includes('"')) {
+        toast.error('JSON 解析失败：请将中文引号 "" 替换为英文引号 "" 或转义 \\"')
+      } else {
+        toast.error(`JSON 解析失败：${message}`)
+      }
     }
   }
 
