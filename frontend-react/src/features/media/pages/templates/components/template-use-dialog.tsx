@@ -2,12 +2,20 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { Code, Copy, Download, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -181,6 +189,10 @@ export function TemplateUseDialog({
   }
 
   const variableList = template?.variables || []
+  const requiredCount = variableList.filter((v) => v.required).length
+  const sizeLabel = template
+    ? `${template.width} × ${template.height}`
+    : '尺寸未知'
 
   // 复制 HTML 到剪贴板
   const handleCopyHtml = async () => {
@@ -208,50 +220,26 @@ export function TemplateUseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='flex h-[85vh] max-w-6xl flex-col gap-0 p-0'>
-        <DialogHeader className='border-b px-6 py-4'>
-          <DialogTitle>使用模板: {template?.name}</DialogTitle>
-          <DialogDescription>填写变量值，预览并导出图片</DialogDescription>
-        </DialogHeader>
-
-        <div className='grid min-h-0 flex-1 grid-cols-[320px_1fr]'>
-          {/* 左侧: 变量表单 */}
-          <div className='flex flex-col border-r p-4'>
-            <h4 className='mb-4 font-medium'>填写变量</h4>
-            <ScrollArea className='min-h-0 flex-1'>
-              <div className='space-y-4 pr-4'>
-                {variableList.map((v) => (
-                  <div key={v.name} className='space-y-2'>
-                    <Label htmlFor={v.name}>
-                      {v.label || v.name}
-                      {v.required && (
-                        <span className='text-destructive ml-1'>*</span>
-                      )}
-                    </Label>
-                    <Input
-                      id={v.name}
-                      value={variables[v.name] || ''}
-                      onChange={(e) =>
-                        handleVariableChange(v.name, e.target.value)
-                      }
-                      placeholder={v.placeholder || `输入 ${v.label || v.name}`}
-                    />
-                  </div>
-                ))}
-
-                {variableList.length === 0 && (
-                  <p className='text-muted-foreground text-sm'>
-                    此模板没有定义变量
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-
-            <Button
-              onClick={handlePreview}
-              disabled={renderTemplate.isPending}
-              className='mt-4 w-full'
-            >
+      <DialogContent
+        showCloseButton={false}
+        className='flex h-[90vh] w-[min(96vw,1280px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-7xl'
+      >
+        <div className='flex flex-wrap items-start justify-between gap-4 border-b bg-muted/30 px-6 py-5'>
+          <DialogHeader className='gap-1 text-start'>
+            <DialogTitle>使用模板: {template?.name}</DialogTitle>
+            <DialogDescription>填写变量值，预览并导出图片</DialogDescription>
+          </DialogHeader>
+          <div className='flex flex-wrap items-center gap-2'>
+            <Badge variant='outline' className='font-mono text-xs'>
+              {sizeLabel}
+            </Badge>
+            <Badge variant={renderedHtml ? 'secondary' : 'outline'}>
+              {renderedHtml ? '已生成预览' : '待预览'}
+            </Badge>
+            <Button variant='outline' onClick={() => onOpenChange(false)}>
+              关闭
+            </Button>
+            <Button onClick={handlePreview} disabled={renderTemplate.isPending}>
               {renderTemplate.isPending ? (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
               ) : (
@@ -260,83 +248,160 @@ export function TemplateUseDialog({
               预览
             </Button>
           </div>
-
-          {/* 右侧: 预览区 */}
-          <div
-            ref={previewContainerRef}
-            className='relative flex items-center justify-center overflow-hidden bg-muted/50'
-          >
-            {renderedHtml ? (
-              <div
-                className='overflow-hidden'
-                style={{
-                  width: (template?.width || 800) * previewScale,
-                  height: (template?.height || 600) * previewScale,
-                }}
-              >
-                <iframe
-                  ref={previewFrameRef}
-                  title={`template-preview-${template?.id ?? 'preview'}`}
-                  className='block border-0 bg-white'
-                  sandbox='allow-same-origin'
-                  srcDoc={previewSrcDoc}
-                  style={{
-                    width: template?.width || 800,
-                    height: template?.height || 600,
-                    transform: `scale(${previewScale})`,
-                    transformOrigin: '0 0',
-                  }}
-                />
-              </div>
-            ) : (
-              <div className='text-muted-foreground flex items-center justify-center'>
-                点击"预览"按钮查看效果
-              </div>
-            )}
-          </div>
         </div>
 
-        <DialogFooter className='gap-2 border-t px-6 py-4'>
-          <Button variant='outline' onClick={() => onOpenChange(false)}>
-            关闭
-          </Button>
-          <Button
-            variant='outline'
-            onClick={handleCopyHtml}
-            disabled={!renderedHtml}
-          >
-            <Code className='mr-2 h-4 w-4' />
-            复制 HTML
-          </Button>
-          <Button
-            variant='outline'
-            onClick={handleDownloadHtml}
-            disabled={!renderedHtml}
-          >
-            <FileDown className='mr-2 h-4 w-4' />
-            下载 HTML
-          </Button>
-          <Button
-            variant='outline'
-            onClick={handleCopy}
-            disabled={!renderedHtml || isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-            ) : (
-              <Copy className='mr-2 h-4 w-4' />
-            )}
-            复制图片
-          </Button>
-          <Button onClick={handleDownload} disabled={!renderedHtml || isGenerating}>
-            {isGenerating ? (
-              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-            ) : (
-              <Download className='mr-2 h-4 w-4' />
-            )}
-            下载图片
-          </Button>
-        </DialogFooter>
+        <div className='grid min-h-0 flex-1 gap-6 p-6 lg:grid-cols-[360px_1fr]'>
+          <div className='flex min-h-0 flex-col gap-6'>
+            <Card className='flex min-h-0 flex-1 flex-col gap-4 py-4'>
+              <CardHeader className='px-6 pb-0'>
+                <div className='flex items-center justify-between gap-2'>
+                  <CardTitle className='text-base'>变量设置</CardTitle>
+                  {variableList.length > 0 && (
+                    <div className='flex items-center gap-2'>
+                      <Badge variant='secondary'>{variableList.length} 个</Badge>
+                      {requiredCount > 0 && (
+                        <Badge variant='outline'>必填 {requiredCount}</Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <CardDescription>填写变量值，必填项标记 *</CardDescription>
+              </CardHeader>
+              <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
+                <ScrollArea className='flex-1 pr-3'>
+                  <div className='space-y-4 pb-1'>
+                    {variableList.map((v) => (
+                      <div key={v.name} className='space-y-2'>
+                        <Label htmlFor={v.name}>
+                          {v.label || v.name}
+                          {v.required && (
+                            <span className='text-destructive ml-1'>*</span>
+                          )}
+                        </Label>
+                        <Input
+                          id={v.name}
+                          value={variables[v.name] || ''}
+                          onChange={(e) =>
+                            handleVariableChange(v.name, e.target.value)
+                          }
+                          placeholder={
+                            v.placeholder || `输入 ${v.label || v.name}`
+                          }
+                        />
+                      </div>
+                    ))}
+
+                    {variableList.length === 0 && (
+                      <p className='text-muted-foreground text-sm'>
+                        此模板没有定义变量
+                      </p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            <Card className='gap-4 py-4'>
+              <CardHeader className='px-6 pb-0'>
+                <CardTitle className='text-base'>导出与分享</CardTitle>
+                <CardDescription>渲染后即可复制或下载</CardDescription>
+              </CardHeader>
+              <CardFooter className='grid grid-cols-1 gap-2 px-6 sm:grid-cols-2'>
+                <Button
+                  variant='outline'
+                  onClick={handleCopyHtml}
+                  disabled={!renderedHtml}
+                >
+                  <Code className='mr-2 h-4 w-4' />
+                  复制 HTML
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={handleDownloadHtml}
+                  disabled={!renderedHtml}
+                >
+                  <FileDown className='mr-2 h-4 w-4' />
+                  下载 HTML
+                </Button>
+                <Button
+                  variant='outline'
+                  onClick={handleCopy}
+                  disabled={!renderedHtml || isGenerating}
+                >
+                  {isGenerating ? (
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  ) : (
+                    <Copy className='mr-2 h-4 w-4' />
+                  )}
+                  复制图片
+                </Button>
+                <Button
+                  onClick={handleDownload}
+                  disabled={!renderedHtml || isGenerating}
+                >
+                  {isGenerating ? (
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  ) : (
+                    <Download className='mr-2 h-4 w-4' />
+                  )}
+                  下载图片
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+
+          <Card className='flex min-h-0 flex-col gap-4 py-4'>
+            <CardHeader className='flex items-center justify-between gap-2 px-6 pb-0'>
+              <div>
+                <CardTitle className='text-base'>实时预览</CardTitle>
+                <CardDescription>尺寸保持原始比例，自动适配容器</CardDescription>
+              </div>
+              <Badge variant='outline' className='font-mono text-xs'>
+                {renderedHtml ? `${Math.round(previewScale * 100)}%` : '--'}
+              </Badge>
+            </CardHeader>
+            <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
+              <div
+                ref={previewContainerRef}
+                className='relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border bg-muted/50 p-4'
+              >
+                {renderedHtml ? (
+                  <div
+                    className='overflow-hidden'
+                    style={{
+                      width: (template?.width || 800) * previewScale,
+                      height: (template?.height || 600) * previewScale,
+                    }}
+                  >
+                    <iframe
+                      ref={previewFrameRef}
+                      title={`template-preview-${template?.id ?? 'preview'}`}
+                      className='block border-0 bg-white'
+                      sandbox='allow-same-origin'
+                      srcDoc={previewSrcDoc}
+                      style={{
+                        width: template?.width || 800,
+                        height: template?.height || 600,
+                        transform: `scale(${previewScale})`,
+                        transformOrigin: '0 0',
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className='text-muted-foreground flex items-center justify-center'>
+                    点击“预览”按钮查看效果
+                  </div>
+                )}
+              </div>
+              <div className='text-muted-foreground mt-3 flex items-center justify-between text-xs'>
+                <span>原始尺寸：{sizeLabel}</span>
+                <span>
+                  缩放：{renderedHtml ? `${Math.round(previewScale * 100)}%` : '--'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </DialogContent>
     </Dialog>
   )
