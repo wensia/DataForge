@@ -41,7 +41,7 @@ export function HtmlTemplatesPage() {
     null
   )
 
-  const { isAdmin } = useAuthStore()
+  const { auth } = useAuthStore()
 
   // 根据 Tab 切换查询参数
   const queryParams =
@@ -113,7 +113,7 @@ export function HtmlTemplatesPage() {
             刷新
           </Button>
           {/* 只有在"我的模板"或管理员在"模板库"时才显示创建按钮 */}
-          {(activeTab === 'mine' || isAdmin()) && (
+          {(activeTab === 'mine' || auth.isAdmin()) && (
             <Button
               size='sm'
               onClick={() => {
@@ -190,7 +190,7 @@ export function HtmlTemplatesPage() {
               </h3>
               <p className='text-muted-foreground mt-1 text-sm'>
                 {activeTab === 'library'
-                  ? isAdmin()
+                  ? auth.isAdmin()
                     ? '点击"创建系统模板"按钮添加第一个系统模板'
                     : '系统模板由管理员创建'
                   : '从模板库复制模板，或点击"创建模板"按钮创建新模板'}
@@ -203,7 +203,7 @@ export function HtmlTemplatesPage() {
                   key={template.id}
                   template={template}
                   isLibrary={activeTab === 'library'}
-                  isAdmin={isAdmin()}
+                  isAdmin={auth.isAdmin()}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onUse={handleUse}
