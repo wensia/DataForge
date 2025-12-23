@@ -1,6 +1,21 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import html2canvas from 'html2canvas'
-import { Code, Copy, Download, FileDown, Loader2, RefreshCw } from 'lucide-react'
+import {
+  Code,
+  Copy,
+  Download,
+  FileDown,
+  Loader2,
+  Maximize2,
+  RefreshCw,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +37,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Slider } from '@/components/ui/slider'
 import { useRenderTemplate } from '../api'
 import { buildTemplateSrcDoc } from '../utils/template-preview'
 import type { HtmlTemplate } from '../data/schema'
@@ -44,6 +60,8 @@ export function TemplateUseDialog({
   const [renderedCss, setRenderedCss] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [previewScale, setPreviewScale] = useState(0.1)
+  const [autoFitScale, setAutoFitScale] = useState(0.1)
+  const [isManualScale, setIsManualScale] = useState(false)
 
   const renderTemplate = useRenderTemplate()
 
@@ -60,9 +78,10 @@ export function TemplateUseDialog({
     }
     setRenderedHtml('')
     setRenderedCss(null)
+    setIsManualScale(false)
   }, [template])
 
-  // 计算预览缩放比例
+  // 计算自适应缩放比例
   useLayoutEffect(() => {
     const container = previewContainerRef.current
     if (!container || !template || !open) return
@@ -73,7 +92,11 @@ export function TemplateUseDialog({
       if (containerWidth === 0 || containerHeight === 0) return
       const scaleX = containerWidth / template.width
       const scaleY = containerHeight / template.height
-      setPreviewScale(Math.min(scaleX, scaleY) * 0.95)
+      const fitScale = Math.min(scaleX, scaleY) * 0.95
+      setAutoFitScale(fitScale)
+      if (!isManualScale) {
+        setPreviewScale(fitScale)
+      }
     }
 
     // 延迟计算，确保容器已完全渲染
@@ -83,7 +106,19 @@ export function TemplateUseDialog({
     resizeObserver.observe(container)
 
     return () => resizeObserver.disconnect()
-  }, [template, open])
+  }, [template, open, isManualScale])
+
+  // 重置为自适应缩放
+  const handleResetScale = useCallback(() => {
+    setIsManualScale(false)
+    setPreviewScale(autoFitScale)
+  }, [autoFitScale])
+
+  // 手动调节缩放
+  const handleScaleChange = useCallback((value: number[]) => {
+    setIsManualScale(true)
+    setPreviewScale(value[0])
+  }, [])
 
   const handleVariableChange = (name: string, value: string) => {
     setVariables((prev) => ({ ...prev, [name]: value }))
@@ -306,11 +341,8 @@ export function TemplateUseDialog({
             <CardHeader className='flex items-center justify-between gap-2 px-6 pb-0'>
               <div>
                 <CardTitle className='text-base'>实时预览</CardTitle>
-                <CardDescription>尺寸保持原始比例，自动适配容器</CardDescription>
+                <CardDescription>原始尺寸：{sizeLabel}</CardDescription>
               </div>
-              <Badge variant='outline' className='font-mono text-xs'>
-                {renderedHtml ? `${Math.round(previewScale * 100)}%` : '--'}
-              </Badge>
             </CardHeader>
             <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
               <div
@@ -345,11 +377,30 @@ export function TemplateUseDialog({
                   </div>
                 )}
               </div>
-              <div className='text-muted-foreground mt-3 flex items-center justify-between text-xs'>
-                <span>原始尺寸：{sizeLabel}</span>
-                <span>
-                  缩放：{renderedHtml ? `${Math.round(previewScale * 100)}%` : '--'}
+              {/* 缩放控制栏 */}
+              <div className='mt-3 flex items-center gap-3'>
+                <span className='text-muted-foreground w-12 shrink-0 text-xs'>
+                  {Math.round(previewScale * 100)}%
                 </span>
+                <Slider
+                  value={[previewScale]}
+                  onValueChange={handleScaleChange}
+                  min={0.1}
+                  max={1}
+                  step={0.01}
+                  className='flex-1'
+                  disabled={!renderedHtml}
+                />
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='h-7 w-7 shrink-0'
+                  onClick={handleResetScale}
+                  disabled={!renderedHtml || !isManualScale}
+                  title='重置为自适应'
+                >
+                  <Maximize2 className='h-4 w-4' />
+                </Button>
               </div>
             </CardContent>
           </Card>
