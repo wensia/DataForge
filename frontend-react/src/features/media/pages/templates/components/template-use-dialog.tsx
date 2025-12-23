@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
-import { Copy, Download, Loader2, RefreshCw } from 'lucide-react'
+import { Code, Copy, Download, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -157,6 +157,30 @@ export function TemplateUseDialog({
 
   const variableList = template?.variables || []
 
+  // 复制 HTML 到剪贴板
+  const handleCopyHtml = async () => {
+    if (!previewSrcDoc) return
+    try {
+      await navigator.clipboard.writeText(previewSrcDoc)
+      toast.success('HTML 已复制到剪贴板')
+    } catch {
+      toast.error('复制失败')
+    }
+  }
+
+  // 下载 HTML 文件
+  const handleDownloadHtml = () => {
+    if (!previewSrcDoc || !template) return
+    const blob = new Blob([previewSrcDoc], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${template.name}-${Date.now()}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('HTML 文件下载成功')
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='max-h-[90vh] max-w-4xl'>
@@ -245,9 +269,25 @@ export function TemplateUseDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className='flex-wrap gap-2'>
           <Button variant='outline' onClick={() => onOpenChange(false)}>
             关闭
+          </Button>
+          <Button
+            variant='outline'
+            onClick={handleCopyHtml}
+            disabled={!renderedHtml}
+          >
+            <Code className='mr-2 h-4 w-4' />
+            复制 HTML
+          </Button>
+          <Button
+            variant='outline'
+            onClick={handleDownloadHtml}
+            disabled={!renderedHtml}
+          >
+            <FileDown className='mr-2 h-4 w-4' />
+            下载 HTML
           </Button>
           <Button
             variant='outline'
