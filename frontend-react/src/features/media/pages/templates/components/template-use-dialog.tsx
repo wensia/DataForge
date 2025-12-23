@@ -208,17 +208,54 @@ export function TemplateUseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[90vh] max-w-5xl'>
+      <DialogContent className='max-h-[90vh] max-w-6xl'>
         <DialogHeader>
           <DialogTitle>使用模板: {template?.name}</DialogTitle>
           <DialogDescription>填写变量值，预览并导出图片</DialogDescription>
         </DialogHeader>
 
-        <div className='grid grid-cols-2 gap-6'>
-          {/* 左侧: 变量表单 */}
+        <div className='grid grid-cols-[1fr_400px] gap-6'>
+          {/* 左侧: 预览区 */}
           <div className='space-y-4'>
+            <h4 className='font-medium'>预览</h4>
+            <div
+              ref={previewContainerRef}
+              className='relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
+            >
+              {renderedHtml ? (
+                <div
+                  className='overflow-hidden'
+                  style={{
+                    width: (template?.width || 800) * previewScale,
+                    height: (template?.height || 600) * previewScale,
+                  }}
+                >
+                  <iframe
+                    ref={previewFrameRef}
+                    title={`template-preview-${template?.id ?? 'preview'}`}
+                    className='block border-0 bg-white'
+                    sandbox='allow-same-origin'
+                    srcDoc={previewSrcDoc}
+                    style={{
+                      width: template?.width || 800,
+                      height: template?.height || 600,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: '0 0',
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className='text-muted-foreground flex items-center justify-center'>
+                  点击"预览"按钮查看效果
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 右侧: 变量表单 */}
+          <div className='flex flex-col space-y-4'>
             <h4 className='font-medium'>填写变量</h4>
-            <ScrollArea className='h-[520px] pr-4'>
+            <ScrollArea className='flex-1 pr-4'>
               <div className='space-y-4'>
                 {variableList.map((v) => (
                   <div key={v.name} className='space-y-2'>
@@ -260,47 +297,9 @@ export function TemplateUseDialog({
               预览
             </Button>
           </div>
-
-          {/* 右侧: 预览区 */}
-          <div className='space-y-4'>
-            <h4 className='font-medium'>预览</h4>
-            <div
-              ref={previewContainerRef}
-              className='relative flex items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
-              style={{ height: '520px' }}
-            >
-              {renderedHtml ? (
-                <div
-                  className='overflow-hidden'
-                  style={{
-                    width: (template?.width || 800) * previewScale,
-                    height: (template?.height || 600) * previewScale,
-                  }}
-                >
-                  <iframe
-                    ref={previewFrameRef}
-                    title={`template-preview-${template?.id ?? 'preview'}`}
-                    className='block border-0 bg-white'
-                    sandbox='allow-same-origin'
-                    srcDoc={previewSrcDoc}
-                    style={{
-                      width: template?.width || 800,
-                      height: template?.height || 600,
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: '0 0',
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className='text-muted-foreground flex items-center justify-center'>
-                  点击"预览"按钮查看效果
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
-        <DialogFooter className='flex-wrap gap-2'>
+        <DialogFooter className='gap-2'>
           <Button variant='outline' onClick={() => onOpenChange(false)}>
             关闭
           </Button>
