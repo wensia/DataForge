@@ -1,3 +1,4 @@
+import { useRef, useState, useLayoutEffect } from 'react'
 import { Edit, Eye, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,9 @@ export function TemplateCard({
   onDelete,
   onUse,
 }: TemplateCardProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(0.1)
+
   // 使用变量默认值替换后构建预览
   const htmlWithDefaults = replaceVariablesWithDefaults(
     template.html_content,
@@ -34,10 +38,34 @@ export function TemplateCard({
   )
   const previewSrcDoc = buildTemplateSrcDoc(htmlWithDefaults, template.css_content)
 
+  // 计算缩放比例
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const updateScale = () => {
+      const containerWidth = container.clientWidth
+      const containerHeight = container.clientHeight
+      const scaleX = (containerWidth * 0.95) / template.width
+      const scaleY = (containerHeight * 0.95) / template.height
+      setScale(Math.min(scaleX, scaleY))
+    }
+
+    updateScale()
+
+    const resizeObserver = new ResizeObserver(updateScale)
+    resizeObserver.observe(container)
+
+    return () => resizeObserver.disconnect()
+  }, [template.width, template.height])
+
   return (
     <Card className='group relative overflow-hidden'>
       {/* 缩略图预览区 */}
-      <div className='relative aspect-[4/3] overflow-hidden bg-muted' style={{ containerType: 'size' }}>
+      <div
+        ref={containerRef}
+        className='relative aspect-[4/3] overflow-hidden bg-muted'
+      >
         {template.thumbnail ? (
           <img
             src={template.thumbnail}
@@ -45,13 +73,13 @@ export function TemplateCard({
             className='h-full w-full object-cover'
           />
         ) : (
-          <div className='flex h-full w-full items-center justify-center overflow-hidden p-2'>
+          <div className='flex h-full w-full items-center justify-center overflow-hidden'>
             <div
               className='origin-center'
               style={{
                 width: template.width,
                 height: template.height,
-                transform: `scale(min(calc(95cqw / ${template.width}), calc(95cqh / ${template.height})))`,
+                transform: `scale(${scale})`,
               }}
             >
               <iframe
