@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { Code, Copy, Download, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,10 +30,12 @@ export function TemplateUseDialog({
   template,
 }: TemplateUseDialogProps) {
   const previewFrameRef = useRef<HTMLIFrameElement>(null)
+  const previewContainerRef = useRef<HTMLDivElement>(null)
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [renderedHtml, setRenderedHtml] = useState<string>('')
   const [renderedCss, setRenderedCss] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [previewScale, setPreviewScale] = useState(0.1)
 
   const renderTemplate = useRenderTemplate()
 
@@ -50,6 +52,27 @@ export function TemplateUseDialog({
     }
     setRenderedHtml('')
     setRenderedCss(null)
+  }, [template])
+
+  // 计算预览缩放比例
+  useLayoutEffect(() => {
+    const container = previewContainerRef.current
+    if (!container || !template) return
+
+    const updateScale = () => {
+      const containerWidth = container.clientWidth
+      const containerHeight = container.clientHeight
+      const scaleX = (containerWidth * 0.95) / template.width
+      const scaleY = (containerHeight * 0.95) / template.height
+      setPreviewScale(Math.min(scaleX, scaleY))
+    }
+
+    updateScale()
+
+    const resizeObserver = new ResizeObserver(updateScale)
+    resizeObserver.observe(container)
+
+    return () => resizeObserver.disconnect()
   }, [template])
 
   const handleVariableChange = (name: string, value: string) => {
@@ -240,24 +263,30 @@ export function TemplateUseDialog({
           <div className='space-y-4'>
             <h4 className='font-medium'>预览</h4>
             <div
+              ref={previewContainerRef}
               className='relative flex items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
-              style={{ height: '400px', containerType: 'size' }}
+              style={{ height: '400px' }}
             >
               {renderedHtml ? (
                 <div
-                  className='origin-center'
+                  className='overflow-hidden'
                   style={{
-                    width: template?.width || 800,
-                    height: template?.height || 600,
-                    transform: `scale(min(calc(95cqw / ${template?.width || 800}), calc(95cqh / ${template?.height || 600})))`,
+                    width: (template?.width || 800) * previewScale,
+                    height: (template?.height || 600) * previewScale,
                   }}
                 >
                   <iframe
                     ref={previewFrameRef}
                     title={`template-preview-${template?.id ?? 'preview'}`}
-                    className='block h-full w-full border-0 bg-white'
+                    className='block border-0 bg-white'
                     sandbox='allow-same-origin'
                     srcDoc={previewSrcDoc}
+                    style={{
+                      width: template?.width || 800,
+                      height: template?.height || 600,
+                      transform: `scale(${previewScale})`,
+                      transformOrigin: '0 0',
+                    }}
                   />
                 </div>
               ) : (
