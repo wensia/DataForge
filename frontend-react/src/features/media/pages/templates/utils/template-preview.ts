@@ -1,3 +1,25 @@
+import type { TemplateVariable } from '../data/schema'
+
+/**
+ * 使用变量默认值替换 HTML 中的 {{变量名}} 占位符
+ */
+export function replaceVariablesWithDefaults(
+  html: string,
+  variables: TemplateVariable[] | null
+): string {
+  if (!variables || variables.length === 0) {
+    return html
+  }
+
+  let result = html
+  for (const variable of variables) {
+    const placeholder = `{{${variable.name}}}`
+    const value = variable.default_value || ''
+    result = result.split(placeholder).join(value)
+  }
+  return result
+}
+
 const BASE_STYLES = `
   html,
   body {

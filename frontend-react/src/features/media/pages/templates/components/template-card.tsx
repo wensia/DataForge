@@ -8,7 +8,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { buildTemplateSrcDoc } from '../utils/template-preview'
+import {
+  buildTemplateSrcDoc,
+  replaceVariablesWithDefaults,
+} from '../utils/template-preview'
 import type { HtmlTemplate } from '../data/schema'
 
 interface TemplateCardProps {
@@ -24,10 +27,12 @@ export function TemplateCard({
   onDelete,
   onUse,
 }: TemplateCardProps) {
-  const previewSrcDoc = buildTemplateSrcDoc(
+  // 使用变量默认值替换后构建预览
+  const htmlWithDefaults = replaceVariablesWithDefaults(
     template.html_content,
-    template.css_content
+    template.variables
   )
+  const previewSrcDoc = buildTemplateSrcDoc(htmlWithDefaults, template.css_content)
 
   return (
     <Card className='group relative overflow-hidden'>
