@@ -69,23 +69,23 @@ export function TemplateCard({
   }, [template.width, template.height])
 
   return (
-    <Card className='group relative overflow-hidden'>
+    <Card className='group relative overflow-hidden transition-shadow hover:shadow-lg'>
       {/* 缩略图预览区 */}
       <div
         ref={containerRef}
-        className='relative aspect-[4/3] overflow-hidden bg-muted'
+        className='relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800'
       >
         {template.thumbnail ? (
           <img
             src={template.thumbnail}
             alt={template.name}
-            className='h-full w-full object-cover'
+            className='h-full w-full object-cover transition-transform duration-300 group-hover:scale-105'
           />
         ) : (
           <div className='absolute inset-0 flex items-center justify-center overflow-hidden'>
             {/* 缩放后的容器 */}
             <div
-              className='overflow-hidden'
+              className='overflow-hidden rounded shadow-sm'
               style={{
                 width: template.width * scale,
                 height: template.height * scale,
@@ -108,51 +108,62 @@ export function TemplateCard({
           </div>
         )}
 
+        {/* 尺寸标签 */}
+        <div className='absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100'>
+          {template.width} × {template.height}
+        </div>
+
         {/* 悬浮操作按钮 */}
-        <div className='absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100'>
+        <div className='absolute inset-0 flex items-center justify-center gap-2 bg-black/60 opacity-0 backdrop-blur-sm transition-all duration-200 group-hover:opacity-100'>
           {isLibrary ? (
-            // 模板库：显示复制按钮
             <Button
               size='sm'
-              variant='secondary'
               onClick={() => onCopy?.(template)}
               disabled={isCopying}
+              className='shadow-lg'
             >
-              <Copy className='mr-1 h-4 w-4' />
+              <Copy className='mr-1.5 h-4 w-4' />
               {isCopying ? '复制中...' : '复制到我的模板'}
             </Button>
           ) : (
-            // 我的模板：显示使用按钮
-            <Button size='sm' variant='secondary' onClick={() => onUse(template)}>
-              <Eye className='mr-1 h-4 w-4' />
-              使用
+            <Button size='sm' onClick={() => onUse(template)} className='shadow-lg'>
+              <Eye className='mr-1.5 h-4 w-4' />
+              使用模板
             </Button>
           )}
         </div>
       </div>
 
-      <CardContent className='p-4'>
-        <div className='flex items-start justify-between'>
-          <div className='min-w-0 flex-1 space-y-1'>
-            <h3 className='truncate font-medium leading-none'>
+      {/* 内容区域 */}
+      <CardContent className='p-3'>
+        <div className='flex items-start gap-2'>
+          <div className='min-w-0 flex-1'>
+            <h3 className='truncate text-sm font-semibold leading-tight'>
               {template.name}
             </h3>
-            {template.description && (
-              <p className='text-muted-foreground line-clamp-2 text-sm'>
+            {template.description ? (
+              <p className='text-muted-foreground mt-1 line-clamp-1 text-xs'>
                 {template.description}
+              </p>
+            ) : (
+              <p className='text-muted-foreground/50 mt-1 text-xs italic'>
+                暂无描述
               </p>
             )}
           </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant='ghost' size='icon' className='h-8 w-8 shrink-0'>
+              <Button
+                variant='ghost'
+                size='icon'
+                className='h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100'
+              >
                 <MoreHorizontal className='h-4 w-4' />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
               {isLibrary ? (
-                // 模板库菜单
                 <>
                   <DropdownMenuItem
                     onClick={() => onCopy?.(template)}
@@ -179,7 +190,6 @@ export function TemplateCard({
                   )}
                 </>
               ) : (
-                // 我的模板菜单
                 <>
                   <DropdownMenuItem onClick={() => onUse(template)}>
                     <Eye className='mr-2 h-4 w-4' />
@@ -204,20 +214,27 @@ export function TemplateCard({
         </div>
       </CardContent>
 
-      <CardFooter className='flex items-center justify-between border-t px-4 py-2'>
-        <div className='flex items-center gap-2'>
+      {/* 底部信息 */}
+      <CardFooter className='flex items-center justify-between border-t px-3 py-2'>
+        <div className='flex items-center gap-1.5'>
           {template.is_system && (
-            <Badge variant='default' className='bg-blue-500'>
+            <Badge variant='secondary' className='h-5 px-1.5 text-[10px] font-medium'>
               系统
             </Badge>
           )}
           {template.category_name && (
-            <Badge variant='outline'>{template.category_name}</Badge>
+            <Badge variant='outline' className='h-5 px-1.5 text-[10px]'>
+              {template.category_name}
+            </Badge>
           )}
-          {!template.is_active && <Badge variant='secondary'>已禁用</Badge>}
+          {!template.is_active && (
+            <Badge variant='destructive' className='h-5 px-1.5 text-[10px]'>
+              已禁用
+            </Badge>
+          )}
         </div>
-        <span className='text-muted-foreground text-xs'>
-          使用 {template.use_count} 次
+        <span className='text-muted-foreground text-[10px]'>
+          {template.use_count} 次使用
         </span>
       </CardFooter>
     </Card>
