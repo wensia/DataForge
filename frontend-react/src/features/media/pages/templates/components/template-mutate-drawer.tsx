@@ -158,7 +158,7 @@ export function TemplateMutateDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='flex flex-col px-8 sm:max-w-2xl'>
+      <SheetContent className='flex flex-col sm:max-w-2xl'>
         <SheetHeader className='text-start'>
           <SheetTitle>{isUpdate ? '编辑模板' : '创建模板'}</SheetTitle>
           <SheetDescription>
@@ -172,7 +172,7 @@ export function TemplateMutateDrawer({
           <form
             id='template-form'
             onSubmit={form.handleSubmit(onSubmit)}
-            className='flex min-h-0 flex-1 flex-col'
+            className='flex min-h-0 flex-1 flex-col px-6'
           >
             <Tabs defaultValue='basic' className='flex min-h-0 flex-1 flex-col'>
               <TabsList className='mb-4 grid w-full grid-cols-2'>
