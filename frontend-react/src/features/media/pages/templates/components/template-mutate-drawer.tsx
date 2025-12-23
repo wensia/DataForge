@@ -287,9 +287,9 @@ export function TemplateMutateDrawer({
     }
 
     try {
-      const importedValues = JSON.parse(jsonImportValue) as Record<string, string>
-      if (typeof importedValues !== 'object' || importedValues === null) {
-        toast.error('JSON 格式错误，请输入对象格式')
+      const importedValues = JSON.parse(jsonImportValue) as Record<string, unknown>
+      if (typeof importedValues !== 'object' || importedValues === null || Array.isArray(importedValues)) {
+        toast.error('JSON 格式错误，请输入对象格式 {...}')
         return
       }
 
@@ -328,8 +328,9 @@ export function TemplateMutateDrawer({
       } else {
         toast.info('没有匹配的变量需要更新')
       }
-    } catch {
-      toast.error('JSON 解析失败，请检查格式')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      toast.error(`JSON 解析失败：${message}`)
     }
   }
 
