@@ -67,6 +67,7 @@ export function TemplateMutateDrawer({
 }: TemplateMutateDrawerProps) {
   const isUpdate = !!template
   const [extractedVars, setExtractedVars] = useState<TemplateVariable[]>([])
+  const [jsonImportValue, setJsonImportValue] = useState('')
 
   const { data: categories = [] } = useTemplateCategories()
   const createTemplate = useCreateTemplate()
@@ -106,6 +107,7 @@ export function TemplateMutateDrawer({
         } else {
           setExtractedVars([])
         }
+        setJsonImportValue('')
       } else {
         form.reset({
           name: '',
@@ -118,6 +120,7 @@ export function TemplateMutateDrawer({
           is_active: true,
         })
         setExtractedVars([])
+        setJsonImportValue('')
       }
     }
   }, [open, template, form])
@@ -161,6 +164,60 @@ export function TemplateMutateDrawer({
     )
   }
 
+  // 从 JSON 导入变量默认值
+  const handleImportJson = () => {
+    if (!jsonImportValue.trim()) {
+      toast.error('请先输入 JSON 内容')
+      return
+    }
+
+    try {
+      const importedValues = JSON.parse(jsonImportValue) as Record<string, string>
+      if (typeof importedValues !== 'object' || importedValues === null) {
+        toast.error('JSON 格式错误，请输入对象格式')
+        return
+      }
+
+      // 更新已有变量的默认值
+      let updatedCount = 0
+      const newVars = extractedVars.map((v) => {
+        if (v.name in importedValues) {
+          updatedCount++
+          return { ...v, default_value: String(importedValues[v.name]) }
+        }
+        return v
+      })
+
+      // 检查是否有新变量需要添加
+      const existingNames = new Set(extractedVars.map((v) => v.name))
+      const newVariables: TemplateVariable[] = []
+      for (const [name, value] of Object.entries(importedValues)) {
+        if (!existingNames.has(name)) {
+          newVariables.push({
+            name,
+            label: name,
+            default_value: String(value),
+            placeholder: null,
+            required: true,
+          })
+        }
+      }
+
+      setExtractedVars([...newVars, ...newVariables])
+
+      if (updatedCount > 0 || newVariables.length > 0) {
+        toast.success(
+          `导入成功：更新 ${updatedCount} 个变量${newVariables.length > 0 ? `，新增 ${newVariables.length} 个变量` : ''}`
+        )
+        setJsonImportValue('')
+      } else {
+        toast.info('没有匹配的变量需要更新')
+      }
+    } catch {
+      toast.error('JSON 解析失败，请检查格式')
+    }
+  }
+
   const onSubmit = async (data: FormValues) => {
     try {
       // 包含变量详情的提交数据
@@ -201,9 +258,17 @@ export function TemplateMutateDrawer({
             className='flex min-h-0 flex-1 flex-col px-6'
           >
             <Tabs defaultValue='basic' className='flex min-h-0 flex-1 flex-col'>
-              <TabsList className='mb-4 grid w-full grid-cols-2'>
+              <TabsList className='mb-4 grid w-full grid-cols-3'>
                 <TabsTrigger value='basic'>基本信息</TabsTrigger>
                 <TabsTrigger value='code'>代码编辑</TabsTrigger>
+                <TabsTrigger value='variables'>
+                  变量设置
+                  {extractedVars.length > 0 && (
+                    <span className='ml-1 rounded-full bg-primary/10 px-1.5 text-xs'>
+                      {extractedVars.length}
+                    </span>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent
@@ -394,16 +459,72 @@ export function TemplateMutateDrawer({
                           使用 {'{{变量名}}'} 格式定义变量，如: {'{{title}}'},{' '}
                           {'{{content}}'}
                         </p>
+                        {extractedVars.length > 0 && (
+                          <p className='text-muted-foreground text-sm'>
+                            已提取 {extractedVars.length} 个变量，前往「变量设置」Tab 编辑默认值
+                          </p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  {/* 变量编辑区域 */}
-                  {extractedVars.length > 0 && (
+                  {/* CSS 样式 */}
+                  <FormField
+                    control={form.control}
+                    name='css_content'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CSS 样式（可选）</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder='输入自定义 CSS 样式'
+                            className='min-h-[120px] font-mono text-sm'
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              {/* 变量设置 Tab */}
+              <TabsContent
+                value='variables'
+                className='mt-0 min-h-0 flex-1 overflow-y-auto px-1'
+              >
+                <div className='space-y-4 pb-4'>
+                  {/* JSON 导入 */}
+                  <div className='space-y-2'>
+                    <div className='flex items-center justify-between'>
+                      <Label className='text-sm font-medium'>JSON 导入默认值</Label>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={handleImportJson}
+                      >
+                        导入
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={jsonImportValue}
+                      onChange={(e) => setJsonImportValue(e.target.value)}
+                      placeholder='粘贴 JSON 格式的变量值，如: {"title": "示例标题", "content": "示例内容"}'
+                      className='min-h-[100px] font-mono text-sm'
+                    />
+                    <p className='text-muted-foreground text-xs'>
+                      导入后会自动更新对应变量的默认值
+                    </p>
+                  </div>
+
+                  {/* 变量列表 */}
+                  {extractedVars.length > 0 ? (
                     <div className='space-y-3'>
                       <Label className='text-sm font-medium'>
-                        已提取变量 ({extractedVars.length})
+                        变量列表 ({extractedVars.length})
                       </Label>
                       <div className='space-y-3'>
                         {extractedVars.map((variable, index) => (
@@ -424,7 +545,9 @@ export function TemplateMutateDrawer({
                                 <Input
                                   value={variable.label || ''}
                                   onChange={(e) =>
-                                    updateVariable(index, { label: e.target.value || null })
+                                    updateVariable(index, {
+                                      label: e.target.value || null,
+                                    })
                                   }
                                   placeholder={variable.name}
                                   className='h-8 text-sm'
@@ -450,26 +573,13 @@ export function TemplateMutateDrawer({
                         ))}
                       </div>
                     </div>
+                  ) : (
+                    <div className='flex flex-col items-center justify-center py-8 text-center'>
+                      <p className='text-muted-foreground text-sm'>
+                        暂无变量，请先在「代码编辑」Tab 中输入 HTML 内容并点击「提取变量」
+                      </p>
+                    </div>
                   )}
-
-                  {/* CSS 样式 */}
-                  <FormField
-                    control={form.control}
-                    name='css_content'
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CSS 样式（可选）</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            placeholder='输入自定义 CSS 样式'
-                            className='min-h-[120px] font-mono text-sm'
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
               </TabsContent>
             </Tabs>
