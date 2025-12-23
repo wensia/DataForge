@@ -216,26 +216,28 @@ export function TemplateUseDialog({
           <div className='space-y-4'>
             <h4 className='font-medium'>预览</h4>
             <div
-              className='overflow-auto rounded-lg border bg-muted/50 p-2'
-              style={{ maxHeight: '400px' }}
+              className='relative flex items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
+              style={{ height: '400px', containerType: 'size' }}
             >
               {renderedHtml ? (
-                <iframe
-                  ref={previewFrameRef}
-                  title={`template-preview-${template?.id ?? 'preview'}`}
-                  className='block border-0 bg-white'
-                  sandbox='allow-same-origin'
-                  srcDoc={previewSrcDoc}
+                <div
+                  className='origin-center'
                   style={{
                     width: template?.width || 800,
                     height: template?.height || 600,
+                    transform: `scale(min(calc(95cqw / ${template?.width || 800}), calc(95cqh / ${template?.height || 600})))`,
                   }}
-                />
-              ) : (
-                <div
-                  className='text-muted-foreground flex items-center justify-center'
-                  style={{ height: 300 }}
                 >
+                  <iframe
+                    ref={previewFrameRef}
+                    title={`template-preview-${template?.id ?? 'preview'}`}
+                    className='block h-full w-full border-0 bg-white'
+                    sandbox='allow-same-origin'
+                    srcDoc={previewSrcDoc}
+                  />
+                </div>
+              ) : (
+                <div className='text-muted-foreground flex items-center justify-center'>
                   点击"预览"按钮查看效果
                 </div>
               )}
