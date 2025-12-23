@@ -208,55 +208,18 @@ export function TemplateUseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[90vh] max-w-6xl'>
-        <DialogHeader>
+      <DialogContent className='flex h-[85vh] max-w-6xl flex-col gap-0 p-0'>
+        <DialogHeader className='border-b px-6 py-4'>
           <DialogTitle>使用模板: {template?.name}</DialogTitle>
           <DialogDescription>填写变量值，预览并导出图片</DialogDescription>
         </DialogHeader>
 
-        <div className='grid grid-cols-[1fr_400px] gap-6'>
-          {/* 左侧: 预览区 */}
-          <div className='space-y-4'>
-            <h4 className='font-medium'>预览</h4>
-            <div
-              ref={previewContainerRef}
-              className='relative flex aspect-square items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
-            >
-              {renderedHtml ? (
-                <div
-                  className='overflow-hidden'
-                  style={{
-                    width: (template?.width || 800) * previewScale,
-                    height: (template?.height || 600) * previewScale,
-                  }}
-                >
-                  <iframe
-                    ref={previewFrameRef}
-                    title={`template-preview-${template?.id ?? 'preview'}`}
-                    className='block border-0 bg-white'
-                    sandbox='allow-same-origin'
-                    srcDoc={previewSrcDoc}
-                    style={{
-                      width: template?.width || 800,
-                      height: template?.height || 600,
-                      transform: `scale(${previewScale})`,
-                      transformOrigin: '0 0',
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className='text-muted-foreground flex items-center justify-center'>
-                  点击"预览"按钮查看效果
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 右侧: 变量表单 */}
-          <div className='flex flex-col space-y-4'>
-            <h4 className='font-medium'>填写变量</h4>
-            <ScrollArea className='flex-1 pr-4'>
-              <div className='space-y-4'>
+        <div className='grid min-h-0 flex-1 grid-cols-[320px_1fr]'>
+          {/* 左侧: 变量表单 */}
+          <div className='flex flex-col border-r p-4'>
+            <h4 className='mb-4 font-medium'>填写变量</h4>
+            <ScrollArea className='min-h-0 flex-1'>
+              <div className='space-y-4 pr-4'>
                 {variableList.map((v) => (
                   <div key={v.name} className='space-y-2'>
                     <Label htmlFor={v.name}>
@@ -287,7 +250,7 @@ export function TemplateUseDialog({
             <Button
               onClick={handlePreview}
               disabled={renderTemplate.isPending}
-              className='w-full'
+              className='mt-4 w-full'
             >
               {renderTemplate.isPending ? (
                 <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -297,9 +260,43 @@ export function TemplateUseDialog({
               预览
             </Button>
           </div>
+
+          {/* 右侧: 预览区 */}
+          <div
+            ref={previewContainerRef}
+            className='relative flex items-center justify-center overflow-hidden bg-muted/50'
+          >
+            {renderedHtml ? (
+              <div
+                className='overflow-hidden'
+                style={{
+                  width: (template?.width || 800) * previewScale,
+                  height: (template?.height || 600) * previewScale,
+                }}
+              >
+                <iframe
+                  ref={previewFrameRef}
+                  title={`template-preview-${template?.id ?? 'preview'}`}
+                  className='block border-0 bg-white'
+                  sandbox='allow-same-origin'
+                  srcDoc={previewSrcDoc}
+                  style={{
+                    width: template?.width || 800,
+                    height: template?.height || 600,
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: '0 0',
+                  }}
+                />
+              </div>
+            ) : (
+              <div className='text-muted-foreground flex items-center justify-center'>
+                点击"预览"按钮查看效果
+              </div>
+            )}
+          </div>
         </div>
 
-        <DialogFooter className='gap-2'>
+        <DialogFooter className='gap-2 border-t px-6 py-4'>
           <Button variant='outline' onClick={() => onOpenChange(false)}>
             关闭
           </Button>
