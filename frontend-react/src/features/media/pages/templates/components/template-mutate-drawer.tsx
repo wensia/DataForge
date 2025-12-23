@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -38,7 +39,7 @@ import {
   useTemplateCategories,
   useUpdateTemplate,
 } from '../api'
-import type { HtmlTemplate } from '../data/schema'
+import type { HtmlTemplate, TemplateVariable } from '../data/schema'
 
 const formSchema = z.object({
   name: z.string().min(1, '名称不能为空').max(100),
@@ -65,7 +66,7 @@ export function TemplateMutateDrawer({
   template,
 }: TemplateMutateDrawerProps) {
   const isUpdate = !!template
-  const [extractedVars, setExtractedVars] = useState<string[]>([])
+  const [extractedVars, setExtractedVars] = useState<TemplateVariable[]>([])
 
   const { data: categories = [] } = useTemplateCategories()
   const createTemplate = useCreateTemplate()
@@ -99,9 +100,11 @@ export function TemplateMutateDrawer({
           category_id: template.category_id || undefined,
           is_active: template.is_active,
         })
-        // 显示已有变量
+        // 加载已有变量（包含默认值等完整信息）
         if (template.variables) {
-          setExtractedVars(template.variables.map((v) => v.name))
+          setExtractedVars(template.variables)
+        } else {
+          setExtractedVars([])
         }
       } else {
         form.reset({
@@ -128,10 +131,21 @@ export function TemplateMutateDrawer({
     }
 
     try {
-      const variables = await extractVariables.mutateAsync(htmlContent)
-      setExtractedVars(variables)
-      if (variables.length > 0) {
-        toast.success(`提取到 ${variables.length} 个变量: ${variables.join(', ')}`)
+      const variableNames = await extractVariables.mutateAsync(htmlContent)
+      // 转换为完整变量对象，保留已有设置
+      const newVars: TemplateVariable[] = variableNames.map((name) => {
+        const existingVar = extractedVars.find((v) => v.name === name)
+        return {
+          name,
+          label: existingVar?.label || name,
+          default_value: existingVar?.default_value || null,
+          placeholder: existingVar?.placeholder || null,
+          required: existingVar?.required ?? true,
+        }
+      })
+      setExtractedVars(newVars)
+      if (variableNames.length > 0) {
+        toast.success(`提取到 ${variableNames.length} 个变量`)
       } else {
         toast.info('未找到变量，请使用 {{变量名}} 格式定义变量')
       }
@@ -140,13 +154,25 @@ export function TemplateMutateDrawer({
     }
   }
 
+  // 更新单个变量的属性
+  const updateVariable = (index: number, updates: Partial<TemplateVariable>) => {
+    setExtractedVars((prev) =>
+      prev.map((v, i) => (i === index ? { ...v, ...updates } : v))
+    )
+  }
+
   const onSubmit = async (data: FormValues) => {
     try {
+      // 包含变量详情的提交数据
+      const submitData = {
+        ...data,
+        variables: extractedVars.length > 0 ? extractedVars : undefined,
+      }
       if (isUpdate && template) {
-        await updateTemplate.mutateAsync({ id: template.id, data })
+        await updateTemplate.mutateAsync({ id: template.id, data: submitData })
         toast.success('模板更新成功')
       } else {
-        await createTemplate.mutateAsync(data)
+        await createTemplate.mutateAsync(submitData)
         toast.success('模板创建成功')
       }
       onOpenChange(false)
@@ -368,18 +394,63 @@ export function TemplateMutateDrawer({
                           使用 {'{{变量名}}'} 格式定义变量，如: {'{{title}}'},{' '}
                           {'{{content}}'}
                         </p>
-                        {extractedVars.length > 0 && (
-                          <p className='text-muted-foreground text-sm'>
-                            已提取变量:{' '}
-                            <span className='font-medium text-foreground'>
-                              {extractedVars.join(', ')}
-                            </span>
-                          </p>
-                        )}
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {/* 变量编辑区域 */}
+                  {extractedVars.length > 0 && (
+                    <div className='space-y-3'>
+                      <Label className='text-sm font-medium'>
+                        已提取变量 ({extractedVars.length})
+                      </Label>
+                      <div className='space-y-3'>
+                        {extractedVars.map((variable, index) => (
+                          <div
+                            key={variable.name}
+                            className='rounded-md border p-3 space-y-2'
+                          >
+                            <div className='flex items-center gap-2'>
+                              <code className='rounded bg-muted px-1.5 py-0.5 text-sm font-mono'>
+                                {`{{${variable.name}}}`}
+                              </code>
+                            </div>
+                            <div className='grid grid-cols-2 gap-2'>
+                              <div className='space-y-1'>
+                                <Label className='text-xs text-muted-foreground'>
+                                  显示名称
+                                </Label>
+                                <Input
+                                  value={variable.label || ''}
+                                  onChange={(e) =>
+                                    updateVariable(index, { label: e.target.value || null })
+                                  }
+                                  placeholder={variable.name}
+                                  className='h-8 text-sm'
+                                />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label className='text-xs text-muted-foreground'>
+                                  默认值
+                                </Label>
+                                <Input
+                                  value={variable.default_value || ''}
+                                  onChange={(e) =>
+                                    updateVariable(index, {
+                                      default_value: e.target.value || null,
+                                    })
+                                  }
+                                  placeholder='输入默认值'
+                                  className='h-8 text-sm'
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* CSS 样式 */}
                   <FormField

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { Copy, Download, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRenderTemplate } from '../api'
+import { buildTemplateSrcDoc } from '../utils/template-preview'
 import type { HtmlTemplate } from '../data/schema'
 
 interface TemplateUseDialogProps {
@@ -28,9 +29,10 @@ export function TemplateUseDialog({
   onOpenChange,
   template,
 }: TemplateUseDialogProps) {
-  const previewRef = useRef<HTMLDivElement>(null)
+  const previewFrameRef = useRef<HTMLIFrameElement>(null)
   const [variables, setVariables] = useState<Record<string, string>>({})
   const [renderedHtml, setRenderedHtml] = useState<string>('')
+  const [renderedCss, setRenderedCss] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
 
   const renderTemplate = useRenderTemplate()
@@ -47,6 +49,7 @@ export function TemplateUseDialog({
       setVariables({})
     }
     setRenderedHtml('')
+    setRenderedCss(null)
   }, [template])
 
   const handleVariableChange = (name: string, value: string) => {
@@ -63,23 +66,35 @@ export function TemplateUseDialog({
         variables,
       })
       setRenderedHtml(result.html)
+      setRenderedCss(result.css ?? null)
     } catch {
       toast.error('渲染失败')
     }
   }
 
+  const previewCss = renderedCss ?? template?.css_content ?? null
+  const previewSrcDoc = useMemo(() => {
+    if (!renderedHtml) return ''
+    return buildTemplateSrcDoc(renderedHtml, previewCss)
+  }, [previewCss, renderedHtml])
+
   // 生成图片并下载
   const handleDownload = async () => {
-    if (!previewRef.current) return
+    if (!previewFrameRef.current || !template) return
+
+    const previewBody = previewFrameRef.current.contentDocument?.body
+    if (!previewBody) return
 
     setIsGenerating(true)
     try {
-      const canvas = await html2canvas(previewRef.current, {
+      const canvas = await html2canvas(previewBody, {
         scale: 2, // 高清
         useCORS: true,
         backgroundColor: '#ffffff',
-        width: template?.width || 800,
-        height: template?.height || 600,
+        width: template.width || 800,
+        height: template.height || 600,
+        windowWidth: template.width || 800,
+        windowHeight: template.height || 600,
         logging: false,
       })
 
@@ -103,16 +118,21 @@ export function TemplateUseDialog({
 
   // 复制图片到剪贴板
   const handleCopy = async () => {
-    if (!previewRef.current) return
+    if (!previewFrameRef.current || !template) return
+
+    const previewBody = previewFrameRef.current.contentDocument?.body
+    if (!previewBody) return
 
     setIsGenerating(true)
     try {
-      const canvas = await html2canvas(previewRef.current, {
+      const canvas = await html2canvas(previewBody, {
         scale: 2,
         useCORS: true,
         backgroundColor: '#ffffff',
-        width: template?.width || 800,
-        height: template?.height || 600,
+        width: template.width || 800,
+        height: template.height || 600,
+        windowWidth: template.width || 800,
+        windowHeight: template.height || 600,
         logging: false,
       })
 
@@ -200,23 +220,17 @@ export function TemplateUseDialog({
               style={{ maxHeight: '400px' }}
             >
               {renderedHtml ? (
-                <div
-                  ref={previewRef}
+                <iframe
+                  ref={previewFrameRef}
+                  title={`template-preview-${template?.id ?? 'preview'}`}
+                  className='block border-0 bg-white'
+                  sandbox='allow-same-origin'
+                  srcDoc={previewSrcDoc}
                   style={{
                     width: template?.width || 800,
                     height: template?.height || 600,
-                    backgroundColor: '#ffffff',
-                    overflow: 'hidden',
                   }}
-                >
-                  {/* 注入 CSS */}
-                  {template?.css_content && (
-                    <style
-                      dangerouslySetInnerHTML={{ __html: template.css_content }}
-                    />
-                  )}
-                  <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
-                </div>
+                />
               ) : (
                 <div
                   className='text-muted-foreground flex items-center justify-center'

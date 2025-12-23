@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { buildTemplateSrcDoc } from '../utils/template-preview'
 import type { HtmlTemplate } from '../data/schema'
 
 interface TemplateCardProps {
@@ -23,6 +24,11 @@ export function TemplateCard({
   onDelete,
   onUse,
 }: TemplateCardProps) {
+  const previewSrcDoc = buildTemplateSrcDoc(
+    template.html_content,
+    template.css_content
+  )
+
   return (
     <Card className='group relative overflow-hidden'>
       {/* 缩略图预览区 */}
@@ -42,8 +48,14 @@ export function TemplateCard({
                 height: template.height,
                 transform: `scale(min(calc(95cqw / ${template.width}), calc(95cqh / ${template.height})))`,
               }}
-              dangerouslySetInnerHTML={{ __html: template.html_content }}
-            />
+            >
+              <iframe
+                title={`${template.name}-preview`}
+                className='pointer-events-none block h-full w-full border-0 bg-white'
+                sandbox='allow-same-origin'
+                srcDoc={previewSrcDoc}
+              />
+            </div>
           </div>
         )}
 
