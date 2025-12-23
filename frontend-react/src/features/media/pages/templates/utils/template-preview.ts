@@ -35,30 +35,33 @@ const BASE_STYLES = `
 `
 
 export function buildTemplateSrcDoc(html: string, css?: string | null) {
-  const combinedCss = [BASE_STYLES, css].filter(Boolean).join('\n')
   const safeHtml = html || ''
 
   if (!safeHtml) {
+    const combinedCss = [BASE_STYLES, css].filter(Boolean).join('\n')
     return `<!doctype html><html><head><meta charset="utf-8" /><style>${combinedCss}</style></head><body></body></html>`
   }
 
+  // 完整 HTML 文档：只注入自定义 CSS，不注入 BASE_STYLES（避免覆盖原有样式）
   if (/<html[\s>]/i.test(safeHtml)) {
-    if (!combinedCss) {
+    if (!css) {
       return safeHtml
     }
 
     if (/<head[\s>]/i.test(safeHtml)) {
       return safeHtml.replace(
         /<\/head>/i,
-        `<style>${combinedCss}</style></head>`
+        `<style>${css}</style></head>`
       )
     }
 
     return safeHtml.replace(
       /<html[^>]*>/i,
-      (match) => `${match}<head><style>${combinedCss}</style></head>`
+      (match) => `${match}<head><style>${css}</style></head>`
     )
   }
 
+  // HTML 片段：需要注入 BASE_STYLES 来提供基础样式
+  const combinedCss = [BASE_STYLES, css].filter(Boolean).join('\n')
   return `<!doctype html><html><head><meta charset="utf-8" /><style>${combinedCss}</style></head><body>${safeHtml}</body></html>`
 }
