@@ -287,7 +287,13 @@ export function TemplateMutateDrawer({
     }
 
     try {
-      const importedValues = JSON.parse(jsonImportValue) as Record<string, unknown>
+      // 预处理：将中文引号转换为转义的 ASCII 引号
+      // 避免中文引号 "" 破坏 JSON 结构
+      const preprocessed = jsonImportValue
+        .replace(/"/g, '\\"') // 左中文引号
+        .replace(/"/g, '\\"') // 右中文引号
+
+      const importedValues = JSON.parse(preprocessed) as Record<string, unknown>
       if (typeof importedValues !== 'object' || importedValues === null || Array.isArray(importedValues)) {
         toast.error('JSON 格式错误，请输入对象格式 {...}')
         return
