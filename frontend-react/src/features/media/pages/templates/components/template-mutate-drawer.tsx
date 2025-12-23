@@ -1,5 +1,23 @@
 import { useEffect, useState } from 'react'
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { GripVertical } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -40,6 +58,84 @@ import {
   useUpdateTemplate,
 } from '../api'
 import type { HtmlTemplate, TemplateVariable } from '../data/schema'
+
+// 可排序变量项组件
+interface SortableVariableItemProps {
+  variable: TemplateVariable
+  index: number
+  onUpdate: (index: number, updates: Partial<TemplateVariable>) => void
+}
+
+function SortableVariableItem({
+  variable,
+  index,
+  onUpdate,
+}: SortableVariableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: variable.name })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className='rounded-md border bg-background p-3 space-y-2'
+    >
+      <div className='flex items-center gap-2'>
+        <button
+          type='button'
+          className='cursor-grab touch-none text-muted-foreground hover:text-foreground'
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className='h-4 w-4' />
+        </button>
+        <code className='rounded bg-muted px-1.5 py-0.5 text-sm font-mono'>
+          {`{{${variable.name}}}`}
+        </code>
+      </div>
+      <div className='grid grid-cols-2 gap-2 pl-6'>
+        <div className='space-y-1'>
+          <Label className='text-xs text-muted-foreground'>显示名称</Label>
+          <Input
+            value={variable.label || ''}
+            onChange={(e) =>
+              onUpdate(index, {
+                label: e.target.value || null,
+              })
+            }
+            placeholder={variable.name}
+            className='h-8 text-sm'
+          />
+        </div>
+        <div className='space-y-1'>
+          <Label className='text-xs text-muted-foreground'>默认值</Label>
+          <Input
+            value={variable.default_value || ''}
+            onChange={(e) =>
+              onUpdate(index, {
+                default_value: e.target.value || null,
+              })
+            }
+            placeholder='输入默认值'
+            className='h-8 text-sm'
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const formSchema = z.object({
   name: z.string().min(1, '名称不能为空').max(100),
@@ -162,6 +258,25 @@ export function TemplateMutateDrawer({
     setExtractedVars((prev) =>
       prev.map((v, i) => (i === index ? { ...v, ...updates } : v))
     )
+  }
+
+  // 拖拽排序
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (over && active.id !== over.id) {
+      setExtractedVars((items) => {
+        const oldIndex = items.findIndex((item) => item.name === active.id)
+        const newIndex = items.findIndex((item) => item.name === over.id)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
   }
 
   // 从 JSON 导入变量默认值
@@ -523,55 +638,35 @@ export function TemplateMutateDrawer({
                   {/* 变量列表 */}
                   {extractedVars.length > 0 ? (
                     <div className='space-y-3'>
-                      <Label className='text-sm font-medium'>
-                        变量列表 ({extractedVars.length})
-                      </Label>
-                      <div className='space-y-3'>
-                        {extractedVars.map((variable, index) => (
-                          <div
-                            key={variable.name}
-                            className='rounded-md border p-3 space-y-2'
-                          >
-                            <div className='flex items-center gap-2'>
-                              <code className='rounded bg-muted px-1.5 py-0.5 text-sm font-mono'>
-                                {`{{${variable.name}}}`}
-                              </code>
-                            </div>
-                            <div className='grid grid-cols-2 gap-2'>
-                              <div className='space-y-1'>
-                                <Label className='text-xs text-muted-foreground'>
-                                  显示名称
-                                </Label>
-                                <Input
-                                  value={variable.label || ''}
-                                  onChange={(e) =>
-                                    updateVariable(index, {
-                                      label: e.target.value || null,
-                                    })
-                                  }
-                                  placeholder={variable.name}
-                                  className='h-8 text-sm'
-                                />
-                              </div>
-                              <div className='space-y-1'>
-                                <Label className='text-xs text-muted-foreground'>
-                                  默认值
-                                </Label>
-                                <Input
-                                  value={variable.default_value || ''}
-                                  onChange={(e) =>
-                                    updateVariable(index, {
-                                      default_value: e.target.value || null,
-                                    })
-                                  }
-                                  placeholder='输入默认值'
-                                  className='h-8 text-sm'
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                      <div className='flex items-center justify-between'>
+                        <Label className='text-sm font-medium'>
+                          变量列表 ({extractedVars.length})
+                        </Label>
+                        <span className='text-xs text-muted-foreground'>
+                          拖拽排序
+                        </span>
                       </div>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext
+                          items={extractedVars.map((v) => v.name)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className='space-y-2'>
+                            {extractedVars.map((variable, index) => (
+                              <SortableVariableItem
+                                key={variable.name}
+                                variable={variable}
+                                index={index}
+                                onUpdate={updateVariable}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
                     </div>
                   ) : (
                     <div className='flex flex-col items-center justify-center py-8 text-center'>
