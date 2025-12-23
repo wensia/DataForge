@@ -158,7 +158,7 @@ export function TemplateMutateDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='flex flex-col sm:max-w-2xl'>
+      <SheetContent className='flex flex-col px-8 sm:max-w-2xl'>
         <SheetHeader className='text-start'>
           <SheetTitle>{isUpdate ? '编辑模板' : '创建模板'}</SheetTitle>
           <SheetDescription>
