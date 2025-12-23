@@ -65,7 +65,13 @@ export function TemplateUseDialog({
 
   const renderTemplate = useRenderTemplate()
 
-  // 初始化变量默认值
+  // 获取模板缩放存储键
+  const getScaleStorageKey = useCallback(
+    (templateId: number) => `template-preview-scale-${templateId}`,
+    []
+  )
+
+  // 初始化变量默认值和加载保存的缩放设置
   useEffect(() => {
     if (template?.variables) {
       const defaults: Record<string, string> = {}
@@ -78,8 +84,21 @@ export function TemplateUseDialog({
     }
     setRenderedHtml('')
     setRenderedCss(null)
+
+    // 加载该模板保存的缩放设置
+    if (template) {
+      const savedScale = localStorage.getItem(getScaleStorageKey(template.id))
+      if (savedScale) {
+        const scale = parseFloat(savedScale)
+        if (!isNaN(scale) && scale >= 0.1 && scale <= 1) {
+          setIsManualScale(true)
+          setPreviewScale(scale)
+          return
+        }
+      }
+    }
     setIsManualScale(false)
-  }, [template])
+  }, [template, getScaleStorageKey])
 
   // 计算自适应缩放比例
   useLayoutEffect(() => {
@@ -112,13 +131,24 @@ export function TemplateUseDialog({
   const handleResetScale = useCallback(() => {
     setIsManualScale(false)
     setPreviewScale(autoFitScale)
-  }, [autoFitScale])
+    // 清除保存的缩放设置
+    if (template) {
+      localStorage.removeItem(getScaleStorageKey(template.id))
+    }
+  }, [autoFitScale, template, getScaleStorageKey])
 
   // 手动调节缩放
-  const handleScaleChange = useCallback((value: number[]) => {
-    setIsManualScale(true)
-    setPreviewScale(value[0])
-  }, [])
+  const handleScaleChange = useCallback(
+    (value: number[]) => {
+      setIsManualScale(true)
+      setPreviewScale(value[0])
+      // 保存缩放设置到 localStorage
+      if (template) {
+        localStorage.setItem(getScaleStorageKey(template.id), value[0].toString())
+      }
+    },
+    [template, getScaleStorageKey]
+  )
 
   const handleVariableChange = (name: string, value: string) => {
     setVariables((prev) => ({ ...prev, [name]: value }))
