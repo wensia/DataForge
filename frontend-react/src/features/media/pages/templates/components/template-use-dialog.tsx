@@ -8,7 +8,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -16,6 +15,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -250,106 +250,58 @@ export function TemplateUseDialog({
           </div>
         </div>
 
-        <div className='grid min-h-0 flex-1 gap-6 p-6 lg:grid-cols-[360px_1fr]'>
-          <div className='flex min-h-0 flex-col gap-6'>
-            <Card className='flex min-h-0 flex-1 flex-col gap-4 py-4'>
-              <CardHeader className='px-6 pb-0'>
-                <div className='flex items-center justify-between gap-2'>
-                  <CardTitle className='text-base'>变量设置</CardTitle>
-                  {variableList.length > 0 && (
-                    <div className='flex items-center gap-2'>
-                      <Badge variant='secondary'>{variableList.length} 个</Badge>
-                      {requiredCount > 0 && (
-                        <Badge variant='outline'>必填 {requiredCount}</Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <CardDescription>填写变量值，必填项标记 *</CardDescription>
-              </CardHeader>
-              <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
-                <ScrollArea className='flex-1 pr-3'>
-                  <div className='space-y-4 pb-1'>
-                    {variableList.map((v) => (
-                      <div key={v.name} className='space-y-2'>
-                        <Label htmlFor={v.name}>
-                          {v.label || v.name}
-                          {v.required && (
-                            <span className='text-destructive ml-1'>*</span>
-                          )}
-                        </Label>
-                        <Input
-                          id={v.name}
-                          value={variables[v.name] || ''}
-                          onChange={(e) =>
-                            handleVariableChange(v.name, e.target.value)
-                          }
-                          placeholder={
-                            v.placeholder || `输入 ${v.label || v.name}`
-                          }
-                        />
-                      </div>
-                    ))}
-
-                    {variableList.length === 0 && (
-                      <p className='text-muted-foreground text-sm'>
-                        此模板没有定义变量
-                      </p>
+        <div className='grid min-h-0 flex-1 gap-6 p-6 lg:grid-cols-[320px_1fr]'>
+          {/* 左侧: 变量设置 */}
+          <Card className='flex min-h-0 flex-col gap-4 py-4'>
+            <CardHeader className='px-6 pb-0'>
+              <div className='flex items-center justify-between gap-2'>
+                <CardTitle className='text-base'>变量设置</CardTitle>
+                {variableList.length > 0 && (
+                  <div className='flex items-center gap-2'>
+                    <Badge variant='secondary'>{variableList.length} 个</Badge>
+                    {requiredCount > 0 && (
+                      <Badge variant='outline'>必填 {requiredCount}</Badge>
                     )}
                   </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                )}
+              </div>
+              <CardDescription>填写变量值，必填项标记 *</CardDescription>
+            </CardHeader>
+            <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
+              <ScrollArea className='flex-1 pr-3'>
+                <div className='space-y-4 pb-1'>
+                  {variableList.map((v) => (
+                    <div key={v.name} className='space-y-2'>
+                      <Label htmlFor={v.name}>
+                        {v.label || v.name}
+                        {v.required && (
+                          <span className='text-destructive ml-1'>*</span>
+                        )}
+                      </Label>
+                      <Input
+                        id={v.name}
+                        value={variables[v.name] || ''}
+                        onChange={(e) =>
+                          handleVariableChange(v.name, e.target.value)
+                        }
+                        placeholder={
+                          v.placeholder || `输入 ${v.label || v.name}`
+                        }
+                      />
+                    </div>
+                  ))}
 
-            <Card className='gap-4 py-4'>
-              <CardHeader className='px-6 pb-0'>
-                <CardTitle className='text-base'>导出与分享</CardTitle>
-                <CardDescription>渲染后即可复制或下载</CardDescription>
-              </CardHeader>
-              <CardFooter className='grid grid-cols-1 gap-2 px-6 sm:grid-cols-2'>
-                <Button
-                  variant='outline'
-                  onClick={handleCopyHtml}
-                  disabled={!renderedHtml}
-                >
-                  <Code className='mr-2 h-4 w-4' />
-                  复制 HTML
-                </Button>
-                <Button
-                  variant='outline'
-                  onClick={handleDownloadHtml}
-                  disabled={!renderedHtml}
-                >
-                  <FileDown className='mr-2 h-4 w-4' />
-                  下载 HTML
-                </Button>
-                <Button
-                  variant='outline'
-                  onClick={handleCopy}
-                  disabled={!renderedHtml || isGenerating}
-                >
-                  {isGenerating ? (
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  ) : (
-                    <Copy className='mr-2 h-4 w-4' />
+                  {variableList.length === 0 && (
+                    <p className='text-muted-foreground text-sm'>
+                      此模板没有定义变量
+                    </p>
                   )}
-                  复制图片
-                </Button>
-                <Button
-                  onClick={handleDownload}
-                  disabled={!renderedHtml || isGenerating}
-                >
-                  {isGenerating ? (
-                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                  ) : (
-                    <Download className='mr-2 h-4 w-4' />
-                  )}
-                  下载图片
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
+          {/* 右侧: 实时预览 */}
           <Card className='flex min-h-0 flex-col gap-4 py-4'>
             <CardHeader className='flex items-center justify-between gap-2 px-6 pb-0'>
               <div>
@@ -389,7 +341,7 @@ export function TemplateUseDialog({
                   </div>
                 ) : (
                   <div className='text-muted-foreground flex items-center justify-center'>
-                    点击“预览”按钮查看效果
+                    点击"预览"按钮查看效果
                   </div>
                 )}
               </div>
@@ -402,6 +354,48 @@ export function TemplateUseDialog({
             </CardContent>
           </Card>
         </div>
+
+        <DialogFooter className='flex-row flex-wrap justify-end gap-2 border-t bg-muted/30 px-6 py-4'>
+          <Button
+            variant='outline'
+            onClick={handleCopyHtml}
+            disabled={!renderedHtml}
+          >
+            <Code className='mr-2 h-4 w-4' />
+            复制 HTML
+          </Button>
+          <Button
+            variant='outline'
+            onClick={handleDownloadHtml}
+            disabled={!renderedHtml}
+          >
+            <FileDown className='mr-2 h-4 w-4' />
+            下载 HTML
+          </Button>
+          <Button
+            variant='outline'
+            onClick={handleCopy}
+            disabled={!renderedHtml || isGenerating}
+          >
+            {isGenerating ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Copy className='mr-2 h-4 w-4' />
+            )}
+            复制图片
+          </Button>
+          <Button
+            onClick={handleDownload}
+            disabled={!renderedHtml || isGenerating}
+          >
+            {isGenerating ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Download className='mr-2 h-4 w-4' />
+            )}
+            下载图片
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
