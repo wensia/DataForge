@@ -586,7 +586,7 @@ export function TemplateMutateDrawer({
           </form>
         </Form>
 
-        <SheetFooter className='gap-2'>
+        <SheetFooter className='flex-row justify-end gap-2'>
           <SheetClose asChild>
             <Button variant='outline'>取消</Button>
           </SheetClose>
