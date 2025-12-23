@@ -73,20 +73,27 @@ export function TemplateCard({
             className='h-full w-full object-cover'
           />
         ) : (
-          <div className='flex h-full w-full items-center justify-center overflow-hidden'>
+          <div className='absolute inset-0 flex items-center justify-center overflow-hidden'>
+            {/* 缩放后的容器 */}
             <div
-              className='origin-center'
+              className='overflow-hidden'
               style={{
-                width: template.width,
-                height: template.height,
-                transform: `scale(${scale})`,
+                width: template.width * scale,
+                height: template.height * scale,
               }}
             >
+              {/* 原始尺寸的 iframe，通过 transform 缩放 */}
               <iframe
                 title={`${template.name}-preview`}
-                className='pointer-events-none block h-full w-full border-0 bg-white'
+                className='pointer-events-none block border-0 bg-white'
                 sandbox='allow-same-origin'
                 srcDoc={previewSrcDoc}
+                style={{
+                  width: template.width,
+                  height: template.height,
+                  transform: `scale(${scale})`,
+                  transformOrigin: '0 0',
+                }}
               />
             </div>
           </div>
