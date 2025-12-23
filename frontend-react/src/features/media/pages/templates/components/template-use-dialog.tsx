@@ -267,8 +267,8 @@ export function TemplateUseDialog({
               </div>
               <CardDescription>填写变量值，必填项标记 *</CardDescription>
             </CardHeader>
-            <CardContent className='flex min-h-0 flex-1 flex-col px-6'>
-              <ScrollArea className='flex-1 pr-3'>
+            <CardContent className='min-h-0 flex-1 overflow-hidden px-6'>
+              <ScrollArea className='h-full pr-3'>
                 <div className='space-y-4 pb-1'>
                   {variableList.map((v) => (
                     <div key={v.name} className='space-y-2'>
