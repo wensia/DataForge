@@ -7,14 +7,12 @@ import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -32,6 +30,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
   useCreateTemplate,
@@ -160,7 +159,7 @@ export function TemplateMutateDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className='flex flex-col sm:max-w-2xl'>
-        <SheetHeader>
+        <SheetHeader className='text-start'>
           <SheetTitle>{isUpdate ? '编辑模板' : '创建模板'}</SheetTitle>
           <SheetDescription>
             {isUpdate
@@ -169,192 +168,242 @@ export function TemplateMutateDrawer({
           </SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className='min-h-0 flex-1'>
-          <Form {...form}>
-            <form
-              id='template-form'
-              onSubmit={form.handleSubmit(onSubmit)}
-              className='space-y-4 px-1 pb-4'
-            >
-              <FormField
-                control={form.control}
-                name='name'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>模板名称</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder='输入模板名称' />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <Form {...form}>
+          <form
+            id='template-form'
+            onSubmit={form.handleSubmit(onSubmit)}
+            className='flex min-h-0 flex-1 flex-col'
+          >
+            <Tabs defaultValue='basic' className='flex min-h-0 flex-1 flex-col'>
+              <TabsList className='mb-4 grid w-full grid-cols-2'>
+                <TabsTrigger value='basic'>基本信息</TabsTrigger>
+                <TabsTrigger value='code'>代码编辑</TabsTrigger>
+              </TabsList>
 
-              <FormField
-                control={form.control}
-                name='description'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>描述（可选）</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder='简短描述模板用途' />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='category_id'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>分类（可选）</FormLabel>
-                    <Select
-                      value={field.value?.toString() || ''}
-                      onValueChange={(v) =>
-                        field.onChange(v ? parseInt(v) : undefined)
-                      }
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder='选择分类' />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='html_content'
-                render={({ field }) => (
-                  <FormItem>
-                    <div className='flex items-center justify-between'>
-                      <FormLabel>HTML 内容</FormLabel>
-                      <Button
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        onClick={handleExtractVariables}
-                        disabled={extractVariables.isPending}
-                      >
-                        提取变量
-                      </Button>
-                    </div>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder='输入 HTML 代码，使用 {{变量名}} 作为变量占位符'
-                        className='min-h-[200px] font-mono text-sm'
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      使用 {'{{变量名}}'} 格式定义变量，如: {'{{title}}'},
-                      {'{{content}}'}
-                    </FormDescription>
-                    {extractedVars.length > 0 && (
-                      <p className='text-muted-foreground text-sm'>
-                        已提取变量: {extractedVars.join(', ')}
-                      </p>
+              <TabsContent
+                value='basic'
+                className='mt-0 min-h-0 flex-1 overflow-y-auto'
+              >
+                <div className='space-y-4 px-0.5 pb-4'>
+                  {/* 模板名称 */}
+                  <FormField
+                    control={form.control}
+                    name='name'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          模板名称
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder='输入模板名称'
+                            className='col-span-4'
+                          />
+                        </FormControl>
+                        <FormMessage className='col-span-4 col-start-3' />
+                      </FormItem>
                     )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  />
 
-              <FormField
-                control={form.control}
-                name='css_content'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CSS 样式（可选）</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        {...field}
-                        placeholder='输入自定义 CSS 样式'
-                        className='min-h-[100px] font-mono text-sm'
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  {/* 描述 */}
+                  <FormField
+                    control={form.control}
+                    name='description'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          描述
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder='简短描述模板用途（可选）'
+                            className='col-span-4'
+                          />
+                        </FormControl>
+                        <FormMessage className='col-span-4 col-start-3' />
+                      </FormItem>
+                    )}
+                  />
 
-              <div className='grid grid-cols-2 gap-4'>
-                <FormField
-                  control={form.control}
-                  name='width'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>宽度 (px)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type='number'
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value) || 800)
+                  {/* 分类 */}
+                  <FormField
+                    control={form.control}
+                    name='category_id'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          分类
+                        </FormLabel>
+                        <Select
+                          value={field.value?.toString() || ''}
+                          onValueChange={(v) =>
+                            field.onChange(v ? parseInt(v) : undefined)
                           }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        >
+                          <FormControl>
+                            <SelectTrigger className='col-span-4'>
+                              <SelectValue placeholder='选择分类（可选）' />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id.toString()}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className='col-span-4 col-start-3' />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name='height'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>高度 (px)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type='number'
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value) || 600)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                  {/* 宽度 */}
+                  <FormField
+                    control={form.control}
+                    name='width'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          宽度 (px)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value) || 800)
+                            }
+                            className='col-span-4'
+                          />
+                        </FormControl>
+                        <FormMessage className='col-span-4 col-start-3' />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name='is_active'
-                render={({ field }) => (
-                  <FormItem className='flex items-center justify-between rounded-lg border p-3'>
-                    <div>
-                      <FormLabel>启用状态</FormLabel>
-                      <p className='text-muted-foreground text-sm'>
-                        禁用后模板将不在列表中显示
-                      </p>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </ScrollArea>
+                  {/* 高度 */}
+                  <FormField
+                    control={form.control}
+                    name='height'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          高度 (px)
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value) || 600)
+                            }
+                            className='col-span-4'
+                          />
+                        </FormControl>
+                        <FormMessage className='col-span-4 col-start-3' />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* 启用状态 */}
+                  <FormField
+                    control={form.control}
+                    name='is_active'
+                    render={({ field }) => (
+                      <FormItem className='grid grid-cols-6 items-center gap-x-4 gap-y-1 space-y-0'>
+                        <FormLabel className='col-span-2 text-end'>
+                          启用状态
+                        </FormLabel>
+                        <div className='col-span-4 flex items-center gap-2'>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <span className='text-muted-foreground text-sm'>
+                            {field.value ? '已启用' : '已禁用'}
+                          </span>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value='code'
+                className='mt-0 min-h-0 flex-1 overflow-y-auto'
+              >
+                <div className='space-y-4 px-0.5 pb-4'>
+                  {/* HTML 内容 */}
+                  <FormField
+                    control={form.control}
+                    name='html_content'
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className='flex items-center justify-between'>
+                          <FormLabel>HTML 内容</FormLabel>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={handleExtractVariables}
+                            disabled={extractVariables.isPending}
+                          >
+                            提取变量
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder='输入 HTML 代码，使用 {{变量名}} 作为变量占位符'
+                            className='min-h-[200px] font-mono text-sm'
+                          />
+                        </FormControl>
+                        <p className='text-muted-foreground text-xs'>
+                          使用 {'{{变量名}}'} 格式定义变量，如: {'{{title}}'},{' '}
+                          {'{{content}}'}
+                        </p>
+                        {extractedVars.length > 0 && (
+                          <p className='text-muted-foreground text-sm'>
+                            已提取变量:{' '}
+                            <span className='font-medium text-foreground'>
+                              {extractedVars.join(', ')}
+                            </span>
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* CSS 样式 */}
+                  <FormField
+                    control={form.control}
+                    name='css_content'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CSS 样式（可选）</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder='输入自定义 CSS 样式'
+                            className='min-h-[120px] font-mono text-sm'
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+          </form>
+        </Form>
 
         <SheetFooter className='gap-2'>
           <SheetClose asChild>
