@@ -26,7 +26,7 @@ export function TemplateCard({
   return (
     <Card className='group relative overflow-hidden'>
       {/* 缩略图预览区 */}
-      <div className='relative aspect-[4/3] overflow-hidden bg-muted'>
+      <div className='relative aspect-[4/3] overflow-hidden bg-muted' style={{ containerType: 'size' }}>
         {template.thumbnail ? (
           <img
             src={template.thumbnail}
@@ -36,10 +36,11 @@ export function TemplateCard({
         ) : (
           <div className='flex h-full w-full items-center justify-center overflow-hidden p-2'>
             <div
-              className='origin-top-left scale-[0.3]'
+              className='origin-center'
               style={{
                 width: template.width,
                 height: template.height,
+                transform: `scale(min(calc(95cqw / ${template.width}), calc(95cqh / ${template.height})))`,
               }}
               dangerouslySetInnerHTML={{ __html: template.html_content }}
             />
