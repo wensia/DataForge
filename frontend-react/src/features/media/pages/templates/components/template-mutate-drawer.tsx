@@ -204,12 +204,14 @@ interface TemplateMutateDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   template?: HtmlTemplate | null
+  isSystemTemplate?: boolean // 是否创建系统模板（仅管理员在模板库创建时为 true）
 }
 
 export function TemplateMutateDrawer({
   open,
   onOpenChange,
   template,
+  isSystemTemplate = false,
 }: TemplateMutateDrawerProps) {
   const isUpdate = !!template
   const [extractedVars, setExtractedVars] = useState<TemplateVariable[]>([])
@@ -400,8 +402,12 @@ export function TemplateMutateDrawer({
         await updateTemplate.mutateAsync({ id: template.id, data: submitData })
         toast.success('模板更新成功')
       } else {
-        await createTemplate.mutateAsync(submitData)
-        toast.success('模板创建成功')
+        // 创建时包含 is_system 字段
+        await createTemplate.mutateAsync({
+          ...submitData,
+          is_system: isSystemTemplate,
+        })
+        toast.success(isSystemTemplate ? '系统模板创建成功' : '模板创建成功')
       }
       onOpenChange(false)
     } catch (error) {

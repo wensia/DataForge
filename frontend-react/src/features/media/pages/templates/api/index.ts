@@ -76,6 +76,8 @@ export function useHtmlTemplates(params?: {
   category_id?: number
   is_active?: boolean
   keyword?: string
+  is_system?: boolean
+  mine?: boolean
 }) {
   return useQuery({
     queryKey: templateKeys.list(params),
@@ -175,6 +177,21 @@ export function useRenderTemplate() {
         { template_id: templateId, variables }
       )
       return response.data.data
+    },
+  })
+}
+
+export function useCopyTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (templateId: number) => {
+      const response = await apiClient.post<ApiResponse<HtmlTemplate>>(
+        `/html-templates/${templateId}/copy`
+      )
+      return response.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: templateKeys.all })
     },
   })
 }

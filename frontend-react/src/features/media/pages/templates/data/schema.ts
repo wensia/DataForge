@@ -36,6 +36,8 @@ export interface HtmlTemplate {
   is_active: boolean
   use_count: number
   created_by: number | null
+  is_system: boolean
+  owner_id: number | null
   created_at: string
   updated_at: string
 }
@@ -51,6 +53,7 @@ export interface HtmlTemplateCreate {
   height?: number
   category_id?: number
   is_active?: boolean
+  is_system?: boolean // 仅管理员可设置为 true
 }
 
 /** 更新模板请求 */

@@ -1,5 +1,5 @@
 import { useRef, useState, useLayoutEffect } from 'react'
-import { Edit, Eye, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Copy, Edit, Eye, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -17,16 +18,24 @@ import type { HtmlTemplate } from '../data/schema'
 
 interface TemplateCardProps {
   template: HtmlTemplate
+  isLibrary?: boolean // 是否在模板库 Tab
+  isAdmin?: boolean // 是否是管理员
   onEdit: (template: HtmlTemplate) => void
   onDelete: (template: HtmlTemplate) => void
   onUse: (template: HtmlTemplate) => void
+  onCopy?: (template: HtmlTemplate) => void
+  isCopying?: boolean
 }
 
 export function TemplateCard({
   template,
+  isLibrary = false,
+  isAdmin = false,
   onEdit,
   onDelete,
   onUse,
+  onCopy,
+  isCopying = false,
 }: TemplateCardProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.1)
@@ -101,10 +110,24 @@ export function TemplateCard({
 
         {/* 悬浮操作按钮 */}
         <div className='absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100'>
-          <Button size='sm' variant='secondary' onClick={() => onUse(template)}>
-            <Eye className='mr-1 h-4 w-4' />
-            使用
-          </Button>
+          {isLibrary ? (
+            // 模板库：显示复制按钮
+            <Button
+              size='sm'
+              variant='secondary'
+              onClick={() => onCopy?.(template)}
+              disabled={isCopying}
+            >
+              <Copy className='mr-1 h-4 w-4' />
+              {isCopying ? '复制中...' : '复制到我的模板'}
+            </Button>
+          ) : (
+            // 我的模板：显示使用按钮
+            <Button size='sm' variant='secondary' onClick={() => onUse(template)}>
+              <Eye className='mr-1 h-4 w-4' />
+              使用
+            </Button>
+          )}
         </div>
       </div>
 
@@ -128,17 +151,54 @@ export function TemplateCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end'>
-              <DropdownMenuItem onClick={() => onEdit(template)}>
-                <Edit className='mr-2 h-4 w-4' />
-                编辑
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className='text-destructive'
-                onClick={() => onDelete(template)}
-              >
-                <Trash2 className='mr-2 h-4 w-4' />
-                删除
-              </DropdownMenuItem>
+              {isLibrary ? (
+                // 模板库菜单
+                <>
+                  <DropdownMenuItem
+                    onClick={() => onCopy?.(template)}
+                    disabled={isCopying}
+                  >
+                    <Copy className='mr-2 h-4 w-4' />
+                    复制到我的模板
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onEdit(template)}>
+                        <Edit className='mr-2 h-4 w-4' />
+                        编辑
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className='text-destructive'
+                        onClick={() => onDelete(template)}
+                      >
+                        <Trash2 className='mr-2 h-4 w-4' />
+                        删除
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </>
+              ) : (
+                // 我的模板菜单
+                <>
+                  <DropdownMenuItem onClick={() => onUse(template)}>
+                    <Eye className='mr-2 h-4 w-4' />
+                    使用
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onEdit(template)}>
+                    <Edit className='mr-2 h-4 w-4' />
+                    编辑
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className='text-destructive'
+                    onClick={() => onDelete(template)}
+                  >
+                    <Trash2 className='mr-2 h-4 w-4' />
+                    删除
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -146,6 +206,11 @@ export function TemplateCard({
 
       <CardFooter className='flex items-center justify-between border-t px-4 py-2'>
         <div className='flex items-center gap-2'>
+          {template.is_system && (
+            <Badge variant='default' className='bg-blue-500'>
+              系统
+            </Badge>
+          )}
           {template.category_name && (
             <Badge variant='outline'>{template.category_name}</Badge>
           )}

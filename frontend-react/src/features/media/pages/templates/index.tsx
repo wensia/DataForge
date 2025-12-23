@@ -14,17 +14,23 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuthStore } from '@/stores/auth-store'
 import { TemplateCard } from './components/template-card'
 import { TemplateMutateDrawer } from './components/template-mutate-drawer'
 import { TemplateUseDialog } from './components/template-use-dialog'
 import {
+  useCopyTemplate,
   useDeleteTemplate,
   useHtmlTemplates,
   useTemplateCategories,
 } from './api'
 import type { HtmlTemplate } from './data/schema'
 
+type TabValue = 'library' | 'mine'
+
 export function HtmlTemplatesPage() {
+  const [activeTab, setActiveTab] = useState<TabValue>('library')
   const [keyword, setKeyword] = useState('')
   const [categoryId, setCategoryId] = useState<number | undefined>()
 
@@ -35,12 +41,18 @@ export function HtmlTemplatesPage() {
     null
   )
 
-  const { data, isLoading, refetch, isRefetching } = useHtmlTemplates({
-    category_id: categoryId,
-    keyword: keyword || undefined,
-  })
+  const { isAdmin } = useAuthStore()
+
+  // 根据 Tab 切换查询参数
+  const queryParams =
+    activeTab === 'library'
+      ? { is_system: true, category_id: categoryId, keyword: keyword || undefined }
+      : { mine: true, category_id: categoryId, keyword: keyword || undefined }
+
+  const { data, isLoading, refetch, isRefetching } = useHtmlTemplates(queryParams)
   const { data: categories = [] } = useTemplateCategories()
   const deleteTemplate = useDeleteTemplate()
+  const copyTemplate = useCopyTemplate()
 
   const templates = data?.items || []
 
@@ -57,6 +69,17 @@ export function HtmlTemplatesPage() {
   const handleUse = (template: HtmlTemplate) => {
     setSelectedTemplate(template)
     setUseDialogOpen(true)
+  }
+
+  const handleCopy = async (template: HtmlTemplate) => {
+    try {
+      await copyTemplate.mutateAsync(template.id)
+      toast.success('模板已复制到我的模板')
+      // 切换到我的模板 Tab
+      setActiveTab('mine')
+    } catch {
+      toast.error('复制失败')
+    }
   }
 
   const confirmDelete = async () => {
@@ -89,51 +112,67 @@ export function HtmlTemplatesPage() {
             />
             刷新
           </Button>
-          <Button
-            size='sm'
-            onClick={() => {
-              setSelectedTemplate(null)
-              setDrawerOpen(true)
-            }}
-          >
-            <Plus className='mr-2 h-4 w-4' />
-            创建模板
-          </Button>
+          {/* 只有在"我的模板"或管理员在"模板库"时才显示创建按钮 */}
+          {(activeTab === 'mine' || isAdmin()) && (
+            <Button
+              size='sm'
+              onClick={() => {
+                setSelectedTemplate(null)
+                setDrawerOpen(true)
+              }}
+            >
+              <Plus className='mr-2 h-4 w-4' />
+              {activeTab === 'library' ? '创建系统模板' : '创建模板'}
+            </Button>
+          )}
         </div>
       </Header>
 
       <Main fixed>
         <div className='space-y-6'>
-          {/* 筛选栏 */}
-          <div className='flex items-center gap-4'>
-            <div className='relative max-w-sm flex-1'>
-              <Search className='text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2' />
-              <Input
-                placeholder='搜索模板...'
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className='pl-9'
-              />
-            </div>
-
-            <Select
-              value={categoryId?.toString() || 'all'}
-              onValueChange={(v) =>
-                setCategoryId(v === 'all' ? undefined : parseInt(v))
-              }
+          {/* Tab 切换 */}
+          <div className='flex items-center justify-between'>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as TabValue)}
             >
-              <SelectTrigger className='w-[180px]'>
-                <SelectValue placeholder='选择分类' />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='all'>全部分类</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id.toString()}>
-                    {cat.name} ({cat.template_count})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <TabsList>
+                <TabsTrigger value='library'>模板库</TabsTrigger>
+                <TabsTrigger value='mine'>我的模板</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* 筛选栏 */}
+            <div className='flex items-center gap-4'>
+              <div className='relative w-64'>
+                <Search className='text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2' />
+                <Input
+                  placeholder='搜索模板...'
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className='pl-9'
+                />
+              </div>
+
+              <Select
+                value={categoryId?.toString() || 'all'}
+                onValueChange={(v) =>
+                  setCategoryId(v === 'all' ? undefined : parseInt(v))
+                }
+              >
+                <SelectTrigger className='w-[180px]'>
+                  <SelectValue placeholder='选择分类' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='all'>全部分类</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name} ({cat.template_count})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* 模板网格 */}
@@ -146,9 +185,15 @@ export function HtmlTemplatesPage() {
           ) : templates.length === 0 ? (
             <div className='flex flex-col items-center justify-center py-16 text-center'>
               <FolderPlus className='text-muted-foreground mb-4 h-12 w-12' />
-              <h3 className='font-medium'>暂无模板</h3>
+              <h3 className='font-medium'>
+                {activeTab === 'library' ? '暂无系统模板' : '暂无我的模板'}
+              </h3>
               <p className='text-muted-foreground mt-1 text-sm'>
-                点击"创建模板"按钮添加第一个 HTML 模板
+                {activeTab === 'library'
+                  ? isAdmin()
+                    ? '点击"创建系统模板"按钮添加第一个系统模板'
+                    : '系统模板由管理员创建'
+                  : '从模板库复制模板，或点击"创建模板"按钮创建新模板'}
               </p>
             </div>
           ) : (
@@ -157,9 +202,13 @@ export function HtmlTemplatesPage() {
                 <TemplateCard
                   key={template.id}
                   template={template}
+                  isLibrary={activeTab === 'library'}
+                  isAdmin={isAdmin()}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onUse={handleUse}
+                  onCopy={handleCopy}
+                  isCopying={copyTemplate.isPending}
                 />
               ))}
             </div>
@@ -172,6 +221,7 @@ export function HtmlTemplatesPage() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         template={selectedTemplate}
+        isSystemTemplate={activeTab === 'library' && !selectedTemplate}
       />
 
       {/* Dialog: 使用模板 */}

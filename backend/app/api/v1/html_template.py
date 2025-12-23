@@ -145,14 +145,24 @@ def delete_category(
 
 @router.get("", response_model=ResponseModel)
 def get_templates(
+    request: Request,
     skip: int = 0,
     limit: int = 50,
     category_id: int | None = None,
     is_active: bool | None = None,
     keyword: str | None = None,
+    is_system: bool | None = None,
+    owner_id: int | None = None,
+    mine: bool = False,
     session: Session = Depends(get_session),
 ):
-    """获取模板列表"""
+    """获取模板列表
+
+    Args:
+        is_system: 筛选系统模板(True)或用户模板(False)
+        owner_id: 筛选指定用户的模板
+        mine: 便捷参数，获取当前用户的模板（需要登录）
+    """
     query = select(HtmlTemplate)
 
     if category_id is not None:
@@ -161,6 +171,23 @@ def get_templates(
         query = query.where(HtmlTemplate.is_active == is_active)
     if keyword:
         query = query.where(HtmlTemplate.name.contains(keyword))
+
+    # 系统模板筛选
+    if is_system is not None:
+        query = query.where(HtmlTemplate.is_system == is_system)
+
+    # 所有者筛选
+    if owner_id is not None:
+        query = query.where(HtmlTemplate.owner_id == owner_id)
+
+    # 获取当前用户的模板
+    if mine:
+        current_user_id = getattr(request.state, "user_id", None)
+        if current_user_id:
+            query = query.where(HtmlTemplate.owner_id == current_user_id)
+        else:
+            # 未登录时返回空列表
+            return ResponseModel(data={"items": [], "total": 0})
 
     # 统计总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -202,9 +229,18 @@ def get_template(
 @router.post("", response_model=ResponseModel)
 def create_template(
     data: HtmlTemplateCreate,
+    current_user: TokenPayload = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """创建模板"""
+    """创建模板
+
+    - 管理员可创建系统模板(is_system=True)
+    - 普通用户只能创建个人模板，自动设置 owner_id
+    """
+    # 权限检查：只有管理员可以创建系统模板
+    if data.is_system and current_user.role != "admin":
+        return ResponseModel.error(code=403, message="只有管理员可以创建系统模板")
+
     # 自动提取变量
     variables = None
     if data.variables:
@@ -219,6 +255,13 @@ def create_template(
 
     template_data = data.model_dump(exclude={"variables"})
     template_data["variables"] = variables
+    template_data["created_by"] = current_user.user_id
+
+    # 设置所有者：系统模板无所有者，用户模板设置当前用户为所有者
+    if data.is_system:
+        template_data["owner_id"] = None
+    else:
+        template_data["owner_id"] = current_user.user_id
 
     template = HtmlTemplate(**template_data)
     session.add(template)
@@ -232,12 +275,26 @@ def create_template(
 def update_template(
     template_id: int,
     data: HtmlTemplateUpdate,
+    current_user: TokenPayload = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """更新模板"""
+    """更新模板
+
+    权限控制：
+    - 系统模板：只有管理员可编辑
+    - 用户模板：只有所有者可编辑
+    """
     template = session.get(HtmlTemplate, template_id)
     if not template:
         return ResponseModel.error(code=404, message="模板不存在")
+
+    # 权限检查
+    if template.is_system:
+        if current_user.role != "admin":
+            return ResponseModel.error(code=403, message="只有管理员可以编辑系统模板")
+    else:
+        if template.owner_id != current_user.user_id and current_user.role != "admin":
+            return ResponseModel.error(code=403, message="只能编辑自己的模板")
 
     update_data = data.model_dump(exclude_unset=True)
 
@@ -260,16 +317,79 @@ def update_template(
 @router.delete("/{template_id}", response_model=ResponseModel)
 def delete_template(
     template_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """删除模板"""
+    """删除模板
+
+    权限控制：
+    - 系统模板：只有管理员可删除
+    - 用户模板：只有所有者可删除
+    """
     template = session.get(HtmlTemplate, template_id)
     if not template:
         return ResponseModel.error(code=404, message="模板不存在")
 
+    # 权限检查
+    if template.is_system:
+        if current_user.role != "admin":
+            return ResponseModel.error(code=403, message="只有管理员可以删除系统模板")
+    else:
+        if template.owner_id != current_user.user_id and current_user.role != "admin":
+            return ResponseModel.error(code=403, message="只能删除自己的模板")
+
     session.delete(template)
     session.commit()
     return ResponseModel(message="删除成功")
+
+
+@router.post("/{template_id}/copy", response_model=ResponseModel)
+def copy_template(
+    template_id: int,
+    current_user: TokenPayload = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """复制模板到当前用户名下
+
+    将系统模板或其他用户的公开模板复制为自己的模板
+    """
+    # 获取原模板
+    template = session.get(HtmlTemplate, template_id)
+    if not template:
+        return ResponseModel.error(code=404, message="模板不存在")
+
+    # 创建新模板，复制所有内容
+    new_template = HtmlTemplate(
+        name=f"{template.name} (副本)",
+        description=template.description,
+        html_content=template.html_content,
+        css_content=template.css_content,
+        variables=template.variables,
+        thumbnail=template.thumbnail,
+        width=template.width,
+        height=template.height,
+        category_id=template.category_id,
+        is_active=True,
+        use_count=0,
+        created_by=current_user.user_id,
+        is_system=False,  # 复制的模板不是系统模板
+        owner_id=current_user.user_id,  # 设置当前用户为所有者
+    )
+
+    session.add(new_template)
+    session.commit()
+    session.refresh(new_template)
+
+    # 获取分类名称
+    category_name = None
+    if new_template.category_id:
+        cat = session.get(TemplateCategory, new_template.category_id)
+        category_name = cat.name if cat else None
+
+    return ResponseModel(
+        message="复制成功",
+        data=HtmlTemplateResponse.from_model(new_template, category_name),
+    )
 
 
 @router.post("/extract-variables", response_model=ResponseModel)
