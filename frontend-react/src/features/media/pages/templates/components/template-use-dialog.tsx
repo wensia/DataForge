@@ -57,23 +57,25 @@ export function TemplateUseDialog({
   // 计算预览缩放比例
   useLayoutEffect(() => {
     const container = previewContainerRef.current
-    if (!container || !template) return
+    if (!container || !template || !open) return
 
     const updateScale = () => {
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
-      const scaleX = (containerWidth * 0.95) / template.width
-      const scaleY = (containerHeight * 0.95) / template.height
-      setPreviewScale(Math.min(scaleX, scaleY))
+      if (containerWidth === 0 || containerHeight === 0) return
+      const scaleX = containerWidth / template.width
+      const scaleY = containerHeight / template.height
+      setPreviewScale(Math.min(scaleX, scaleY) * 0.95)
     }
 
-    updateScale()
+    // 延迟计算，确保容器已完全渲染
+    requestAnimationFrame(updateScale)
 
     const resizeObserver = new ResizeObserver(updateScale)
     resizeObserver.observe(container)
 
     return () => resizeObserver.disconnect()
-  }, [template])
+  }, [template, open])
 
   const handleVariableChange = (name: string, value: string) => {
     setVariables((prev) => ({ ...prev, [name]: value }))
@@ -206,7 +208,7 @@ export function TemplateUseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='max-h-[90vh] max-w-4xl'>
+      <DialogContent className='max-h-[90vh] max-w-5xl'>
         <DialogHeader>
           <DialogTitle>使用模板: {template?.name}</DialogTitle>
           <DialogDescription>填写变量值，预览并导出图片</DialogDescription>
@@ -216,7 +218,7 @@ export function TemplateUseDialog({
           {/* 左侧: 变量表单 */}
           <div className='space-y-4'>
             <h4 className='font-medium'>填写变量</h4>
-            <ScrollArea className='h-[400px] pr-4'>
+            <ScrollArea className='h-[520px] pr-4'>
               <div className='space-y-4'>
                 {variableList.map((v) => (
                   <div key={v.name} className='space-y-2'>
@@ -265,7 +267,7 @@ export function TemplateUseDialog({
             <div
               ref={previewContainerRef}
               className='relative flex items-center justify-center overflow-hidden rounded-lg border bg-muted/50'
-              style={{ height: '400px' }}
+              style={{ height: '520px' }}
             >
               {renderedHtml ? (
                 <div
