@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session, func, select
 
 from app.database import get_session
@@ -21,6 +21,7 @@ from app.models import (
     TemplateCategoryUpdate,
 )
 from app.schemas.response import ResponseModel
+from app.utils.jwt_auth import TokenPayload, get_current_user, require_admin
 
 router = APIRouter(prefix="/html-templates", tags=["HTML 模板"])
 category_router = APIRouter(prefix="/template-categories", tags=["模板分类"])

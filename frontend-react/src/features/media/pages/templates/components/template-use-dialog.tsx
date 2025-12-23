@@ -11,6 +11,7 @@ import {
   Code,
   Copy,
   Download,
+  Expand,
   FileDown,
   Loader2,
   Maximize2,
@@ -38,6 +39,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Slider } from '@/components/ui/slider'
+import { LongTextEditorDialog } from './long-text-editor-dialog'
 import { useRenderTemplate } from '../api'
 import { buildTemplateSrcDoc } from '../utils/template-preview'
 import type { HtmlTemplate } from '../data/schema'
@@ -62,6 +64,7 @@ export function TemplateUseDialog({
   const [previewScale, setPreviewScale] = useState(0.1)
   const [autoFitScale, setAutoFitScale] = useState(0.1)
   const [isManualScale, setIsManualScale] = useState(false)
+  const [editingVariable, setEditingVariable] = useState<string | null>(null)
 
   const renderTemplate = useRenderTemplate()
 
@@ -343,16 +346,29 @@ export function TemplateUseDialog({
                           <span className='text-destructive ml-1'>*</span>
                         )}
                       </Label>
-                      <Input
-                        id={v.name}
-                        value={variables[v.name] || ''}
-                        onChange={(e) =>
-                          handleVariableChange(v.name, e.target.value)
-                        }
-                        placeholder={
-                          v.placeholder || `输入 ${v.label || v.name}`
-                        }
-                      />
+                      <div className='flex gap-1'>
+                        <Input
+                          id={v.name}
+                          value={variables[v.name] || ''}
+                          onChange={(e) =>
+                            handleVariableChange(v.name, e.target.value)
+                          }
+                          placeholder={
+                            v.placeholder || `输入 ${v.label || v.name}`
+                          }
+                          className='flex-1'
+                        />
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='icon'
+                          className='h-9 w-9 shrink-0'
+                          onClick={() => setEditingVariable(v.name)}
+                          title='展开编辑'
+                        >
+                          <Expand className='h-4 w-4' />
+                        </Button>
+                      </div>
                     </div>
                   ))}
 
@@ -363,6 +379,18 @@ export function TemplateUseDialog({
                   )}
                 </div>
               </ScrollArea>
+
+              {/* 长文本编辑器弹窗 */}
+              {editingVariable && (
+                <LongTextEditorDialog
+                  open={!!editingVariable}
+                  onOpenChange={(open) => !open && setEditingVariable(null)}
+                  title={`编辑 ${variableList.find((v) => v.name === editingVariable)?.label || editingVariable}`}
+                  value={variables[editingVariable] || ''}
+                  onSave={(value) => handleVariableChange(editingVariable, value)}
+                  placeholder={`输入 ${variableList.find((v) => v.name === editingVariable)?.label || editingVariable}`}
+                />
+              )}
             </CardContent>
           </Card>
 

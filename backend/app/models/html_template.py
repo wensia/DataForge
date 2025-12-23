@@ -116,6 +116,12 @@ class HtmlTemplate(BaseTable, table=True):
     use_count: int = Field(default=0, description="使用次数")
     created_by: int | None = Field(default=None, description="创建者 ID")
 
+    # 新增：系统模板和所有者字段
+    is_system: bool = Field(default=False, index=True, description="是否为系统/根模板")
+    owner_id: int | None = Field(
+        default=None, foreign_key="users.id", index=True, description="模板所有者 ID"
+    )
+
     # 关联分类
     category: TemplateCategory | None = Relationship(back_populates="templates")
 
@@ -132,6 +138,7 @@ class HtmlTemplateCreate(SQLModel):
     height: int = 600
     category_id: int | None = None
     is_active: bool = True
+    is_system: bool = False  # 仅管理员可设置为 True
 
 
 class HtmlTemplateUpdate(SQLModel):
@@ -166,6 +173,8 @@ class HtmlTemplateResponse(SQLModel):
     is_active: bool
     use_count: int
     created_by: int | None
+    is_system: bool  # 是否为系统模板
+    owner_id: int | None  # 模板所有者 ID
     created_at: str
     updated_at: str
 
@@ -196,6 +205,8 @@ class HtmlTemplateResponse(SQLModel):
             is_active=template.is_active,
             use_count=template.use_count,
             created_by=template.created_by,
+            is_system=template.is_system,
+            owner_id=template.owner_id,
             created_at=template.created_at.isoformat() if template.created_at else "",
             updated_at=template.updated_at.isoformat() if template.updated_at else "",
         )
