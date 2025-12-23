@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Send,
   Zap,
+  BookOpen,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -92,6 +93,16 @@ export const sidebarData: SidebarData = {
           title: '员工映射',
           url: '/analysis/staff-mapping',
           icon: UserRoundCog,
+        },
+      ],
+    },
+    {
+      title: '自媒体',
+      items: [
+        {
+          title: '自媒体中心',
+          url: '/media',
+          icon: BookOpen,
         },
       ],
     },

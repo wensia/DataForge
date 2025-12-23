@@ -26,9 +26,11 @@ import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as authOtpRouteImport } from './routes/(auth)/otp'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
+import { Route as AuthenticatedMediaRouteRouteImport } from './routes/_authenticated/media/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedMediaIndexRouteImport } from './routes/_authenticated/media/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedDajialaIndexRouteImport } from './routes/_authenticated/dajiala/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
@@ -47,6 +49,12 @@ import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_a
 import { Route as AuthenticatedSettingsApiKeysRouteImport } from './routes/_authenticated/settings/api-keys'
 import { Route as AuthenticatedSettingsAiRouteImport } from './routes/_authenticated/settings/ai'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedMediaTagsRouteImport } from './routes/_authenticated/media/tags'
+import { Route as AuthenticatedMediaPublishRouteImport } from './routes/_authenticated/media/publish'
+import { Route as AuthenticatedMediaEditorRouteImport } from './routes/_authenticated/media/editor'
+import { Route as AuthenticatedMediaAssetsRouteImport } from './routes/_authenticated/media/assets'
+import { Route as AuthenticatedMediaArticlesRouteImport } from './routes/_authenticated/media/articles'
+import { Route as AuthenticatedMediaAccountsRouteImport } from './routes/_authenticated/media/accounts'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedAnalysisStaffMappingRouteImport } from './routes/_authenticated/analysis/staff-mapping'
 import { Route as AuthenticatedAnalysisChatRouteImport } from './routes/_authenticated/analysis/chat'
@@ -138,6 +146,11 @@ const AuthenticatedSettingsRouteRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMediaRouteRoute = AuthenticatedMediaRouteRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -154,6 +167,11 @@ const AuthenticatedSettingsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedMediaIndexRoute = AuthenticatedMediaIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedMediaRouteRoute,
+} as any)
 const AuthenticatedHelpCenterIndexRoute =
   AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
@@ -259,6 +277,41 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedMediaTagsRoute = AuthenticatedMediaTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AuthenticatedMediaRouteRoute,
+} as any)
+const AuthenticatedMediaPublishRoute =
+  AuthenticatedMediaPublishRouteImport.update({
+    id: '/publish',
+    path: '/publish',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
+const AuthenticatedMediaEditorRoute =
+  AuthenticatedMediaEditorRouteImport.update({
+    id: '/editor',
+    path: '/editor',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
+const AuthenticatedMediaAssetsRoute =
+  AuthenticatedMediaAssetsRouteImport.update({
+    id: '/assets',
+    path: '/assets',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
+const AuthenticatedMediaArticlesRoute =
+  AuthenticatedMediaArticlesRouteImport.update({
+    id: '/articles',
+    path: '/articles',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
+const AuthenticatedMediaAccountsRoute =
+  AuthenticatedMediaAccountsRouteImport.update({
+    id: '/accounts',
+    path: '/accounts',
+    getParentRoute: () => AuthenticatedMediaRouteRoute,
+  } as any)
 const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
@@ -286,6 +339,7 @@ const AuthenticatedAdminPagesRoute = AuthenticatedAdminPagesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/record-download': typeof RecordDownloadRoute
+  '/media': typeof AuthenticatedMediaRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -304,6 +358,12 @@ export interface FileRoutesByFullPath {
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/media/accounts': typeof AuthenticatedMediaAccountsRoute
+  '/media/articles': typeof AuthenticatedMediaArticlesRoute
+  '/media/assets': typeof AuthenticatedMediaAssetsRoute
+  '/media/editor': typeof AuthenticatedMediaEditorRoute
+  '/media/publish': typeof AuthenticatedMediaPublishRoute
+  '/media/tags': typeof AuthenticatedMediaTagsRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -322,6 +382,7 @@ export interface FileRoutesByFullPath {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/dajiala': typeof AuthenticatedDajialaIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/media/': typeof AuthenticatedMediaIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -346,6 +407,12 @@ export interface FileRoutesByTo {
   '/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/media/accounts': typeof AuthenticatedMediaAccountsRoute
+  '/media/articles': typeof AuthenticatedMediaArticlesRoute
+  '/media/assets': typeof AuthenticatedMediaAssetsRoute
+  '/media/editor': typeof AuthenticatedMediaEditorRoute
+  '/media/publish': typeof AuthenticatedMediaPublishRoute
+  '/media/tags': typeof AuthenticatedMediaTagsRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -364,6 +431,7 @@ export interface FileRoutesByTo {
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/dajiala': typeof AuthenticatedDajialaIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/media': typeof AuthenticatedMediaIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -373,6 +441,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/chat': typeof ChatRoute
   '/record-download': typeof RecordDownloadRoute
+  '/_authenticated/media': typeof AuthenticatedMediaRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/otp': typeof authOtpRoute
@@ -391,6 +460,12 @@ export interface FileRoutesById {
   '/_authenticated/analysis/chat': typeof AuthenticatedAnalysisChatRoute
   '/_authenticated/analysis/staff-mapping': typeof AuthenticatedAnalysisStaffMappingRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/media/accounts': typeof AuthenticatedMediaAccountsRoute
+  '/_authenticated/media/articles': typeof AuthenticatedMediaArticlesRoute
+  '/_authenticated/media/assets': typeof AuthenticatedMediaAssetsRoute
+  '/_authenticated/media/editor': typeof AuthenticatedMediaEditorRoute
+  '/_authenticated/media/publish': typeof AuthenticatedMediaPublishRoute
+  '/_authenticated/media/tags': typeof AuthenticatedMediaTagsRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/ai': typeof AuthenticatedSettingsAiRoute
   '/_authenticated/settings/api-keys': typeof AuthenticatedSettingsApiKeysRoute
@@ -409,6 +484,7 @@ export interface FileRoutesById {
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/dajiala/': typeof AuthenticatedDajialaIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/_authenticated/media/': typeof AuthenticatedMediaIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
@@ -418,6 +494,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/chat'
     | '/record-download'
+    | '/media'
     | '/settings'
     | '/forgot-password'
     | '/otp'
@@ -436,6 +513,12 @@ export interface FileRouteTypes {
     | '/analysis/chat'
     | '/analysis/staff-mapping'
     | '/errors/$error'
+    | '/media/accounts'
+    | '/media/articles'
+    | '/media/assets'
+    | '/media/editor'
+    | '/media/publish'
+    | '/media/tags'
     | '/settings/account'
     | '/settings/ai'
     | '/settings/api-keys'
@@ -454,6 +537,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/dajiala'
     | '/help-center'
+    | '/media/'
     | '/settings/'
     | '/tasks'
     | '/users'
@@ -478,6 +562,12 @@ export interface FileRouteTypes {
     | '/analysis/chat'
     | '/analysis/staff-mapping'
     | '/errors/$error'
+    | '/media/accounts'
+    | '/media/articles'
+    | '/media/assets'
+    | '/media/editor'
+    | '/media/publish'
+    | '/media/tags'
     | '/settings/account'
     | '/settings/ai'
     | '/settings/api-keys'
@@ -496,6 +586,7 @@ export interface FileRouteTypes {
     | '/chats'
     | '/dajiala'
     | '/help-center'
+    | '/media'
     | '/settings'
     | '/tasks'
     | '/users'
@@ -504,6 +595,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/chat'
     | '/record-download'
+    | '/_authenticated/media'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
     | '/(auth)/otp'
@@ -522,6 +614,12 @@ export interface FileRouteTypes {
     | '/_authenticated/analysis/chat'
     | '/_authenticated/analysis/staff-mapping'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/media/accounts'
+    | '/_authenticated/media/articles'
+    | '/_authenticated/media/assets'
+    | '/_authenticated/media/editor'
+    | '/_authenticated/media/publish'
+    | '/_authenticated/media/tags'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/ai'
     | '/_authenticated/settings/api-keys'
@@ -540,6 +638,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chats/'
     | '/_authenticated/dajiala/'
     | '/_authenticated/help-center/'
+    | '/_authenticated/media/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/users/'
@@ -682,6 +781,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/media': {
+      id: '/_authenticated/media'
+      path: '/media'
+      fullPath: '/media'
+      preLoaderRoute: typeof AuthenticatedMediaRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users/': {
       id: '/_authenticated/users/'
       path: '/users'
@@ -702,6 +808,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/media/': {
+      id: '/_authenticated/media/'
+      path: '/'
+      fullPath: '/media/'
+      preLoaderRoute: typeof AuthenticatedMediaIndexRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
     }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
@@ -829,6 +942,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/media/tags': {
+      id: '/_authenticated/media/tags'
+      path: '/tags'
+      fullPath: '/media/tags'
+      preLoaderRoute: typeof AuthenticatedMediaTagsRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
+    '/_authenticated/media/publish': {
+      id: '/_authenticated/media/publish'
+      path: '/publish'
+      fullPath: '/media/publish'
+      preLoaderRoute: typeof AuthenticatedMediaPublishRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
+    '/_authenticated/media/editor': {
+      id: '/_authenticated/media/editor'
+      path: '/editor'
+      fullPath: '/media/editor'
+      preLoaderRoute: typeof AuthenticatedMediaEditorRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
+    '/_authenticated/media/assets': {
+      id: '/_authenticated/media/assets'
+      path: '/assets'
+      fullPath: '/media/assets'
+      preLoaderRoute: typeof AuthenticatedMediaAssetsRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
+    '/_authenticated/media/articles': {
+      id: '/_authenticated/media/articles'
+      path: '/articles'
+      fullPath: '/media/articles'
+      preLoaderRoute: typeof AuthenticatedMediaArticlesRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
+    '/_authenticated/media/accounts': {
+      id: '/_authenticated/media/accounts'
+      path: '/accounts'
+      fullPath: '/media/accounts'
+      preLoaderRoute: typeof AuthenticatedMediaAccountsRouteImport
+      parentRoute: typeof AuthenticatedMediaRouteRoute
+    }
     '/_authenticated/errors/$error': {
       id: '/_authenticated/errors/$error'
       path: '/errors/$error'
@@ -859,6 +1014,32 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedMediaRouteRouteChildren {
+  AuthenticatedMediaAccountsRoute: typeof AuthenticatedMediaAccountsRoute
+  AuthenticatedMediaArticlesRoute: typeof AuthenticatedMediaArticlesRoute
+  AuthenticatedMediaAssetsRoute: typeof AuthenticatedMediaAssetsRoute
+  AuthenticatedMediaEditorRoute: typeof AuthenticatedMediaEditorRoute
+  AuthenticatedMediaPublishRoute: typeof AuthenticatedMediaPublishRoute
+  AuthenticatedMediaTagsRoute: typeof AuthenticatedMediaTagsRoute
+  AuthenticatedMediaIndexRoute: typeof AuthenticatedMediaIndexRoute
+}
+
+const AuthenticatedMediaRouteRouteChildren: AuthenticatedMediaRouteRouteChildren =
+  {
+    AuthenticatedMediaAccountsRoute: AuthenticatedMediaAccountsRoute,
+    AuthenticatedMediaArticlesRoute: AuthenticatedMediaArticlesRoute,
+    AuthenticatedMediaAssetsRoute: AuthenticatedMediaAssetsRoute,
+    AuthenticatedMediaEditorRoute: AuthenticatedMediaEditorRoute,
+    AuthenticatedMediaPublishRoute: AuthenticatedMediaPublishRoute,
+    AuthenticatedMediaTagsRoute: AuthenticatedMediaTagsRoute,
+    AuthenticatedMediaIndexRoute: AuthenticatedMediaIndexRoute,
+  }
+
+const AuthenticatedMediaRouteRouteWithChildren =
+  AuthenticatedMediaRouteRoute._addFileChildren(
+    AuthenticatedMediaRouteRouteChildren,
+  )
 
 interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
@@ -898,6 +1079,7 @@ const AuthenticatedSettingsRouteRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedMediaRouteRoute: typeof AuthenticatedMediaRouteRouteWithChildren
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedAccountsRoute: typeof AuthenticatedAccountsRoute
   AuthenticatedTaskExecutionsRoute: typeof AuthenticatedTaskExecutionsRoute
@@ -918,6 +1100,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedMediaRouteRoute: AuthenticatedMediaRouteRouteWithChildren,
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedAccountsRoute: AuthenticatedAccountsRoute,
   AuthenticatedTaskExecutionsRoute: AuthenticatedTaskExecutionsRoute,
