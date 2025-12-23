@@ -182,9 +182,9 @@ export function TemplateMutateDrawer({
 
               <TabsContent
                 value='basic'
-                className='mt-0 min-h-0 flex-1 overflow-y-auto'
+                className='mt-0 min-h-0 flex-1 overflow-y-auto px-1'
               >
-                <div className='space-y-4 px-0.5 pb-4'>
+                <div className='space-y-4 pb-4'>
                   {/* 模板名称 */}
                   <FormField
                     control={form.control}
@@ -336,9 +336,9 @@ export function TemplateMutateDrawer({
 
               <TabsContent
                 value='code'
-                className='mt-0 min-h-0 flex-1 overflow-y-auto'
+                className='mt-0 min-h-0 flex-1 overflow-y-auto px-1'
               >
-                <div className='space-y-4 px-0.5 pb-4'>
+                <div className='space-y-4 pb-4'>
                   {/* HTML 内容 */}
                   <FormField
                     control={form.control}
