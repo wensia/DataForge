@@ -842,6 +842,81 @@
   box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.3);
 }
 
+/* ===== Anthropic Command/Combobox Styles ===== */
+/* Override accent color for selected items - use orange instead of green */
+.style-anthropic [data-slot='command-item'][data-selected='true'],
+.style-anthropic [cmdk-item][data-selected='true'],
+.style-anthropic [cmdk-item][aria-selected='true'] {
+  background-color: rgba(217, 119, 87, 0.15) !important;
+  color: #d97757 !important;
+}
+
+.style-anthropic.dark [data-slot='command-item'][data-selected='true'],
+.dark .style-anthropic [data-slot='command-item'][data-selected='true'],
+.style-anthropic.dark [cmdk-item][data-selected='true'],
+.dark .style-anthropic [cmdk-item][data-selected='true'],
+.style-anthropic.dark [cmdk-item][aria-selected='true'],
+.dark .style-anthropic [cmdk-item][aria-selected='true'] {
+  background-color: rgba(217, 119, 87, 0.2) !important;
+  color: #d97757 !important;
+}
+
+/* Command input styling */
+.style-anthropic [data-slot='command-input-wrapper'] {
+  border-color: #e8e6dc;
+}
+
+.style-anthropic.dark [data-slot='command-input-wrapper'],
+.dark .style-anthropic [data-slot='command-input-wrapper'] {
+  border-color: #3a3a39;
+}
+
+/* Command item hover */
+.style-anthropic [data-slot='command-item']:hover,
+.style-anthropic [cmdk-item]:hover {
+  background-color: rgba(217, 119, 87, 0.08);
+}
+
+/* Checkbox in command items - use orange */
+.style-anthropic [data-slot='command-item'] .bg-primary,
+.style-anthropic [cmdk-item] .bg-primary {
+  background-color: #d97757 !important;
+}
+
+.style-anthropic [data-slot='command-item'] .border-primary,
+.style-anthropic [cmdk-item] .border-primary {
+  border-color: #d97757 !important;
+}
+
+/* Popover content for filters */
+.style-anthropic [data-slot='popover-content'] {
+  border-color: #e8e6dc;
+  box-shadow: 0 4px 16px rgba(20, 20, 19, 0.12);
+}
+
+.style-anthropic.dark [data-slot='popover-content'],
+.dark .style-anthropic [data-slot='popover-content'] {
+  border-color: #3a3a39;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Filter button styling */
+.style-anthropic button[class*='border-dashed'] {
+  border-color: #d97757;
+  color: #d97757;
+}
+
+.style-anthropic button[class*='border-dashed']:hover {
+  background-color: rgba(217, 119, 87, 0.08);
+  border-color: #c5684a;
+}
+
+/* Badge in filter button */
+.style-anthropic button [class*='badge'] {
+  background-color: rgba(217, 119, 87, 0.15);
+  color: #d97757;
+}
+
 /* ===== Dynamic Border Radius Overrides ===== */
 /* Override Tailwind's static rounded utilities to use dynamic --radius variable */
 .rounded-sm {
