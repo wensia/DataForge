@@ -19,7 +19,7 @@ export const styles = [
 
 export type Style = (typeof styles)[number]
 
-export const DEFAULT_STYLE: Style = 'anthropic'
+export const DEFAULT_STYLE: Style = 'lyra'
 
 export interface StyleConfig {
   name: string
