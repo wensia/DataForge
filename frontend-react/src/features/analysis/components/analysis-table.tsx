@@ -636,12 +636,16 @@ export function AnalysisTable() {
             </span>
           )}
 
+          {/* 列可见性 */}
+          <DataTableViewOptions table={table} columnNames={columnNames} />
+
           {/* 刷新按钮 */}
           <Button
-            variant='outline'
+            variant='default'
             size='icon-xs'
             onClick={() => refetchRecords()}
             disabled={recordsFetching}
+            title='刷新数据'
           >
             {recordsFetching ? (
               <Loader2 className='h-4 w-4 animate-spin' />
@@ -649,9 +653,6 @@ export function AnalysisTable() {
               <RotateCcw className='h-4 w-4' />
             )}
           </Button>
-
-          {/* 列可见性 */}
-          <DataTableViewOptions table={table} columnNames={columnNames} />
         </div>
       </div>
 
