@@ -483,10 +483,11 @@ export function TaskExecutions() {
                   placeholder='搜索任务名称或ID...'
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className='h-8 w-[200px]'
+                  inputSize='xs'
+                  className='w-[200px]'
                 />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className='h-8 w-[120px]'>
+                  <SelectTrigger selectSize='xs' className='w-[120px]'>
                     <SelectValue placeholder='状态' />
                   </SelectTrigger>
                   <SelectContent>
@@ -499,7 +500,7 @@ export function TaskExecutions() {
                   </SelectContent>
                 </Select>
                 <Select value={taskFilter} onValueChange={setTaskFilter}>
-                  <SelectTrigger className='h-8 w-[160px]'>
+                  <SelectTrigger selectSize='xs' className='w-[160px]'>
                     <SelectValue placeholder='任务' />
                   </SelectTrigger>
                   <SelectContent>

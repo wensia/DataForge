@@ -43,7 +43,8 @@ export function AccountsRowActions<TData>({
       <DropdownMenuTrigger asChild>
         <Button
           variant='ghost'
-          className='data-[state=open]:bg-muted flex h-8 w-8 p-0'
+          size='icon-xs'
+          className='data-[state=open]:bg-muted'
         >
           <DotsHorizontalIcon className='h-4 w-4' />
           <span className='sr-only'>打开菜单</span>

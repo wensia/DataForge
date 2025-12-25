@@ -86,7 +86,8 @@ export function TranscriptStatsDialog({
               id='duration-min'
               type='number'
               placeholder='秒'
-              className='h-8 w-24'
+              inputSize='xs'
+              className='w-24'
               min={0}
               value={durationMin ?? ''}
               onChange={(e) => {

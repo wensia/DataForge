@@ -41,14 +41,16 @@ export function DataTableToolbar<TData>({
             onChange={(event) =>
               table.getColumn(searchKey)?.setFilterValue(event.target.value)
             }
-            className='h-8 w-[150px] lg:w-[250px]'
+            inputSize='xs'
+            className='w-[150px] lg:w-[250px]'
           />
         ) : (
           <Input
             placeholder={searchPlaceholder}
             value={table.getState().globalFilter ?? ''}
             onChange={(event) => table.setGlobalFilter(event.target.value)}
-            className='h-8 w-[150px] lg:w-[250px]'
+            inputSize='xs'
+            className='w-[150px] lg:w-[250px]'
           />
         )}
         <div className='flex gap-x-2'>
@@ -68,11 +70,11 @@ export function DataTableToolbar<TData>({
         {isFiltered && (
           <Button
             variant='ghost'
+            size='xs'
             onClick={() => {
               table.resetColumnFilters()
               table.setGlobalFilter('')
             }}
-            className='h-8 px-2 lg:px-3'
           >
             Reset
             <Cross2Icon className='ms-2 h-4 w-4' />

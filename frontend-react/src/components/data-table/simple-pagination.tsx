@@ -54,7 +54,7 @@ export function SimplePagination({
               value={String(pageSize)}
               onValueChange={(value) => onPageSizeChange(Number(value))}
             >
-              <SelectTrigger className='h-8 w-[80px]'>
+              <SelectTrigger selectSize='xs' className='w-[80px]'>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -72,8 +72,7 @@ export function SimplePagination({
       <div className='flex items-center gap-1'>
         <Button
           variant='outline'
-          size='icon'
-          className='h-8 w-8'
+          size='icon-xs'
           onClick={() => onPageChange(1)}
           disabled={page <= 1}
         >
@@ -81,8 +80,7 @@ export function SimplePagination({
         </Button>
         <Button
           variant='outline'
-          size='icon'
-          className='h-8 w-8'
+          size='icon-xs'
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
         >
@@ -96,7 +94,8 @@ export function SimplePagination({
             ) : (
               <Button
                 variant={page === pageNumber ? 'default' : 'outline'}
-                className='h-8 min-w-11 px-2.5'
+                size='xs'
+                className='min-w-11'
                 onClick={() => onPageChange(pageNumber as number)}
               >
                 {pageNumber}
@@ -107,8 +106,7 @@ export function SimplePagination({
 
         <Button
           variant='outline'
-          size='icon'
-          className='h-8 w-8'
+          size='icon-xs'
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
         >
@@ -116,8 +114,7 @@ export function SimplePagination({
         </Button>
         <Button
           variant='outline'
-          size='icon'
-          className='h-8 w-8'
+          size='icon-xs'
           onClick={() => onPageChange(totalPages)}
           disabled={page >= totalPages}
         >

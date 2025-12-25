@@ -263,18 +263,17 @@ export function Chats() {
                   <div className='border-input bg-card focus-within:ring-ring flex flex-1 items-center gap-2 rounded-md border px-2 py-1 focus-within:ring-1 focus-within:outline-hidden lg:gap-4'>
                     <div className='space-x-1'>
                       <Button
-                        size='icon'
+                        size='icon-xs'
                         type='button'
                         variant='ghost'
-                        className='h-8 rounded-md'
                       >
                         <Plus size={20} className='stroke-muted-foreground' />
                       </Button>
                       <Button
-                        size='icon'
+                        size='icon-xs'
                         type='button'
                         variant='ghost'
-                        className='hidden h-8 rounded-md lg:inline-flex'
+                        className='hidden lg:inline-flex'
                       >
                         <ImagePlus
                           size={20}
@@ -282,10 +281,10 @@ export function Chats() {
                         />
                       </Button>
                       <Button
-                        size='icon'
+                        size='icon-xs'
                         type='button'
                         variant='ghost'
-                        className='hidden h-8 rounded-md lg:inline-flex'
+                        className='hidden lg:inline-flex'
                       >
                         <Paperclip
                           size={20}

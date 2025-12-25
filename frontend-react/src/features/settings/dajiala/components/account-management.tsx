@@ -599,7 +599,8 @@ function EditTagInline({ tag, colorOptions, onSave, onCancel, isPending }: EditT
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="h-8 flex-1"
+        inputSize='xs'
+        className='flex-1'
       />
       <select
         value={color}
@@ -613,14 +614,13 @@ function EditTagInline({ tag, colorOptions, onSave, onCancel, isPending }: EditT
         ))}
       </select>
       <Button
-        size="sm"
-        className="h-8"
+        size='xs'
         onClick={() => onSave({ name, color })}
         disabled={isPending}
       >
         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : '保存'}
       </Button>
-      <Button variant="ghost" size="sm" className="h-8" onClick={onCancel}>
+      <Button variant='ghost' size='xs' onClick={onCancel}>
         取消
       </Button>
     </div>

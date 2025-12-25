@@ -432,9 +432,9 @@ export function AnalysisTable() {
             <PopoverTrigger asChild>
               <Button
                 variant='outline'
-                size='sm'
+                size='xs'
                 className={cn(
-                  'h-8 justify-start text-left font-normal',
+                  'justify-start text-left font-normal',
                   !dateRange.from && 'text-muted-foreground'
                 )}
               >
@@ -551,7 +551,8 @@ export function AnalysisTable() {
               placeholder='最小秒'
               value={durationMin}
               onChange={(e) => setDurationMin(e.target.value)}
-              className='h-8 w-20'
+              inputSize='xs'
+              className='w-20'
               min={0}
             />
             <span className='text-muted-foreground'>-</span>
@@ -560,19 +561,20 @@ export function AnalysisTable() {
               placeholder='最大秒'
               value={durationMax}
               onChange={(e) => setDurationMax(e.target.value)}
-              className='h-8 w-20'
+              inputSize='xs'
+              className='w-20'
               min={0}
             />
           </div>
 
           {/* 搜索按钮 */}
-          <Button size='sm' onClick={handleSearch}>
+          <Button size='xs' onClick={handleSearch}>
             查询
           </Button>
 
           {/* 重置按钮 */}
           {isFiltered && (
-            <Button variant='ghost' size='sm' onClick={handleResetFilters}>
+            <Button variant='ghost' size='xs' onClick={handleResetFilters}>
               重置
             </Button>
           )}
@@ -587,7 +589,7 @@ export function AnalysisTable() {
               </span>
               <Button
                 variant='destructive'
-                size='sm'
+                size='xs'
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={deleteMutation.isPending}
               >
@@ -604,7 +606,7 @@ export function AnalysisTable() {
           {/* 转写统计按钮 */}
           <Button
             variant='outline'
-            size='sm'
+            size='xs'
             onClick={() => setOpen('transcript-stats')}
           >
             <BarChart3 className='mr-2 h-4 w-4' />
@@ -614,7 +616,7 @@ export function AnalysisTable() {
           {/* 刷新按钮 */}
           <Button
             variant='outline'
-            size='sm'
+            size='icon-xs'
             onClick={() => refetchRecords()}
             disabled={recordsFetching}
           >
@@ -755,7 +757,7 @@ function ServerSideFilter({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant='outline' size='sm' className='h-8 border-dashed'>
+        <Button variant='outline' size='xs' className='border-dashed'>
           <PlusCircle className='mr-2 h-4 w-4' />
           {title}
           {selectedOption && (
