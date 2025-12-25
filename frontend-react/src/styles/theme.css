@@ -330,6 +330,518 @@
   opacity: 1;
 }
 
+/* ===== Anthropic Spacing System ===== */
+/* Brand-recommended spacing scale based on 4px grid */
+.style-anthropic {
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+}
+
+/* ===== Anthropic Typography Scale ===== */
+.style-anthropic {
+  /* Font sizes - slightly larger for better readability */
+  --text-xs: 0.8125rem;    /* 13px */
+  --text-sm: 0.9375rem;    /* 15px */
+  --text-base: 1.0625rem;  /* 17px */
+  --text-lg: 1.1875rem;    /* 19px */
+  --text-xl: 1.375rem;     /* 22px */
+  --text-2xl: 1.625rem;    /* 26px */
+  --text-3xl: 2rem;        /* 32px */
+  --text-4xl: 2.5rem;      /* 40px */
+
+  /* Line heights - optimized for Poppins/Lora */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+}
+
+/* Apply typography scale */
+.style-anthropic .text-xs { font-size: var(--text-xs); }
+.style-anthropic .text-sm { font-size: var(--text-sm); }
+.style-anthropic .text-base { font-size: var(--text-base); }
+.style-anthropic .text-lg { font-size: var(--text-lg); }
+.style-anthropic .text-xl { font-size: var(--text-xl); }
+.style-anthropic .text-2xl { font-size: var(--text-2xl); }
+.style-anthropic .text-3xl { font-size: var(--text-3xl); }
+.style-anthropic .text-4xl { font-size: var(--text-4xl); }
+
+/* Heading styles */
+.style-anthropic h1 {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.style-anthropic h2 {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.style-anthropic h3 {
+  font-size: var(--text-xl);
+  line-height: var(--leading-tight);
+}
+
+.style-anthropic h4 {
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}
+
+.style-anthropic h5,
+.style-anthropic h6 {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+/* Body text */
+.style-anthropic p {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+/* ===== Anthropic Button Styles ===== */
+.style-anthropic button,
+.style-anthropic [role='button'] {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+}
+
+/* Primary button */
+.style-anthropic .bg-primary {
+  background-color: #d97757 !important;
+  box-shadow: 0 1px 2px rgba(20, 20, 19, 0.1);
+}
+
+.style-anthropic .bg-primary:hover {
+  background-color: #c5684a !important;
+  box-shadow: 0 2px 4px rgba(20, 20, 19, 0.15);
+}
+
+/* Secondary button */
+.style-anthropic .bg-secondary {
+  background-color: #6a9bcc !important;
+}
+
+.style-anthropic .bg-secondary:hover {
+  background-color: #5a8bbc !important;
+}
+
+/* Button sizes - unified */
+.style-anthropic button[class*='h-9'],
+.style-anthropic [role='button'][class*='h-9'] {
+  height: 2.375rem; /* 38px */
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.style-anthropic button[class*='h-10'],
+.style-anthropic [role='button'][class*='h-10'] {
+  height: 2.625rem; /* 42px */
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.style-anthropic button[class*='h-11'],
+.style-anthropic [role='button'][class*='h-11'] {
+  height: 2.875rem; /* 46px */
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* ===== Anthropic Card Styles ===== */
+.style-anthropic [class*='card'] {
+  border-color: #e8e6dc;
+  box-shadow: 0 1px 3px rgba(20, 20, 19, 0.05);
+}
+
+.style-anthropic.dark [class*='card'],
+.dark .style-anthropic [class*='card'] {
+  border-color: #3a3a39;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Card padding - unified 24px */
+.style-anthropic [data-slot='card-header'],
+.style-anthropic [class*='CardHeader'] {
+  padding: 1.5rem 1.5rem 0.75rem;
+}
+
+.style-anthropic [data-slot='card-content'],
+.style-anthropic [class*='CardContent'] {
+  padding: 0.75rem 1.5rem;
+}
+
+.style-anthropic [data-slot='card-footer'],
+.style-anthropic [class*='CardFooter'] {
+  padding: 0.75rem 1.5rem 1.5rem;
+}
+
+/* Card title */
+.style-anthropic [data-slot='card-title'],
+.style-anthropic [class*='CardTitle'] {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: #141413;
+}
+
+.style-anthropic.dark [data-slot='card-title'],
+.dark .style-anthropic [data-slot='card-title'],
+.style-anthropic.dark [class*='CardTitle'],
+.dark .style-anthropic [class*='CardTitle'] {
+  color: #faf9f5;
+}
+
+/* Card description */
+.style-anthropic [data-slot='card-description'],
+.style-anthropic [class*='CardDescription'] {
+  font-size: var(--text-sm);
+  color: #b0aea5;
+}
+
+/* ===== Anthropic Table Styles ===== */
+.style-anthropic table {
+  font-size: var(--text-sm);
+}
+
+/* Table header */
+.style-anthropic th,
+.style-anthropic thead td {
+  font-family: var(--font-poppins);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b0aea5;
+  padding: 0.875rem 1rem;
+  border-bottom: 2px solid #e8e6dc;
+}
+
+.style-anthropic.dark th,
+.dark .style-anthropic th,
+.style-anthropic.dark thead td,
+.dark .style-anthropic thead td {
+  color: #b0aea5;
+  border-bottom-color: #3a3a39;
+}
+
+/* Table cells */
+.style-anthropic td {
+  padding: 1rem;
+  border-bottom: 1px solid #e8e6dc;
+  vertical-align: middle;
+}
+
+.style-anthropic.dark td,
+.dark .style-anthropic td {
+  border-bottom-color: #2a2a29;
+}
+
+/* Table row hover */
+.style-anthropic tbody tr:hover {
+  background-color: rgba(232, 230, 220, 0.5);
+}
+
+.style-anthropic.dark tbody tr:hover,
+.dark .style-anthropic tbody tr:hover {
+  background-color: rgba(42, 42, 41, 0.5);
+}
+
+/* ===== Anthropic Form Styles ===== */
+/* Input fields */
+.style-anthropic input[type='text'],
+.style-anthropic input[type='email'],
+.style-anthropic input[type='password'],
+.style-anthropic input[type='number'],
+.style-anthropic input[type='search'],
+.style-anthropic input[type='url'],
+.style-anthropic input[type='tel'],
+.style-anthropic textarea,
+.style-anthropic select {
+  font-size: var(--text-sm);
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.375rem;
+  border: 1px solid #e8e6dc;
+  background-color: #faf9f5;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.style-anthropic.dark input[type='text'],
+.style-anthropic.dark input[type='email'],
+.style-anthropic.dark input[type='password'],
+.style-anthropic.dark input[type='number'],
+.style-anthropic.dark input[type='search'],
+.style-anthropic.dark input[type='url'],
+.style-anthropic.dark input[type='tel'],
+.style-anthropic.dark textarea,
+.style-anthropic.dark select,
+.dark .style-anthropic input[type='text'],
+.dark .style-anthropic input[type='email'],
+.dark .style-anthropic input[type='password'],
+.dark .style-anthropic input[type='number'],
+.dark .style-anthropic input[type='search'],
+.dark .style-anthropic input[type='url'],
+.dark .style-anthropic input[type='tel'],
+.dark .style-anthropic textarea,
+.dark .style-anthropic select {
+  border-color: #3a3a39;
+  background-color: #1a1a19;
+}
+
+/* Input focus */
+.style-anthropic input:focus,
+.style-anthropic textarea:focus,
+.style-anthropic select:focus {
+  border-color: #d97757;
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.15);
+  outline: none;
+}
+
+/* Input height - unified */
+.style-anthropic input[class*='h-9'] { height: 2.375rem; }
+.style-anthropic input[class*='h-10'] { height: 2.625rem; }
+.style-anthropic input[class*='h-11'] { height: 2.875rem; }
+
+/* Labels */
+.style-anthropic label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: #141413;
+  margin-bottom: 0.375rem;
+}
+
+.style-anthropic.dark label,
+.dark .style-anthropic label {
+  color: #faf9f5;
+}
+
+/* Checkbox and Radio */
+.style-anthropic input[type='checkbox'],
+.style-anthropic input[type='radio'] {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: #d97757;
+}
+
+/* ===== Anthropic Layout Spacing ===== */
+/* Main content area */
+.style-anthropic main,
+.style-anthropic [data-slot='main'] {
+  padding: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .style-anthropic main,
+  .style-anthropic [data-slot='main'] {
+    padding: 2rem;
+  }
+}
+
+/* Section spacing */
+.style-anthropic section {
+  margin-bottom: 2rem;
+}
+
+/* Grid gaps - unified */
+.style-anthropic .gap-2 { gap: 0.625rem; }
+.style-anthropic .gap-3 { gap: 0.875rem; }
+.style-anthropic .gap-4 { gap: 1.125rem; }
+.style-anthropic .gap-6 { gap: 1.625rem; }
+.style-anthropic .gap-8 { gap: 2.125rem; }
+
+/* Padding utilities - slightly increased */
+.style-anthropic .p-2 { padding: 0.625rem; }
+.style-anthropic .p-3 { padding: 0.875rem; }
+.style-anthropic .p-4 { padding: 1.125rem; }
+.style-anthropic .p-6 { padding: 1.625rem; }
+.style-anthropic .p-8 { padding: 2.125rem; }
+
+.style-anthropic .px-2 { padding-left: 0.625rem; padding-right: 0.625rem; }
+.style-anthropic .px-3 { padding-left: 0.875rem; padding-right: 0.875rem; }
+.style-anthropic .px-4 { padding-left: 1.125rem; padding-right: 1.125rem; }
+.style-anthropic .px-6 { padding-left: 1.625rem; padding-right: 1.625rem; }
+.style-anthropic .px-8 { padding-left: 2.125rem; padding-right: 2.125rem; }
+
+.style-anthropic .py-2 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.style-anthropic .py-3 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+.style-anthropic .py-4 { padding-top: 1.125rem; padding-bottom: 1.125rem; }
+.style-anthropic .py-6 { padding-top: 1.625rem; padding-bottom: 1.625rem; }
+.style-anthropic .py-8 { padding-top: 2.125rem; padding-bottom: 2.125rem; }
+
+/* ===== Anthropic Sidebar Styles ===== */
+.style-anthropic [data-sidebar='sidebar'] {
+  background-color: #faf9f5;
+  border-right: 1px solid #e8e6dc;
+}
+
+.style-anthropic.dark [data-sidebar='sidebar'],
+.dark .style-anthropic [data-sidebar='sidebar'] {
+  background-color: #141413;
+  border-right-color: #2a2a29;
+}
+
+/* Sidebar menu items */
+.style-anthropic [data-sidebar='menu-button'] {
+  font-size: var(--text-sm);
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+.style-anthropic [data-sidebar='menu-button']:hover {
+  background-color: rgba(217, 119, 87, 0.1);
+}
+
+.style-anthropic [data-sidebar='menu-button'][data-active='true'] {
+  background-color: rgba(217, 119, 87, 0.15);
+  color: #d97757;
+  font-weight: 500;
+}
+
+.style-anthropic.dark [data-sidebar='menu-button']:hover,
+.dark .style-anthropic [data-sidebar='menu-button']:hover {
+  background-color: rgba(217, 119, 87, 0.15);
+}
+
+.style-anthropic.dark [data-sidebar='menu-button'][data-active='true'],
+.dark .style-anthropic [data-sidebar='menu-button'][data-active='true'] {
+  background-color: rgba(217, 119, 87, 0.2);
+}
+
+/* Sidebar group titles */
+.style-anthropic [data-sidebar='group-label'] {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #b0aea5;
+  padding: 0.5rem 0.875rem;
+  margin-top: 1rem;
+}
+
+/* ===== Anthropic Badge Styles ===== */
+.style-anthropic [class*='badge'] {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+}
+
+/* ===== Anthropic Dialog/Modal Styles ===== */
+.style-anthropic [role='dialog'] {
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 24px rgba(20, 20, 19, 0.15);
+}
+
+.style-anthropic.dark [role='dialog'],
+.dark .style-anthropic [role='dialog'] {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Dialog header */
+.style-anthropic [role='dialog'] [class*='DialogHeader'] {
+  padding: 1.5rem 1.5rem 1rem;
+}
+
+/* Dialog content */
+.style-anthropic [role='dialog'] [class*='DialogContent'] {
+  padding: 0 1.5rem 1rem;
+}
+
+/* Dialog footer */
+.style-anthropic [role='dialog'] [class*='DialogFooter'] {
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+/* ===== Anthropic Dropdown Menu Styles ===== */
+.style-anthropic [role='menu'] {
+  border-radius: 0.375rem;
+  border: 1px solid #e8e6dc;
+  box-shadow: 0 4px 12px rgba(20, 20, 19, 0.1);
+  padding: 0.375rem;
+}
+
+.style-anthropic.dark [role='menu'],
+.dark .style-anthropic [role='menu'] {
+  border-color: #3a3a39;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.style-anthropic [role='menuitem'] {
+  font-size: var(--text-sm);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+}
+
+.style-anthropic [role='menuitem']:hover {
+  background-color: rgba(217, 119, 87, 0.1);
+}
+
+/* ===== Anthropic Tooltip Styles ===== */
+.style-anthropic [role='tooltip'] {
+  font-size: var(--text-xs);
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.25rem;
+  background-color: #141413;
+  color: #faf9f5;
+}
+
+.style-anthropic.dark [role='tooltip'],
+.dark .style-anthropic [role='tooltip'] {
+  background-color: #faf9f5;
+  color: #141413;
+}
+
+/* ===== Anthropic Scrollbar Styles ===== */
+.style-anthropic ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.style-anthropic ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.style-anthropic ::-webkit-scrollbar-thumb {
+  background-color: #b0aea5;
+  border-radius: 4px;
+}
+
+.style-anthropic ::-webkit-scrollbar-thumb:hover {
+  background-color: #d97757;
+}
+
+.style-anthropic.dark ::-webkit-scrollbar-thumb,
+.dark .style-anthropic ::-webkit-scrollbar-thumb {
+  background-color: #3a3a39;
+}
+
+.style-anthropic.dark ::-webkit-scrollbar-thumb:hover,
+.dark .style-anthropic ::-webkit-scrollbar-thumb:hover {
+  background-color: #d97757;
+}
+
+/* ===== Anthropic Focus States ===== */
+.style-anthropic :focus-visible {
+  outline: 2px solid #d97757;
+  outline-offset: 2px;
+}
+
+.style-anthropic button:focus-visible,
+.style-anthropic [role='button']:focus-visible {
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.3);
+}
+
 /* ===== Dynamic Border Radius Overrides ===== */
 /* Override Tailwind's static rounded utilities to use dynamic --radius variable */
 .rounded-sm {
