@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { styles, Style, DEFAULT_STYLE, styleConfig } from '@/config/styles'
+import { styles, DEFAULT_STYLE, styleConfig, type Style } from '@/config/styles'
 import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
 
 const STYLE_COOKIE_NAME = 'visual-style'

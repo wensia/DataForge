@@ -65,6 +65,8 @@
   --font-inter: 'Inter', 'sans-serif';
   --font-manrope: 'Manrope', 'sans-serif';
   --font-jetbrains-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --font-poppins: 'Poppins', 'Arial', sans-serif;
+  --font-lora: 'Lora', 'Georgia', serif;
 
   /* 圆角层级 - 基于 --radius 变量计算 */
   /* Tailwind v4 border-radius scale overrides */
@@ -143,6 +145,101 @@
 /* Mira: Dense & Compact */
 .style-mira {
   --radius: 0.25rem; /* 4px */
+}
+
+/* Anthropic: Warm & Elegant - Official Brand Style */
+.style-anthropic {
+  --radius: 0.375rem; /* 6px */
+
+  /* Anthropic Brand Colors - Light Mode */
+  --background: #faf9f5;
+  --foreground: #141413;
+  --card: #faf9f5;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
+  --primary: #d97757;
+  --primary-foreground: #faf9f5;
+  --secondary: #6a9bcc;
+  --secondary-foreground: #141413;
+  --muted: #e8e6dc;
+  --muted-foreground: #b0aea5;
+  --accent: #788c5d;
+  --accent-foreground: #faf9f5;
+  --destructive: #dc2626;
+  --border: #e8e6dc;
+  --input: #e8e6dc;
+  --ring: #d97757;
+  --chart-1: #d97757;
+  --chart-2: #6a9bcc;
+  --chart-3: #788c5d;
+  --chart-4: #b0aea5;
+  --chart-5: #141413;
+
+  /* Font family - Poppins for general, Lora for body text */
+  font-family: var(--font-poppins);
+}
+
+/* Anthropic: Dark Mode Colors */
+.style-anthropic.dark,
+.dark .style-anthropic {
+  --background: #141413;
+  --foreground: #faf9f5;
+  --card: #1a1a19;
+  --card-foreground: #faf9f5;
+  --popover: #1a1a19;
+  --popover-foreground: #faf9f5;
+  --primary: #d97757;
+  --primary-foreground: #141413;
+  --secondary: #6a9bcc;
+  --secondary-foreground: #faf9f5;
+  --muted: #2a2a29;
+  --muted-foreground: #b0aea5;
+  --accent: #788c5d;
+  --accent-foreground: #141413;
+  --destructive: #ef4444;
+  --border: #3a3a39;
+  --input: #3a3a39;
+  --ring: #d97757;
+  --chart-1: #d97757;
+  --chart-2: #6a9bcc;
+  --chart-3: #788c5d;
+  --chart-4: #b0aea5;
+  --chart-5: #faf9f5;
+}
+
+/* Anthropic: Typography - Headings use Poppins, Body uses Lora */
+.style-anthropic h1,
+.style-anthropic h2,
+.style-anthropic h3,
+.style-anthropic h4,
+.style-anthropic h5,
+.style-anthropic h6 {
+  font-family: var(--font-poppins);
+  font-weight: 600;
+}
+
+.style-anthropic p,
+.style-anthropic span:not([class*='icon']),
+.style-anthropic li,
+.style-anthropic td,
+.style-anthropic th,
+.style-anthropic label,
+.style-anthropic textarea {
+  font-family: var(--font-lora);
+}
+
+/* Anthropic: Keep UI elements with Poppins */
+.style-anthropic button,
+.style-anthropic input,
+.style-anthropic select,
+.style-anthropic [role='menuitem'],
+.style-anthropic [role='option'],
+.style-anthropic nav,
+.style-anthropic .sidebar,
+.style-anthropic [class*='badge'],
+.style-anthropic [class*='tag'] {
+  font-family: var(--font-poppins);
 }
 
 /* ===== Dynamic Border Radius Overrides ===== */

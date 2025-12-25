@@ -8,7 +8,14 @@
  * - Overall visual feel
  */
 
-export const styles = ['lyra', 'vega', 'nova', 'maia', 'mira'] as const
+export const styles = [
+  'lyra',
+  'vega',
+  'nova',
+  'maia',
+  'mira',
+  'anthropic',
+] as const
 
 export type Style = (typeof styles)[number]
 
@@ -98,6 +105,20 @@ export const styleConfig: Record<Style, StyleConfig> = {
     description: {
       zh: '密集型，高信息密度',
       en: 'Dense & Compact',
+    },
+  },
+  anthropic: {
+    name: 'Anthropic',
+    radius: '0.375rem', // 6px - balanced
+    font: 'poppins', // Headings: Poppins, Body: Lora (handled in CSS)
+    forceFont: true,
+    label: {
+      zh: 'Anthropic',
+      en: 'Anthropic',
+    },
+    description: {
+      zh: '温暖优雅，品牌风格',
+      en: 'Warm & Elegant',
     },
   },
 }
