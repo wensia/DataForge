@@ -21,6 +21,7 @@ import {
   Check,
   PlusCircle,
   BarChart3,
+  Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -633,17 +634,24 @@ export function AnalysisTable() {
             />
           </div>
 
-          {/* 搜索按钮 */}
-          <Button size='xs' onClick={handleSearch}>
-            查询
-          </Button>
+          <div className='flex-1' />
 
           {/* 重置按钮 */}
           {isFiltered && (
-            <Button variant='ghost' size='xs' onClick={handleResetFilters}>
-              重置
+            <Button
+              variant='ghost'
+              size='icon-xs'
+              onClick={handleResetFilters}
+              title='重置筛选'
+            >
+              <RotateCcw className='h-4 w-4' />
             </Button>
           )}
+
+          {/* 搜索按钮 */}
+          <Button size='icon-xs' onClick={handleSearch} title='查询'>
+            <Search className='h-4 w-4' />
+          </Button>
         </div>
       </div>
 
