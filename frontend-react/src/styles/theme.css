@@ -242,6 +242,94 @@
   font-family: var(--font-poppins);
 }
 
+/* ===== Anthropic Icon Styles ===== */
+/* Icon size: 18px for better visibility with brand style */
+.style-anthropic svg[class*='lucide'],
+.style-anthropic svg[class*='size-4'] {
+  width: 18px;
+  height: 18px;
+}
+
+/* Sidebar navigation icons - use brand orange */
+.style-anthropic [data-sidebar='menu-button'] svg {
+  color: #d97757;
+  stroke-width: 1.75;
+}
+
+/* Active sidebar item - brighter orange */
+.style-anthropic [data-sidebar='menu-button'][data-active='true'] svg {
+  color: #d97757;
+  stroke-width: 2;
+}
+
+/* Muted icons - use mid gray */
+.style-anthropic .text-muted-foreground svg,
+.style-anthropic svg.text-muted-foreground {
+  color: #b0aea5;
+}
+
+/* Primary action icons - orange */
+.style-anthropic .text-primary svg,
+.style-anthropic svg.text-primary {
+  color: #d97757;
+}
+
+/* Secondary icons - blue */
+.style-anthropic .text-secondary svg,
+.style-anthropic svg.text-secondary {
+  color: #6a9bcc;
+}
+
+/* Success/accent icons - green */
+.style-anthropic .text-accent svg,
+.style-anthropic svg.text-accent {
+  color: #788c5d;
+}
+
+/* Button icons inherit parent color */
+.style-anthropic button svg {
+  stroke-width: 1.75;
+}
+
+/* Dropdown menu icons */
+.style-anthropic [role='menuitem'] svg {
+  color: #b0aea5;
+  width: 16px;
+  height: 16px;
+}
+
+.style-anthropic [role='menuitem']:hover svg {
+  color: #d97757;
+}
+
+/* Table action icons */
+.style-anthropic [data-slot='data-table'] svg {
+  stroke-width: 1.75;
+}
+
+/* Chart/data visualization icons - cycle through brand colors */
+.style-anthropic .chart-icon-1 { color: #d97757; }
+.style-anthropic .chart-icon-2 { color: #6a9bcc; }
+.style-anthropic .chart-icon-3 { color: #788c5d; }
+
+/* Dark mode icon adjustments */
+.style-anthropic.dark svg[class*='lucide'],
+.dark .style-anthropic svg[class*='lucide'] {
+  stroke-width: 1.5;
+}
+
+.style-anthropic.dark [data-sidebar='menu-button'] svg,
+.dark .style-anthropic [data-sidebar='menu-button'] svg {
+  color: #d97757;
+  opacity: 0.9;
+}
+
+.style-anthropic.dark [data-sidebar='menu-button'][data-active='true'] svg,
+.dark .style-anthropic [data-sidebar='menu-button'][data-active='true'] svg {
+  color: #d97757;
+  opacity: 1;
+}
+
 /* ===== Dynamic Border Radius Overrides ===== */
 /* Override Tailwind's static rounded utilities to use dynamic --radius variable */
 .rounded-sm {
