@@ -118,7 +118,98 @@ export function Page() {
 
 核心规则：**滚动容器必须在卡片内部，且父级必须 `min-h-0`。**
 
-### 3.6 认证页/空白页布局
+### 3.6 工具栏布局规范（两行分离模式）
+
+适用于复杂数据表页面，将筛选和操作分离为两行：
+
+```tsx
+<div className='flex flex-shrink-0 flex-col gap-2'>
+  {/* 第一行：筛选区 */}
+  <div className='flex flex-wrap items-center gap-2'>
+    {/* 筛选控件（日期、下拉筛选、输入框等） */}
+    <DateRangePicker />
+    <ServerSideFilter title='类型' ... />
+    <ServerSideFilter title='状态' ... />
+
+    <Separator orientation='vertical' className='h-5' />
+
+    {/* 其他筛选输入 */}
+    <Input inputSize='xs' ... />
+
+    <div className='flex-1' />
+
+    {/* 重置按钮（仅筛选激活时显示） */}
+    {isFiltered && (
+      <Button variant='ghost' size='icon-xs' title='重置筛选'>
+        <RotateCcw />
+      </Button>
+    )}
+
+    {/* 查询按钮（最右侧） */}
+    <Button size='icon-xs' title='查询'>
+      <Search />
+    </Button>
+  </div>
+
+  {/* 第二行：操作按钮 */}
+  <div className='flex items-center gap-2'>
+    {/* 批量操作（选中时显示） */}
+    {selectedCount > 0 && (
+      <>
+        <span className='text-muted-foreground text-sm'>已选择 {selectedCount} 行</span>
+        <Button variant='destructive' size='xs'>删除</Button>
+        <Separator orientation='vertical' className='h-5' />
+      </>
+    )}
+
+    {/* 功能按钮 */}
+    <Button variant='outline' size='xs'>统计</Button>
+
+    <div className='flex-1' />
+
+    {/* 右侧工具 */}
+    <DataTableViewOptions table={table} />
+
+    {/* 刷新按钮（最右侧） */}
+    <Button variant='default' size='icon-xs' title='刷新数据'>
+      <RotateCcw />
+    </Button>
+  </div>
+</div>
+```
+
+#### 布局原则
+
+| 位置 | 内容 | 说明 |
+|------|------|------|
+| 第一行左侧 | 筛选控件 | 日期、下拉筛选、输入框等 |
+| 第一行右侧 | 重置 + 查询 | 查询在最右，重置仅在有筛选时显示 |
+| 第二行左侧 | 批量操作 + 功能按钮 | 选中行时显示批量操作 |
+| 第二行右侧 | 列设置 + 刷新 | 刷新按钮在最右侧 |
+
+#### 按钮样式区分
+
+| 按钮类型 | variant | size | 说明 |
+|----------|---------|------|------|
+| 筛选区重置 | `ghost` | `icon-xs` | 浅色，不抢眼 |
+| 筛选区查询 | `default` | `icon-xs` | 实心，易识别 |
+| 工具栏刷新 | `default` | `icon-xs` | 实心，与重置区分 |
+| 功能按钮 | `outline` | `xs` | 带文字的次级操作 |
+| 批量删除 | `destructive` | `xs` | 危险操作，红色 |
+
+#### 组件尺寸规范
+
+工具栏统一使用 `h-8`（32px）高度：
+
+| 组件 | 属性 |
+|------|------|
+| Button | `size='xs'` 或 `size='icon-xs'` |
+| Input | `inputSize='xs'` |
+| SelectTrigger | `selectSize='xs'` |
+
+参考实现：`frontend-react/src/features/analysis/components/analysis-table.tsx`
+
+### 3.7 认证页/空白页布局
 
 组件：`frontend-react/src/features/auth/auth-layout.tsx`
 
