@@ -427,70 +427,7 @@ export function AnalysisTable() {
     <div className='flex flex-1 flex-col gap-4 overflow-hidden'>
       {/* 工具栏 */}
       <div className='flex flex-shrink-0 flex-col gap-2'>
-        {/* 第一行：操作按钮 */}
-        <div className='flex items-center gap-2'>
-          {/* 批量删除 */}
-          {selectedRowCount > 0 && isAdmin && (
-            <>
-              <span className='text-muted-foreground text-sm'>
-                已选择 {selectedRowCount} 行
-              </span>
-              <Button
-                variant='destructive'
-                size='xs'
-                onClick={() => setShowDeleteDialog(true)}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? (
-                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                ) : (
-                  <Trash2 className='mr-2 h-4 w-4' />
-                )}
-                删除
-              </Button>
-              <Separator orientation='vertical' className='h-5' />
-            </>
-          )}
-
-          {/* 转写统计按钮 */}
-          <Button
-            variant='outline'
-            size='xs'
-            onClick={() => setOpen('transcript-stats')}
-          >
-            <BarChart3 className='mr-2 h-4 w-4' />
-            转写统计
-          </Button>
-
-          <div className='flex-1' />
-
-          {/* 保存状态 */}
-          {isSaving && (
-            <span className='text-muted-foreground text-xs flex items-center gap-1'>
-              <Loader2 className='h-3 w-3 animate-spin' />
-              保存中...
-            </span>
-          )}
-
-          {/* 刷新按钮 */}
-          <Button
-            variant='outline'
-            size='icon-xs'
-            onClick={() => refetchRecords()}
-            disabled={recordsFetching}
-          >
-            {recordsFetching ? (
-              <Loader2 className='h-4 w-4 animate-spin' />
-            ) : (
-              <RotateCcw className='h-4 w-4' />
-            )}
-          </Button>
-
-          {/* 列可见性 */}
-          <DataTableViewOptions table={table} columnNames={columnNames} />
-        </div>
-
-        {/* 第二行：筛选区 */}
+        {/* 第一行：筛选区 */}
         <div className='flex flex-wrap items-center gap-2'>
           {/* 日期范围选择器 */}
           <Popover>
@@ -652,6 +589,69 @@ export function AnalysisTable() {
           <Button size='icon-xs' onClick={handleSearch} title='查询'>
             <Search className='h-4 w-4' />
           </Button>
+        </div>
+
+        {/* 第二行：操作按钮 */}
+        <div className='flex items-center gap-2'>
+          {/* 批量删除 */}
+          {selectedRowCount > 0 && isAdmin && (
+            <>
+              <span className='text-muted-foreground text-sm'>
+                已选择 {selectedRowCount} 行
+              </span>
+              <Button
+                variant='destructive'
+                size='xs'
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                ) : (
+                  <Trash2 className='mr-2 h-4 w-4' />
+                )}
+                删除
+              </Button>
+              <Separator orientation='vertical' className='h-5' />
+            </>
+          )}
+
+          {/* 转写统计按钮 */}
+          <Button
+            variant='outline'
+            size='xs'
+            onClick={() => setOpen('transcript-stats')}
+          >
+            <BarChart3 className='mr-2 h-4 w-4' />
+            转写统计
+          </Button>
+
+          <div className='flex-1' />
+
+          {/* 保存状态 */}
+          {isSaving && (
+            <span className='text-muted-foreground text-xs flex items-center gap-1'>
+              <Loader2 className='h-3 w-3 animate-spin' />
+              保存中...
+            </span>
+          )}
+
+          {/* 刷新按钮 */}
+          <Button
+            variant='outline'
+            size='icon-xs'
+            onClick={() => refetchRecords()}
+            disabled={recordsFetching}
+          >
+            {recordsFetching ? (
+              <Loader2 className='h-4 w-4 animate-spin' />
+            ) : (
+              <RotateCcw className='h-4 w-4' />
+            )}
+          </Button>
+
+          {/* 列可见性 */}
+          <DataTableViewOptions table={table} columnNames={columnNames} />
         </div>
       </div>
 
