@@ -152,6 +152,16 @@ def apply_user_data_filters(
     )
 
 
+def is_complete_phone_number(callee: str | None) -> bool:
+    """判断是否为完整的手机号（11位数字）"""
+    if not callee:
+        return False
+    # 去除空格和横线
+    clean = callee.replace(" ", "").replace("-", "")
+    # 检查是否为11位数字且以1开头（中国手机号）
+    return len(clean) == 11 and clean.isdigit() and clean.startswith("1")
+
+
 @router.get("/records", response_model=ResponseModel)
 async def get_records(
     source: str | None = None,
@@ -174,6 +184,7 @@ async def get_records(
     """获取通话记录列表
 
     需要数据分析权限。如果用户配置了数据筛选条件，会强制过滤数据。
+    但如果用户输入了完整的手机号（11位），则绕过员工/部门限制，允许精确查询。
 
     用户可配置的筛选条件（在 data_filters 中）：
     - start_date: 开始日期限制（用户只能看此日期之后的数据）
@@ -190,7 +201,7 @@ async def get_records(
         staff_name: 员工筛选
         call_type: 通话类型筛选
         call_result: 通话结果筛选
-        callee: 被叫号码筛选（模糊匹配）
+        callee: 被叫号码筛选（模糊匹配，完整手机号时绕过数据访问限制）
         duration_min: 最小通话时长（秒）
         duration_max: 最大通话时长（秒）
         is_invalid_call: 筛选无效通话（转写为空但时长>30秒）
@@ -209,6 +220,9 @@ async def get_records(
     ):
         end_time = end_time.replace(hour=23, minute=59, second=59)
 
+    # 检查是否为完整手机号查询 - 如果是则绕过员工/部门限制
+    bypass_staff_filter = is_complete_phone_number(callee)
+
     # 应用用户的数据过滤配置
     (
         effective_start_time,
@@ -219,6 +233,11 @@ async def get_records(
     ) = apply_user_data_filters(
         user, start_time, end_time, call_type, department, staff_name
     )
+
+    # 如果是完整手机号查询，清除员工/部门限制
+    if bypass_staff_filter:
+        allowed_departments = None
+        allowed_staff_names = None
 
     # 如果用户配置了部门/员工限制，需要验证前端传入的值是否在允许范围内
     effective_department = department
