@@ -22,6 +22,7 @@ import {
   PlusCircle,
   BarChart3,
   Search,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -143,6 +144,9 @@ export function AnalysisTable() {
   const [durationMax, setDurationMax] = useState<string>(
     search.durationMax?.toString() ?? ''
   )
+
+  // 被叫手机号输入状态（只有点击搜索才触发查询）
+  const [calleeInput, setCalleeInput] = useState<string>(search.callee ?? '')
 
   // Context
   const { setOpen, setCurrentRow, setAudioUrl, setAudioLoading } = useAnalysis()
@@ -321,6 +325,7 @@ export function AnalysisTable() {
       end_time: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
       duration_min: durationMin ? parseInt(durationMin, 10) : undefined,
       duration_max: durationMax ? parseInt(durationMax, 10) : undefined,
+      callee: calleeInput || undefined,
     }
 
     setFilters(newFilters)
@@ -343,7 +348,7 @@ export function AnalysisTable() {
         transcriptStatus: newFilters.transcript_status,
       },
     })
-  }, [filters, dateRange, durationMin, durationMax, navigate])
+  }, [filters, dateRange, durationMin, durationMax, calleeInput, navigate])
 
   // 重置筛选
   const handleResetFilters = useCallback(() => {
@@ -351,6 +356,7 @@ export function AnalysisTable() {
     setDateRange({ from: undefined, to: undefined })
     setDurationMin('')
     setDurationMax('')
+    setCalleeInput('')
     table.resetColumnFilters()
 
     navigate({
@@ -429,43 +435,6 @@ export function AnalysisTable() {
       <div className='flex flex-shrink-0 flex-col gap-2'>
         {/* 第一行：筛选区 */}
         <div className='flex flex-wrap items-center gap-2'>
-          {/* 日期范围选择器 */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant='outline'
-                size='xs'
-                className={cn(
-                  'justify-start text-left font-normal',
-                  !dateRange.from && 'text-muted-foreground'
-                )}
-              >
-                <CalendarIcon className='mr-2 h-4 w-4' />
-                {dateRange.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, 'MM/dd')} - {format(dateRange.to, 'MM/dd')}
-                    </>
-                  ) : (
-                    format(dateRange.from, 'yyyy-MM-dd')
-                  )
-                ) : (
-                  '选择日期范围'
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className='w-auto p-0' align='start'>
-              <Calendar
-                initialFocus
-                mode='range'
-                defaultMonth={dateRange.from}
-                selected={dateRange}
-                onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-
           {/* 服务端筛选按钮 */}
           <ServerSideFilter
             title='通话类型'
@@ -548,28 +517,31 @@ export function AnalysisTable() {
 
           <Separator orientation='vertical' className='h-5' />
 
-          {/* 时长范围 */}
-          <div className='flex items-center gap-1'>
-            <Input
-              type='number'
-              placeholder='最小秒'
-              value={durationMin}
-              onChange={(e) => setDurationMin(e.target.value)}
-              inputSize='xs'
-              className='w-20'
-              min={0}
-            />
-            <span className='text-muted-foreground'>-</span>
-            <Input
-              type='number'
-              placeholder='最大秒'
-              value={durationMax}
-              onChange={(e) => setDurationMax(e.target.value)}
-              inputSize='xs'
-              className='w-20'
-              min={0}
-            />
-          </div>
+          {/* 被叫手机号搜索 */}
+          <Input
+            type='text'
+            placeholder='被叫手机号'
+            value={calleeInput}
+            onChange={(e) => setCalleeInput(e.target.value)}
+            inputSize='xs'
+            className='w-32'
+          />
+
+          {/* 高级筛选 */}
+          <AdvancedFilterPopover
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            durationMin={durationMin}
+            durationMax={durationMax}
+            onDurationMinChange={setDurationMin}
+            onDurationMaxChange={setDurationMax}
+            onConfirm={handleSearch}
+            onReset={() => {
+              setDateRange({ from: undefined, to: undefined })
+              setDurationMin('')
+              setDurationMax('')
+            }}
+          />
 
           <div className='flex-1' />
 
@@ -751,6 +723,153 @@ export function AnalysisTable() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+// 高级筛选弹窗组件
+interface AdvancedFilterPopoverProps {
+  dateRange: { from: Date | undefined; to: Date | undefined }
+  onDateRangeChange: (range: { from: Date | undefined; to: Date | undefined }) => void
+  durationMin: string
+  durationMax: string
+  onDurationMinChange: (value: string) => void
+  onDurationMaxChange: (value: string) => void
+  onConfirm: () => void
+  onReset: () => void
+}
+
+function AdvancedFilterPopover({
+  dateRange,
+  onDateRangeChange,
+  durationMin,
+  durationMax,
+  onDurationMinChange,
+  onDurationMaxChange,
+  onConfirm,
+  onReset,
+}: AdvancedFilterPopoverProps) {
+  const [open, setOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const hasDateFilter = !!(dateRange.from || dateRange.to)
+  const hasDurationFilter = !!(durationMin || durationMax)
+  const filterCount = (hasDateFilter ? 1 : 0) + (hasDurationFilter ? 1 : 0)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant='outline' size='xs' className='border-dashed'>
+          <SlidersHorizontal className='mr-2 h-4 w-4' />
+          高级筛选
+          {filterCount > 0 && (
+            <>
+              <Separator orientation='vertical' className='mx-2 h-4' />
+              <Badge variant='secondary' className='rounded-sm px-1 font-normal'>
+                {filterCount}
+              </Badge>
+            </>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className='w-72' align='start'>
+        <div className='space-y-4'>
+          {/* 日期范围 */}
+          <div className='space-y-2'>
+            <h4 className='font-medium text-sm'>日期范围</h4>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant='outline'
+                  size='xs'
+                  className={cn(
+                    'justify-start text-left font-normal w-full',
+                    !dateRange.from && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className='mr-2 h-4 w-4' />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, 'yyyy-MM-dd')} ~ {format(dateRange.to, 'yyyy-MM-dd')}
+                      </>
+                    ) : (
+                      format(dateRange.from, 'yyyy-MM-dd')
+                    )
+                  ) : (
+                    '选择日期范围'
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className='w-auto p-0' align='start'>
+                <Calendar
+                  mode='range'
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={(range) => {
+                    onDateRangeChange({ from: range?.from, to: range?.to })
+                    if (range?.from && range?.to) {
+                      setCalendarOpen(false)
+                    }
+                  }}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <Separator />
+
+          {/* 通话时长 */}
+          <div className='space-y-2'>
+            <h4 className='font-medium text-sm'>通话时长（秒）</h4>
+            <div className='flex items-center gap-2'>
+              <Input
+                type='number'
+                placeholder='最小'
+                value={durationMin}
+                onChange={(e) => onDurationMinChange(e.target.value)}
+                inputSize='xs'
+                className='flex-1'
+                min={0}
+              />
+              <span className='text-muted-foreground'>-</span>
+              <Input
+                type='number'
+                placeholder='最大'
+                value={durationMax}
+                onChange={(e) => onDurationMaxChange(e.target.value)}
+                inputSize='xs'
+                className='flex-1'
+                min={0}
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='flex justify-end gap-2'>
+            <Button
+              variant='outline'
+              size='xs'
+              onClick={() => {
+                onReset()
+              }}
+              disabled={filterCount === 0}
+            >
+              重置
+            </Button>
+            <Button
+              size='xs'
+              onClick={() => {
+                onConfirm()
+                setOpen(false)
+              }}
+            >
+              确认
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

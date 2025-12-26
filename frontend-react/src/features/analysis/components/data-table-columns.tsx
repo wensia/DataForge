@@ -249,8 +249,28 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
         const hasTranscript = !!row.original.transcript
         const transcriptStatus = row.original.transcript_status
 
-        // 无录音
+        // 无录音地址
         if (!recordUrl) {
+          // 如果有通话时长，仍然可以点击查看详情
+          const duration = row.original.duration
+          if (duration && duration > 0) {
+            return (
+              <div className='flex w-full items-center justify-center'>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className='flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-amber-100 text-amber-600 transition-colors hover:bg-amber-200'
+                      onClick={() => options.onOpenRecordModal(row.original)}
+                    >
+                      <Mic className='h-4 w-4' />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>无录音地址 - 点击查看详情</TooltipContent>
+                </Tooltip>
+              </div>
+            )
+          }
+          // 无时长也无录音地址
           return (
             <div className='flex w-full items-center justify-center'>
               <span className='flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-400'>
@@ -260,17 +280,20 @@ export function getColumns(options: ColumnOptions): ColumnDef<CallRecord>[] {
           )
         }
 
-        // 空音频（已标记）
+        // 空音频（已标记）- 仍可点击播放确认
         if (transcriptStatus === 'empty') {
           return (
             <div className='flex w-full items-center justify-center'>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className='flex h-7 w-7 cursor-default items-center justify-center rounded-full bg-gray-100 text-gray-400'>
-                    <Minus className='h-4 w-4' />
-                  </span>
+                  <button
+                    className='flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-gray-100 text-gray-400 transition-colors hover:bg-gray-200'
+                    onClick={() => options.onOpenRecordModal(row.original)}
+                  >
+                    <Mic className='h-4 w-4' />
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent>空音频</TooltipContent>
+                <TooltipContent>空音频 - 点击播放确认</TooltipContent>
               </Tooltip>
             </div>
           )
