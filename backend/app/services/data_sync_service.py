@@ -538,6 +538,84 @@ def get_call_record_stats(
     }
 
 
+def get_batch_phone_stats(
+    session: Session,
+    phones: list[str],
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> dict[str, Any]:
+    """批量查询手机号通话统计
+
+    Args:
+        session: 数据库会话
+        phones: 手机号列表
+        start_time: 开始时间
+        end_time: 结束时间
+
+    Returns:
+        dict: {
+            "items": [{"phone": "xxx", "inbound_count": 1, ...}],
+            "not_found": ["xxx"]
+        }
+    """
+    from sqlalchemy import case, func
+
+    if not phones:
+        return {"items": [], "not_found": []}
+
+    # 清理手机号（去除空格、横线）
+    cleaned_phones = [p.replace(" ", "").replace("-", "") for p in phones if p.strip()]
+    if not cleaned_phones:
+        return {"items": [], "not_found": []}
+
+    # 构建查询：按 callee 分组，统计呼入/呼出次数和最后通话时间
+    query = (
+        select(
+            CallRecord.callee,
+            func.sum(
+                case((CallRecord.call_type == "inbound", 1), else_=0)
+            ).label("inbound_count"),
+            func.sum(
+                case((CallRecord.call_type == "outbound", 1), else_=0)
+            ).label("outbound_count"),
+            func.count().label("total_count"),
+            func.max(CallRecord.call_time).label("last_call_time"),
+        )
+        .where(CallRecord.callee.in_(cleaned_phones))
+        .group_by(CallRecord.callee)
+    )
+
+    # 应用时间筛选
+    if start_time:
+        query = query.where(CallRecord.call_time >= start_time)
+    if end_time:
+        query = query.where(CallRecord.call_time <= end_time)
+
+    results = session.exec(query).all()
+
+    # 构建返回结果
+    items = []
+    found_phones = set()
+
+    for row in results:
+        found_phones.add(row.callee)
+        items.append({
+            "phone": row.callee,
+            "inbound_count": row.inbound_count or 0,
+            "outbound_count": row.outbound_count or 0,
+            "total_count": row.total_count or 0,
+            "last_call_time": row.last_call_time.isoformat() if row.last_call_time else None,
+        })
+
+    # 找出未找到记录的手机号
+    not_found = [p for p in cleaned_phones if p not in found_phones]
+
+    # 按总通话数降序排序
+    items.sort(key=lambda x: x["total_count"], reverse=True)
+
+    return {"items": items, "not_found": not_found}
+
+
 def delete_call_records(session: Session, record_ids: list[int]) -> int:
     """批量删除通话记录
 

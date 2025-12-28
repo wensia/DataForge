@@ -390,6 +390,60 @@ async def get_monthly_transcript_stats(
     return ResponseModel(data=stats)
 
 
+@router.post("/batch-phone-stats", response_model=ResponseModel)
+async def get_batch_phone_stats(
+    phones: list[str] = Body(..., description="手机号列表"),
+    start_date: str | None = Body(None, description="开始日期 (YYYY-MM-DD)"),
+    end_date: str | None = Body(None, description="结束日期 (YYYY-MM-DD)"),
+    user: User = Depends(require_analysis_access),
+    session: Session = Depends(get_session),
+) -> ResponseModel:
+    """批量查询手机号通话统计
+
+    需要数据分析权限。查询多个手机号的通话频次（呼入/呼出次数）和最后通话时间。
+
+    Args:
+        phones: 手机号列表
+        start_date: 开始日期（可选）
+        end_date: 结束日期（可选）
+
+    Returns:
+        ResponseModel: 包含统计结果和未找到的手机号列表
+    """
+    if not phones:
+        return ResponseModel.error(code=400, message="请输入至少一个手机号")
+
+    if len(phones) > 100:
+        return ResponseModel.error(code=400, message="单次最多查询100个手机号")
+
+    # 解析日期
+    start_time = None
+    end_time = None
+
+    if start_date:
+        try:
+            start_time = datetime.fromisoformat(start_date)
+        except ValueError:
+            return ResponseModel.error(code=400, message="开始日期格式错误，请使用 YYYY-MM-DD 格式")
+
+    if end_date:
+        try:
+            end_time = datetime.fromisoformat(end_date)
+            # 设置为当天末尾
+            end_time = end_time.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            return ResponseModel.error(code=400, message="结束日期格式错误，请使用 YYYY-MM-DD 格式")
+
+    result = sync_svc.get_batch_phone_stats(
+        session=session,
+        phones=phones,
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    return ResponseModel(data=result)
+
+
 # ============ 数据同步接口 ============
 
 

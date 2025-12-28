@@ -179,3 +179,33 @@ export function formatDate(dateStr: string | null): string {
   const seconds = String(date.getSeconds()).padStart(2, '0')
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
+
+// ============ 批量手机号查询 ============
+
+/**
+ * 单个手机号的通话统计
+ */
+export interface PhoneStats {
+  phone: string
+  inbound_count: number
+  outbound_count: number
+  total_count: number
+  last_call_time: string | null
+}
+
+/**
+ * 批量手机号查询响应
+ */
+export interface BatchPhoneStatsResponse {
+  items: PhoneStats[]
+  not_found: string[]
+}
+
+/**
+ * 批量手机号查询请求
+ */
+export interface BatchPhoneStatsRequest {
+  phones: string[]
+  start_date?: string
+  end_date?: string
+}

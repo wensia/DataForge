@@ -8,6 +8,8 @@ import type {
   AIProvider,
   AnalysisRequest,
   AnalysisResult,
+  BatchPhoneStatsRequest,
+  BatchPhoneStatsResponse,
   CallRecord,
   CallRecordStats,
   ChatRequest,
@@ -322,6 +324,21 @@ export function useDeleteUserPreference() {
     },
     onSuccess: (_, key) => {
       queryClient.invalidateQueries({ queryKey: preferenceKeys.detail(key) })
+    },
+  })
+}
+
+// ============ 批量手机号查询 API ============
+
+// 批量查询手机号通话统计
+export function useBatchPhoneStats() {
+  return useMutation({
+    mutationFn: async (data: BatchPhoneStatsRequest) => {
+      const response = await apiClient.post<ApiResponse<BatchPhoneStatsResponse>>(
+        '/analysis/batch-phone-stats',
+        data
+      )
+      return response.data.data
     },
   })
 }

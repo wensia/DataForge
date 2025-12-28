@@ -23,6 +23,7 @@ import {
   BarChart3,
   Search,
   SlidersHorizontal,
+  Phone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -76,6 +77,7 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
+import { BatchPhoneQueryDialog } from './batch-phone-query-dialog'
 import { callTypeOptions, callResultOptions, invalidCallOptions, transcriptStatusOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
@@ -156,6 +158,7 @@ export function AnalysisTable() {
 
   // UI 状态
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showBatchQueryDialog, setShowBatchQueryDialog] = useState(false)
 
   // 表格状态
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -598,6 +601,16 @@ export function AnalysisTable() {
             转写统计
           </Button>
 
+          {/* 批量查询按钮 */}
+          <Button
+            variant='outline'
+            size='xs'
+            onClick={() => setShowBatchQueryDialog(true)}
+          >
+            <Phone className='mr-2 h-4 w-4' />
+            批量查询
+          </Button>
+
           <div className='flex-1' />
 
           {/* 保存状态 */}
@@ -722,6 +735,17 @@ export function AnalysisTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 批量查询弹窗 */}
+      <BatchPhoneQueryDialog
+        open={showBatchQueryDialog}
+        onOpenChange={setShowBatchQueryDialog}
+        onSelectPhone={(phone) => {
+          // 设置搜索框并触发搜索
+          setCalleeInput(phone)
+          setFilters((prev) => ({ ...prev, callee: phone, page: 1 }))
+        }}
+      />
     </div>
   )
 }
