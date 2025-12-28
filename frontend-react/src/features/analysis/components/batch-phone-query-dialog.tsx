@@ -91,7 +91,7 @@ export function BatchPhoneQueryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='max-w-3xl'>
+      <DialogContent className='w-[640px] max-w-[90vw]'>
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <Phone className='h-5 w-5' />
@@ -215,12 +215,12 @@ export function BatchPhoneQueryDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>手机号</TableHead>
-                      <TableHead className='text-right'>呼入</TableHead>
-                      <TableHead className='text-right'>呼出</TableHead>
-                      <TableHead className='text-right'>合计</TableHead>
+                      <TableHead className='w-[120px]'>手机号</TableHead>
+                      <TableHead className='w-[50px] text-right'>呼入</TableHead>
+                      <TableHead className='w-[50px] text-right'>呼出</TableHead>
+                      <TableHead className='w-[50px] text-right'>合计</TableHead>
                       <TableHead className='text-right'>最后通话</TableHead>
-                      <TableHead className='w-[60px]'></TableHead>
+                      <TableHead className='w-[40px]'></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -230,7 +230,7 @@ export function BatchPhoneQueryDialog({
                         className='cursor-pointer hover:bg-muted/50'
                         onClick={() => handleRowClick(item.phone)}
                       >
-                        <TableCell className='font-mono font-medium'>
+                        <TableCell className='font-mono text-sm'>
                           {item.phone}
                         </TableCell>
                         <TableCell className='text-right text-blue-600'>
@@ -242,12 +242,12 @@ export function BatchPhoneQueryDialog({
                         <TableCell className='text-right font-medium'>
                           {item.total_count}
                         </TableCell>
-                        <TableCell className='text-right text-muted-foreground'>
+                        <TableCell className='text-right text-muted-foreground text-sm'>
                           {item.last_call_time
                             ? formatDate(item.last_call_time)
                             : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className='px-2'>
                           <ExternalLink className='h-4 w-4 text-muted-foreground' />
                         </TableCell>
                       </TableRow>
