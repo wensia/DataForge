@@ -220,24 +220,27 @@ async def get_records(
     ):
         end_time = end_time.replace(hour=23, minute=59, second=59)
 
-    # 检查是否为完整手机号查询 - 如果是则绕过员工/部门限制
-    bypass_staff_filter = is_complete_phone_number(callee)
+    # 检查是否为完整手机号查询 - 如果是则绕过所有数据访问限制
+    bypass_data_filter = is_complete_phone_number(callee)
 
-    # 应用用户的数据过滤配置
-    (
-        effective_start_time,
-        effective_end_time,
-        effective_call_type,
-        allowed_departments,
-        allowed_staff_names,
-    ) = apply_user_data_filters(
-        user, start_time, end_time, call_type, department, staff_name
-    )
-
-    # 如果是完整手机号查询，清除员工/部门限制
-    if bypass_staff_filter:
+    if bypass_data_filter:
+        # 完整手机号查询：绕过所有用户数据访问限制，使用前端传入的原始参数
+        effective_start_time = start_time
+        effective_end_time = end_time
+        effective_call_type = call_type
         allowed_departments = None
         allowed_staff_names = None
+    else:
+        # 非完整手机号查询：应用用户的数据过滤配置
+        (
+            effective_start_time,
+            effective_end_time,
+            effective_call_type,
+            allowed_departments,
+            allowed_staff_names,
+        ) = apply_user_data_filters(
+            user, start_time, end_time, call_type, department, staff_name
+        )
 
     # 如果用户配置了部门/员工限制，需要验证前端传入的值是否在允许范围内
     effective_department = department
