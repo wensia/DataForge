@@ -578,6 +578,10 @@ def get_batch_phone_stats(
             func.sum(
                 case((CallRecord.call_type == "outbound", 1), else_=0)
             ).label("outbound_count"),
+            func.sum(
+                case((CallRecord.call_result == "2", 1), else_=0)
+            ).label("answered_count"),
+            func.sum(CallRecord.duration).label("total_duration"),
             func.count().label("total_count"),
             func.max(CallRecord.call_time).label("last_call_time"),
         )
@@ -599,11 +603,16 @@ def get_batch_phone_stats(
 
     for row in results:
         found_phones.add(row.callee)
+        total_count = row.total_count or 0
+        answered_count = row.answered_count or 0
         items.append({
             "phone": row.callee,
             "inbound_count": row.inbound_count or 0,
             "outbound_count": row.outbound_count or 0,
-            "total_count": row.total_count or 0,
+            "answered_count": answered_count,
+            "answer_rate": round(answered_count / total_count * 100, 2) if total_count > 0 else 0,
+            "total_duration": row.total_duration or 0,
+            "total_count": total_count,
             "last_call_time": row.last_call_time.isoformat() if row.last_call_time else None,
         })
 

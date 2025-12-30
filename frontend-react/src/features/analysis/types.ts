@@ -189,6 +189,9 @@ export interface PhoneStats {
   phone: string
   inbound_count: number
   outbound_count: number
+  answered_count: number
+  answer_rate: number
+  total_duration: number
   total_count: number
   last_call_time: string | null
 }

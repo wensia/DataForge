@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, Phone, Search, ExternalLink } from 'lucide-react'
+import { Loader2, Search, ExternalLink, Calendar as CalendarIcon, X, Info } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -91,184 +94,225 @@ export function BatchPhoneQueryDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='w-[640px] max-w-[90vw]'>
-        <DialogHeader>
-          <DialogTitle className='flex items-center gap-2'>
-            <Phone className='h-5 w-5' />
-            批量查询手机号
-          </DialogTitle>
-          <DialogDescription>
-            输入多个手机号查询通话频次和最后通话时间，点击结果行可在主表格中查看详情
-          </DialogDescription>
+      <DialogContent className='max-w-[720px] p-0 overflow-hidden gap-0'>
+        <DialogHeader className='p-6 pb-4'>
+          <div className='flex items-center justify-between'>
+            <div className='space-y-1'>
+              <DialogTitle className='text-xl'>
+                批量查询手机号
+              </DialogTitle>
+              <DialogDescription>
+                快速检索多个手机号的通话概况与活跃时间
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        {/* 输入区域 */}
-        <div className='space-y-4'>
-          <div className='space-y-2'>
-            <Label htmlFor='phones'>
-              手机号列表
-              {phoneCount > 0 && (
-                <span className='text-muted-foreground ml-2 text-xs'>
-                  已输入 {phoneCount} 个
-                </span>
-              )}
-            </Label>
-            <Textarea
-              id='phones'
-              placeholder='请输入手机号，每行一个（也支持逗号或空格分隔）'
-              className='min-h-[120px] font-mono text-sm'
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-            />
-          </div>
-
-          {/* 日期范围 */}
-          <div className='flex flex-wrap items-center gap-4'>
-            <div className='flex items-center gap-2'>
-              <Label className='whitespace-nowrap text-sm'>日期范围</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    className={cn(
-                      'w-[130px] justify-start text-left font-normal',
-                      !startDate && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className='mr-2 h-4 w-4' />
-                    {startDate ? format(startDate, 'yyyy-MM-dd') : '开始日期'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start'>
-                  <Calendar
-                    mode='single'
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    locale={zhCN}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className='text-muted-foreground'>~</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    className={cn(
-                      'w-[130px] justify-start text-left font-normal',
-                      !endDate && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className='mr-2 h-4 w-4' />
-                    {endDate ? format(endDate, 'yyyy-MM-dd') : '结束日期'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className='w-auto p-0' align='start'>
-                  <Calendar
-                    mode='single'
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    locale={zhCN}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              {(startDate || endDate) && (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => {
-                    setStartDate(undefined)
-                    setEndDate(undefined)
-                  }}
-                >
-                  清除
-                </Button>
-              )}
-            </div>
-            <div className='flex-1' />
-            <Button
-              onClick={handleQuery}
-              disabled={phoneCount === 0 || batchQuery.isPending}
-            >
-              {batchQuery.isPending ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : (
-                <Search className='mr-2 h-4 w-4' />
-              )}
-              查询
-            </Button>
-          </div>
-        </div>
-
-        {/* 结果区域 */}
-        {results !== null && (
-          <div className='space-y-2'>
-            <div className='text-sm text-muted-foreground'>
-              查询结果：找到 {results.length} 个，未找到 {notFound.length} 个
+        <div className='px-6 pb-6 space-y-6'>
+          {/* 输入区域面板 */}
+          <div className='rounded-xl border bg-muted/30 p-4 space-y-4'>
+            <div className='space-y-2'>
+              <div className='flex items-center justify-between'>
+                <Label htmlFor='phones' className='text-sm font-semibold'>
+                  手机号列表
+                </Label>
+                {phoneCount > 0 && (
+                  <Badge variant='secondary' className='font-mono px-2 py-0 text-[10px]'>
+                    已识别 {phoneCount} 个号码
+                  </Badge>
+                )}
+              </div>
+              <Textarea
+                id='phones'
+                placeholder='请输入手机号，支持每行一个、逗号或空格分隔...'
+                className='min-h-[100px] max-h-[160px] font-mono text-sm bg-background border-muted-foreground/20 focus-visible:ring-primary/30 transition-shadow resize-none'
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+              />
             </div>
 
-            {results.length > 0 && (
-              <div className='max-h-[300px] overflow-auto rounded-md border'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className='w-[120px]'>手机号</TableHead>
-                      <TableHead className='w-[50px] text-right'>呼入</TableHead>
-                      <TableHead className='w-[50px] text-right'>呼出</TableHead>
-                      <TableHead className='w-[50px] text-right'>合计</TableHead>
-                      <TableHead className='text-right'>最后通话</TableHead>
-                      <TableHead className='w-[40px]'></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.map((item) => (
-                      <TableRow
-                        key={item.phone}
-                        className='cursor-pointer hover:bg-muted/50'
-                        onClick={() => handleRowClick(item.phone)}
+            <div className='flex flex-wrap items-center gap-3 pt-1'>
+              <div className='flex items-center gap-2 bg-background border rounded-md p-1 pl-2.5'>
+                <span className='text-xs font-medium text-muted-foreground whitespace-nowrap'>统计时段</span>
+                <Separator orientation='vertical' className='h-4' />
+                <div className='flex items-center gap-1'>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className={cn(
+                          'h-7 px-2 text-xs font-normal hover:bg-muted',
+                          !startDate && 'text-muted-foreground'
+                        )}
                       >
-                        <TableCell className='font-mono text-sm'>
-                          {item.phone}
-                        </TableCell>
-                        <TableCell className='text-right text-blue-600'>
-                          {item.inbound_count}
-                        </TableCell>
-                        <TableCell className='text-right text-green-600'>
-                          {item.outbound_count}
-                        </TableCell>
-                        <TableCell className='text-right font-medium'>
-                          {item.total_count}
-                        </TableCell>
-                        <TableCell className='text-right text-muted-foreground text-sm'>
-                          {item.last_call_time
-                            ? formatDate(item.last_call_time)
-                            : '-'}
-                        </TableCell>
-                        <TableCell className='px-2'>
-                          <ExternalLink className='h-4 w-4 text-muted-foreground' />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        <CalendarIcon className='mr-1.5 h-3.5 w-3.5' />
+                        {startDate ? format(startDate, 'yyyy-MM-dd') : '开始日期'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-auto p-0' align='start'>
+                      <Calendar
+                        mode='single'
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        locale={zhCN}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <span className='text-muted-foreground/50 text-[10px]'>至</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className={cn(
+                          'h-7 px-2 text-xs font-normal hover:bg-muted',
+                          !endDate && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className='mr-1.5 h-3.5 w-3.5' />
+                        {endDate ? format(endDate, 'yyyy-MM-dd') : '结束日期'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className='w-auto p-0' align='start'>
+                      <Calendar
+                        mode='single'
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        locale={zhCN}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {(startDate || endDate) && (
+                    <Button
+                      variant='ghost'
+                      size='icon'
+                      className='h-6 w-6 rounded-full hover:bg-destructive/10 hover:text-destructive'
+                      onClick={() => {
+                        setStartDate(undefined)
+                        setEndDate(undefined)
+                      }}
+                    >
+                      <X className='h-3 w-3' />
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
 
-            {notFound.length > 0 && (
-              <div className='rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950'>
-                <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
-                  未找到记录的手机号：
-                </div>
-                <div className='mt-1 text-sm text-amber-600 dark:text-amber-400'>
-                  {notFound.join('、')}
-                </div>
-              </div>
-            )}
+              <div className='flex-1' />
+              <Button
+                onClick={handleQuery}
+                disabled={phoneCount === 0 || batchQuery.isPending}
+                className='shadow-sm px-6 h-9 transition-all active:scale-95'
+              >
+                {batchQuery.isPending ? (
+                  <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                ) : (
+                  <Search className='mr-2 h-4 w-4' />
+                )}
+                立即查询
+              </Button>
+            </div>
           </div>
-        )}
+
+          {/* 结果区域 */}
+          {results !== null && (
+            <div className='space-y-4 animate-in fade-in slide-in-from-top-2 duration-300'>
+              <div className='flex items-center justify-between bg-muted/10 px-1 py-0.5 rounded-lg'>
+                <div className='flex gap-4'>
+                  <div className='flex items-center gap-1.5'>
+                    <div className='w-1.5 h-1.5 rounded-full bg-blue-500' />
+                    <span className='text-xs text-muted-foreground'>匹配记录</span>
+                    <Badge variant='outline' className='bg-blue-50/50 text-blue-600 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20 px-1.5 py-0 min-w-[20px] justify-center'>
+                      {results.length}
+                    </Badge>
+                  </div>
+                  {notFound.length > 0 && (
+                    <div className='flex items-center gap-1.5'>
+                      <div className='w-1.5 h-1.5 rounded-full bg-amber-500' />
+                      <span className='text-xs text-muted-foreground'>未找到</span>
+                      <Badge variant='outline' className='bg-amber-50/50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 px-1.5 py-0 min-w-[20px] justify-center'>
+                        {notFound.length}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <span className='text-[10px] text-muted-foreground flex items-center gap-1'>
+                  <Info className='h-3 w-3' />
+                  点击行可查看详细记录
+                </span>
+              </div>
+
+              {results.length > 0 && (
+                <div className='rounded-xl border shadow-sm overflow-hidden bg-background'>
+                  <ScrollArea className='h-[320px]'>
+                    <Table>
+                      <TableHeader className='bg-muted/30 sticky top-0 z-10'>
+                        <TableRow className='hover:bg-transparent border-b'>
+                          <TableHead className='w-[140px] pl-4 font-semibold text-xs'>手机号</TableHead>
+                          <TableHead className='w-[70px] text-center font-semibold text-xs'>呼入</TableHead>
+                          <TableHead className='w-[70px] text-center font-semibold text-xs'>呼出</TableHead>
+                          <TableHead className='w-[70px] text-center font-semibold text-xs'>合计</TableHead>
+                          <TableHead className='text-right pr-12 font-semibold text-xs'>最后通话时间</TableHead>
+                          <TableHead className='w-[40px]'></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {results.map((item) => (
+                          <TableRow
+                            key={item.phone}
+                            className='group cursor-pointer hover:bg-muted/50 transition-colors border-b last:border-0'
+                            onClick={() => handleRowClick(item.phone)}
+                          >
+                            <TableCell className='font-mono text-sm font-medium pl-4 py-3'>
+                              {item.phone}
+                            </TableCell>
+                            <TableCell className='text-center'>
+                              <span className='inline-flex items-center justify-center min-w-[24px] rounded px-1 text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400 font-medium text-xs'>
+                                {item.inbound_count}
+                              </span>
+                            </TableCell>
+                            <TableCell className='text-center'>
+                              <span className='inline-flex items-center justify-center min-w-[24px] rounded px-1 text-green-600 bg-green-50 dark:bg-green-500/10 dark:text-green-400 font-medium text-xs'>
+                                {item.outbound_count}
+                              </span>
+                            </TableCell>
+                            <TableCell className='text-center'>
+                              <span className='font-bold text-xs'>
+                                {item.total_count}
+                              </span>
+                            </TableCell>
+                            <TableCell className='text-right pr-4 text-muted-foreground text-xs font-mono'>
+                              {item.last_call_time
+                                ? formatDate(item.last_call_time)
+                                : '—'}
+                            </TableCell>
+                            <TableCell className='px-2'>
+                              <ExternalLink className='h-3.5 w-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors duration-200' />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {notFound.length > 0 && (
+                <Alert className='bg-amber-50/50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900 shadow-none px-4 py-3 flex items-start gap-3 rounded-xl'>
+                  <AlertDescription className='text-xs leading-relaxed'>
+                    <span className='font-bold text-amber-800 dark:text-amber-300 mr-2'>未录入系统：</span>
+                    <span className='text-amber-700 dark:text-amber-400 font-mono'>
+                      {notFound.join('、')}
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   )

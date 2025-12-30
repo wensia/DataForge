@@ -77,7 +77,6 @@ import {
   defaultColumnVisibility,
 } from './data-table-columns'
 import { useAnalysis } from './analysis-provider'
-import { BatchPhoneQueryDialog } from './batch-phone-query-dialog'
 import { callTypeOptions, callResultOptions, invalidCallOptions, transcriptStatusOptions, type FilterOption } from '../data/filter-options'
 import type { CallRecord, RecordsParams } from '../types'
 
@@ -151,14 +150,13 @@ export function AnalysisTable() {
   const [calleeInput, setCalleeInput] = useState<string>(search.callee ?? '')
 
   // Context
-  const { setOpen, setCurrentRow, setAudioUrl, setAudioLoading } = useAnalysis()
+  const { setOpen, setCurrentRow, setAudioUrl, setAudioLoading, showBatchSidebar, setShowBatchSidebar } = useAnalysis()
 
   // 权限检查
   const isAdmin = useAuthStore((state) => state.auth.isAdmin())
 
   // UI 状态
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [showBatchQueryDialog, setShowBatchQueryDialog] = useState(false)
 
   // 表格状态
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -605,7 +603,7 @@ export function AnalysisTable() {
           <Button
             variant='outline'
             size='xs'
-            onClick={() => setShowBatchQueryDialog(true)}
+            onClick={() => setShowBatchSidebar(!showBatchSidebar)}
           >
             <Phone className='mr-2 h-4 w-4' />
             批量查询
@@ -655,9 +653,9 @@ export function AnalysisTable() {
                     {header.isPlaceholder
                       ? null
                       : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
                   </th>
                 ))}
               </tr>
@@ -736,16 +734,26 @@ export function AnalysisTable() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 批量查询弹窗 */}
-      <BatchPhoneQueryDialog
-        open={showBatchQueryDialog}
-        onOpenChange={setShowBatchQueryDialog}
-        onSelectPhone={(phone) => {
-          // 设置搜索框并触发搜索
-          setCalleeInput(phone)
-          setFilters((prev) => ({ ...prev, callee: phone, page: 1 }))
-        }}
-      />
+      {/* 侧边栏联动逻辑 */}
+      {useEffect(() => {
+        const handleSelectPhone = (e: Event) => {
+          const detail = (e as CustomEvent).detail
+          if (detail) {
+            setCalleeInput(detail)
+            setFilters((prev) => ({ ...prev, callee: detail, page: 1 }))
+            // 滚动到顶部以查看新结果
+            const tableContainer = document.querySelector('.overflow-auto')
+            if (tableContainer) tableContainer.scrollTo({ top: 0, behavior: 'smooth' })
+          }
+        }
+        window.addEventListener('select-phone-filter', handleSelectPhone)
+        return () => window.removeEventListener('select-phone-filter', handleSelectPhone)
+      }, []) as any}
+
+      {/* 批量查询逻辑 */}
+      <div className='hidden'>
+        {/* 这里不再需要 BatchPhoneQueryDialog，因为它已经变成了 Sidebar */}
+      </div>
     </div>
   )
 }

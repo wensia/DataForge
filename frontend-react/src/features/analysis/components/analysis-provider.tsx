@@ -14,6 +14,10 @@ type AnalysisContextType = {
   setAudioUrl: React.Dispatch<React.SetStateAction<string | null>>
   audioLoading: boolean
   setAudioLoading: React.Dispatch<React.SetStateAction<boolean>>
+  showBatchSidebar: boolean
+  setShowBatchSidebar: (show: boolean) => void
+  batchSidebarWidth: number
+  setBatchSidebarWidth: (width: number) => void
 }
 
 const AnalysisContext = React.createContext<AnalysisContextType | null>(null)
@@ -23,18 +27,26 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
   const [currentRow, setCurrentRow] = useState<CallRecord | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioLoading, setAudioLoading] = useState(false)
+  const [showBatchSidebar, setShowBatchSidebar] = useState(false)
+  const [batchSidebarWidth, setBatchSidebarWidth] = useState(400)
 
   return (
-    <AnalysisContext value={{
-      open,
-      setOpen,
-      currentRow,
-      setCurrentRow,
-      audioUrl,
-      setAudioUrl,
-      audioLoading,
-      setAudioLoading,
-    }}>
+    <AnalysisContext
+      value={{
+        open,
+        setOpen,
+        currentRow,
+        setCurrentRow,
+        audioUrl,
+        setAudioUrl,
+        audioLoading,
+        setAudioLoading,
+        showBatchSidebar,
+        setShowBatchSidebar,
+        batchSidebarWidth,
+        setBatchSidebarWidth,
+      }}
+    >
       {children}
     </AnalysisContext>
   )
