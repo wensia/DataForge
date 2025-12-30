@@ -379,37 +379,27 @@ export function AIChat() {
         {/* 桌面端侧边栏 */}
         <div
           className={cn(
-            'hidden h-full flex-col border-r bg-muted/30 transition-all duration-300 md:flex',
+            'hidden h-full flex-col border-r bg-zinc-50 dark:bg-zinc-900/50 transition-all duration-300 md:flex',
             sidebarOpen ? 'w-72' : 'w-0 overflow-hidden border-r-0'
           )}
         >
           <ScrollArea className="flex-1">
-            <div className="p-2">
+            <div className="p-4 space-y-4">
+              {/* Add a template-like header in sidebar */}
+              <div className="px-2 mb-2 font-semibold text-lg tracking-tight">
+                Chat History
+              </div>
               <ThreadList />
             </div>
           </ScrollArea>
         </div>
 
-        {/* 移动端侧边栏 */}
-        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-          <SheetContent side="left" className="w-72 p-0">
-            <SheetHeader className="sr-only">
-              <SheetTitle>对话列表</SheetTitle>
-            </SheetHeader>
-            <div className="flex h-full flex-col">
-              <ScrollArea className="flex-1">
-                <div className="p-2">
-                  <ThreadList />
-                </div>
-              </ScrollArea>
-            </div>
-          </SheetContent>
-        </Sheet>
+        {/* ... Mobile Sidebar ... */}
 
         {/* 主内容区 */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background/50">
           {/* 顶部栏 */}
-          <header className="flex h-12 shrink-0 items-center justify-between border-b px-2 sm:px-4">
+          <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -427,8 +417,9 @@ export function AIChat() {
               >
                 {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
               </Button>
-              <span className="max-w-[240px] truncate text-sm font-medium">
-                {conversationData?.title || 'DataForge AI'}
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Brain className="h-4 w-4 text-purple-600" />
+                {conversationData?.title || 'DataForge AI PRO'}
               </span>
               {isLoadingConversation && selectedId && (
                 <span className="text-xs text-muted-foreground">加载中…</span>
