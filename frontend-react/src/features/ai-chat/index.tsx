@@ -37,6 +37,7 @@ type StoreMessage = {
   id: string
   role: ApiMessage['role']
   content: string
+  reasoning?: string | null
   createdAt: Date
   status?: ApiMessage['status']
 }
@@ -63,13 +64,6 @@ function extractText(message: AppendMessage): string {
     .join('\n')
 }
 
-function formatStreaming(reasoning: string, content: string): string {
-  if (!reasoning) return content
-  const quoted = reasoning.replace(/\n/g, '\n> ')
-  const body = content ? `\n\n${content}` : ''
-  return `> 💭 **思考中...**\n> ${quoted}${body}`
-}
-
 function toThreadData(conversation: Conversation) {
   return {
     id: String(conversation.id),
@@ -78,6 +72,8 @@ function toThreadData(conversation: Conversation) {
     title: conversation.title,
   }
 }
+
+
 
 export function AIChat() {
   const queryClient = useQueryClient()
@@ -192,27 +188,29 @@ export function AIChat() {
       id: String(m.id),
       role: m.role,
       content: m.content,
+      reasoning: m.reasoning_content,
       createdAt: new Date(m.created_at),
       status: m.status,
     }))
 
     // 覆盖流式消息内容（如果后端已创建 assistant message 记录）
     if (isStreamingForCurrent && streamingMessageId) {
-      const streamingText = formatStreaming(streamingReasoning, streamingContent)
       const id = String(streamingMessageId)
       const idx = base.findIndex((m) => m.id === id && m.role === 'assistant')
 
       if (idx >= 0) {
         base[idx] = {
           ...base[idx],
-          content: streamingText || base[idx].content,
+          content: streamingContent || base[idx].content,
+          reasoning: streamingReasoning || base[idx].reasoning,
           status: 'streaming',
         }
       } else {
         base.push({
           id,
           role: 'assistant',
-          content: streamingText || '正在思考...',
+          content: streamingContent,
+          reasoning: streamingReasoning,
           createdAt: new Date(),
           status: 'streaming',
         })
@@ -317,6 +315,9 @@ export function AIChat() {
         role: message.role,
         content: message.content,
         createdAt: message.createdAt,
+        metadata: {
+          reasoning: message.reasoning,
+        } as any,
         ...(message.role === 'assistant' ? { status: toAuiAssistantStatus(message.status) } : {}),
       }
     },

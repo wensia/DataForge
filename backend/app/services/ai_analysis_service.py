@@ -58,6 +58,16 @@ def _get_ai_client_from_env(provider: str) -> AIClient | None:
             if settings.deepseek_api_key
             else None
         )
+    if provider == "doubao":
+        return (
+            get_ai_client(
+                "doubao",
+                settings.doubao_api_key,
+                endpoint_id=settings.doubao_endpoint_id,
+            )
+            if settings.doubao_api_key and settings.doubao_endpoint_id
+            else None
+        )
     return None
 
 
@@ -84,7 +94,9 @@ def _resolve_ai_client(
             return None
         return (
             p,
-            get_ai_client(p, cfg.api_key, base_url=cfg.base_url),
+            get_ai_client(
+                p, cfg.api_key, base_url=cfg.base_url, endpoint_id=cfg.default_model
+            ),
             cfg.default_model,
         )
 
@@ -120,18 +132,23 @@ def _resolve_ai_client(
         provider_id = any_cfg.provider
         return (
             provider_id,
-            get_ai_client(provider_id, any_cfg.api_key, base_url=any_cfg.base_url),
+            get_ai_client(
+                provider_id,
+                any_cfg.api_key,
+                base_url=any_cfg.base_url,
+                endpoint_id=any_cfg.default_model,
+            ),
             any_cfg.default_model,
         )
 
     # 4) 兼容旧配置：退化到任意可用的 .env
-    for p in ("kimi", "deepseek"):
+    for p in ("kimi", "deepseek", "doubao"):
         resolved = _from_env(p)
         if resolved:
             return resolved
 
     raise AIAnalysisError(
-        "未配置可用的 AI 服务，请在「系统设置 -> AI 配置」中添加并启用，或在 .env 中配置 KIMI_API_KEY / DEEPSEEK_API_KEY"
+        "未配置可用的 AI 服务，请在「系统设置 -> AI 配置」中添加并启用，或在 .env 中配置 KIMI / DEEPSEEK / DOUBAO 相关参数"
     )
 
 

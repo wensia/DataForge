@@ -26,6 +26,7 @@ class AIProvider(str, Enum):
 
     KIMI = "kimi"
     DEEPSEEK = "deepseek"
+    DOUBAO = "doubao"
 
 
 class AnalysisResult(BaseTable, table=True):

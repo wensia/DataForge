@@ -53,6 +53,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         "/api/v1/organization",  # 组织架构（由 JWT 中间件保护）
         "/api/v1/robot",  # 机器人配置（由 JWT 中间件保护）
         "/api/v1/tasks",  # 定时任务管理（由 JWT 中间件保护）
+        "/api/v1/ai-configs",  # AI 配置管理（由 JWT 中间件保护）
     ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

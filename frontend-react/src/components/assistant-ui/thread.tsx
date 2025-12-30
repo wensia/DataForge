@@ -1,3 +1,19 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { type FC, useState } from "react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  BotIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  DownloadIcon,
+  PencilIcon,
+  SquareIcon,
+} from "lucide-react";
+
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
@@ -9,26 +25,59 @@ import {
   ErrorPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
+  useMessage,
 } from "@assistant-ui/react";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  BotIcon,
-  CheckIcon,
-  CopyIcon,
-  DownloadIcon,
-  PencilIcon,
-  SquareIcon,
-  UserIcon,
-} from "lucide-react";
-import type { FC } from "react";
+const ReasoningBlock: FC = () => {
+  const message = useMessage();
+  const reasoning = (message as any).metadata?.reasoning as string | undefined;
+  const isStreaming = message.status?.type === 'running';
+  const [isOpen, setIsOpen] = useState(true);
+
+  if (!reasoning && !isStreaming) return null;
+  if (!reasoning && isStreaming) return (
+    <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
+      <BotIcon className="h-3 w-3" />
+      <span>思考中...</span>
+    </div>
+  );
+
+  return (
+    <div className="mb-4 text-sm">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex mb-2 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+      >
+        {isStreaming ? (
+          <div className="relative flex h-2 w-2 mr-1">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+          </div>
+        ) : (
+          <BotIcon className="h-3 w-3" />
+        )}
+        <span>深度思考过程</span>
+        {isOpen ? <ChevronDownIcon className="h-3 w-3 opacity-50" /> : <ChevronRightIcon className="h-3 w-3 opacity-50" />}
+      </button>
+      {isOpen && (
+        <div className="pl-4 border-l-2 border-muted text-muted-foreground/80 pb-2">
+          <div className="prose dark:prose-invert prose-sm max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {reasoning || ""}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root
       className="aui-root aui-thread-root @container flex h-full flex-col bg-background"
       style={{
-        ["--thread-max-width" as string]: "44rem",
+        ["--thread-max-width" as string]: "48rem",
       }}
     >
       <ThreadPrimitive.Viewport
@@ -142,7 +191,7 @@ const ThreadSuggestions: FC = () => {
 const Composer: FC = () => {
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
-      <div className="aui-composer-attachment-dropzone flex w-full flex-col rounded-2xl border border-input bg-background px-1 pt-2 outline-none transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20">
+      <div className="aui-composer-attachment-dropzone flex w-full flex-col rounded-3xl border border-input/50 bg-background px-3 pt-3 pb-2 shadow-sm transition-all focus-within:shadow-md has-[textarea:focus-visible]:border-ring/50 has-[textarea:focus-visible]:ring-0">
         <ComposerPrimitive.Input
           placeholder="输入消息…"
           className="aui-composer-input mb-1 max-h-32 min-h-14 w-full resize-none bg-transparent px-4 pt-2 pb-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0"
@@ -214,7 +263,8 @@ const AssistantMessage: FC = () => {
         </div>
         <div className="min-w-0 flex-1">
           <div className="aui-assistant-message-content-wrapper relative min-w-0">
-            <div className="aui-assistant-message-content wrap-break-word inline-block max-w-full rounded-2xl bg-muted px-4 py-2.5 text-foreground leading-relaxed">
+            <div className="aui-assistant-message-content wrap-break-word inline-block max-w-full text-foreground/90 font-serif leading-relaxed text-[1.05rem]">
+              <ReasoningBlock />
               <MessagePrimitive.Parts
                 components={{
                   Text: MarkdownText,
@@ -294,11 +344,8 @@ const UserMessage: FC = () => {
       data-role="user"
     >
       <div className="flex min-w-0 flex-row-reverse items-start gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <UserIcon className="h-4 w-4" />
-        </div>
-        <div className="aui-user-message-content-wrapper relative min-w-0">
-          <div className="aui-user-message-content wrap-break-word inline-block max-w-full rounded-2xl bg-primary px-4 py-2.5 text-primary-foreground">
+        <div className="aui-user-message-content-wrapper relative min-w-0 max-w-[80%]">
+          <div className="aui-user-message-content wrap-break-word inline-block max-w-full rounded-2xl bg-muted/80 px-5 py-3 text-foreground font-medium">
             <MessagePrimitive.Parts />
           </div>
           <UserActionBar />

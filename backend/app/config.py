@@ -69,7 +69,9 @@ class Settings(BaseSettings):
     # AI 服务配置
     kimi_api_key: str = ""  # Kimi (月之暗面) API 密钥
     deepseek_api_key: str = ""  # DeepSeek API 密钥
-    default_ai_provider: str = "kimi"  # 默认 AI 服务: kimi / deepseek
+    default_ai_provider: str = "kimi"  # 默认 AI 服务: kimi / deepseek / doubao
+    doubao_api_key: str = ""  # 豆包 (火山引擎) API 密钥
+    doubao_endpoint_id: str = ""  # 豆包 Endpoint ID (ep-2024...)
 
     # Redis 配置
     redis_url: str = ""  # Redis 连接 URL

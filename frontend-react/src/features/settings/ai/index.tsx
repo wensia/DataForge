@@ -188,6 +188,7 @@ function useTestAiConfig() {
 const providerOptions = [
   { value: 'kimi', label: 'Kimi (月之暗面)' },
   { value: 'deepseek', label: 'DeepSeek (深度求索)' },
+  { value: 'doubao', label: 'Doubao (豆包)' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'other', label: '其他' },
 ]
@@ -553,24 +554,26 @@ export function AiSettings() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name='base_url'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Base URL</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        placeholder='https://api.example.com/v1'
-                        className='font-mono text-sm'
-                      />
-                    </FormControl>
-                    <FormDescription>API 端点地址</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {selectedProvider === 'other' && (
+                <FormField
+                  control={form.control}
+                  name='base_url'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Base URL</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder='https://api.example.com/v1'
+                          className='font-mono text-sm'
+                        />
+                      </FormControl>
+                      <FormDescription>API 端点地址</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -596,7 +599,11 @@ export function AiSettings() {
                 name='default_model'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>默认模型（可选）</FormLabel>
+                    <FormLabel>
+                      {selectedProvider === 'doubao'
+                        ? 'Endpoint ID (Model)'
+                        : '默认模型（可选）'}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -605,7 +612,9 @@ export function AiSettings() {
                             ? 'moonshot-v1-8k'
                             : selectedProvider === 'deepseek'
                               ? 'deepseek-chat'
-                              : '模型名称'
+                              : selectedProvider === 'doubao'
+                                ? 'ep-20240604...'
+                                : '模型名称'
                         }
                       />
                     </FormControl>
@@ -727,7 +736,11 @@ export function AiSettings() {
                 name='default_model'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>默认模型（可选）</FormLabel>
+                    <FormLabel>
+                      {editingConfig?.provider === 'doubao'
+                        ? 'Endpoint ID (Model)'
+                        : '默认模型（可选）'}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         {...field}
@@ -736,7 +749,9 @@ export function AiSettings() {
                             ? 'moonshot-v1-8k'
                             : editingConfig?.provider === 'deepseek'
                               ? 'deepseek-chat'
-                              : '模型名称'
+                              : editingConfig?.provider === 'doubao'
+                                ? 'ep-20240604...'
+                                : '模型名称'
                         }
                       />
                     </FormControl>

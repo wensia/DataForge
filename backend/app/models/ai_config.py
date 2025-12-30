@@ -18,6 +18,10 @@ PROVIDER_PRESETS = {
         "base_url": "https://api.deepseek.com",
         "models": ["deepseek-chat", "deepseek-reasoner"],
     },
+    AIProvider.DOUBAO: {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "models": [],  # Doubao uses Endpoint ID as model
+    },
 }
 
 
