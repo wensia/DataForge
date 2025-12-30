@@ -4,13 +4,20 @@
 """
 
 import json
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 
 from loguru import logger
 from sqlmodel import Session, select
 
-from app.clients.ai import AIClient, AIClientError, ChatMessage, get_ai_client
+from app.clients.ai import (
+    AIClient,
+    AIClientError,
+    ChatMessage,
+    StreamChunk,
+    get_ai_client,
+)
 from app.config import settings
 from app.models.ai_config import AIConfig
 from app.models.analysis_result import (
@@ -542,3 +549,45 @@ def get_analysis_history(
 
     results = session.exec(query).all()
     return list(results), total
+
+
+async def stream_chat(
+    session: Session,
+    messages: list[dict[str, Any]],
+    provider: str | None = None,
+) -> AsyncGenerator[str, None]:
+    """流式聊天
+
+    Args:
+        session: 数据库会话
+        messages: 消息列表 [{"role": "user", "content": "..."}]
+        provider: AI 服务提供商
+
+    Yields:
+        str: 响应片段
+    """
+    try:
+        # 转换消息格式
+        chat_messages = [
+            ChatMessage(role=msg["role"], content=msg["content"]) for msg in messages
+        ]
+
+        # 获取客户端
+        provider_id, client, model = _resolve_ai_client(session, provider)
+
+        # 调用流式接口
+        if hasattr(client, "chat_stream"):
+            async for chunk in client.chat_stream(chat_messages, model=model):
+                if chunk.content:
+                    yield chunk.content
+        else:
+            # 如果不支持流式，回退到普通调用
+            response = await client.chat(chat_messages, model=model)
+            yield response.content
+
+    except AIClientError as e:
+        logger.error(f"AI 流式服务错误: {e.message}")
+        yield f"Error: {e.message}"
+    except Exception as e:
+        logger.error(f"AI 流式未知错误: {e}")
+        yield f"Error: {str(e)}"

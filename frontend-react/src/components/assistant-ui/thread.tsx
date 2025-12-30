@@ -122,12 +122,15 @@ const ThreadWelcome: FC = () => {
   return (
     <div className="aui-thread-welcome-root mx-auto my-auto flex w-full max-w-(--thread-max-width) grow flex-col">
       <div className="aui-thread-welcome-center flex w-full grow flex-col items-center justify-center">
-        <div className="aui-thread-welcome-message flex size-full flex-col justify-center px-4">
-          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in font-semibold text-2xl duration-200">
-            DataForge AI
+        <div className="aui-thread-welcome-message flex size-full flex-col justify-center gap-4 px-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+            <BotIcon className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in font-serif font-medium text-3xl text-foreground duration-200">
+            Good morning, DataForge AI here.
           </h1>
-          <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in text-muted-foreground text-xl delay-75 duration-200">
-            有什么可以帮您？
+          <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in text-muted-foreground text-lg delay-75 duration-200 max-w-lg mx-auto">
+            I can help you analyze data, generate reports, or answer complex questions. How can I assist you today?
           </p>
         </div>
       </div>

@@ -5,7 +5,10 @@
 
 from datetime import datetime
 
+from typing import Any
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlmodel import Session
 
@@ -639,6 +642,23 @@ async def chat_with_data(
         return ResponseModel(data=AnalysisResultResponse.model_validate(result))
     except ai_svc.AIAnalysisError as e:
         raise HTTPException(status_code=500, detail=e.message) from e
+
+
+@router.post("/chat_stream")
+async def chat_stream(
+    messages: list[dict[str, Any]] = Body(..., embed=True),
+    user: User = Depends(require_analysis_access),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """流式对话 (适配 Vercel AI SDK)
+
+    Args:
+        messages: 消息列表
+    """
+    return StreamingResponse(
+        ai_svc.stream_chat(session, messages), media_type="text/plain"
+    )
+
 
 
 @router.get("/history", response_model=ResponseModel)
