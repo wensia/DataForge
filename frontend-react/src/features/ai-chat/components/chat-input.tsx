@@ -13,6 +13,7 @@ export const ChatInput = React.forwardRef<HTMLTextAreaElement, ChatInputProps>(
     ({ className, onSubmit, isLoading, ...props }, ref) => {
         const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
             if (e.key === "Enter" && !e.shiftKey) {
+                if (e.nativeEvent.isComposing) return
                 e.preventDefault()
                 // Directly call onSubmit without arguments
                 onSubmit?.()

@@ -31,7 +31,9 @@ export function ChatMessage({ role, content, isLoading }: ChatMessageProps) {
                 <div
                     className={cn(
                         "prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0",
-                        isUser ? "ml-auto max-w-[85%] bg-primary text-primary-foreground rounded-2xl px-4 py-2" : "max-w-none"
+                        isUser
+                            ? "ml-auto max-w-[85%] w-fit bg-primary text-primary-foreground rounded-2xl px-4 py-2 text-left"
+                            : "max-w-none"
                     )}
                 >
                     {isLoading && !content ? (

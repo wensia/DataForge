@@ -575,6 +575,15 @@ async def stream_chat(
         # 获取客户端
         provider_id, client, model = _resolve_ai_client(session, provider)
 
+        # 强制默认模型
+        if not model:
+            if provider_id == "deepseek":
+                model = "deepseek-chat"
+            elif provider_id == "kimi":
+                model = "moonshot-v1-8k"
+        
+        logger.info(f"Using AI model: {model} for provider: {provider_id}")
+
         # 调用流式接口
         if hasattr(client, "chat_stream"):
             async for chunk in client.chat_stream(chat_messages, model=model):

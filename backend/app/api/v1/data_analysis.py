@@ -646,7 +646,8 @@ async def chat_with_data(
 
 @router.post("/chat_stream")
 async def chat_stream(
-    messages: list[dict[str, Any]] = Body(..., embed=True),
+    messages: list[dict[str, Any]] = Body(...),
+    provider: str | None = Body(None),
     user: User = Depends(require_analysis_access),
     session: Session = Depends(get_session),
 ) -> StreamingResponse:
@@ -654,9 +655,10 @@ async def chat_stream(
 
     Args:
         messages: 消息列表
+        provider: AI 服务提供商 (可选)
     """
     return StreamingResponse(
-        ai_svc.stream_chat(session, messages), media_type="text/plain"
+        ai_svc.stream_chat(session, messages, provider), media_type="text/plain"
     )
 
 
