@@ -19,7 +19,7 @@ import { Thread } from '@/components/assistant-ui/thread'
 import { ThreadList } from '@/components/assistant-ui/thread-list'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+// import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import {
@@ -113,7 +113,7 @@ export function AIChat() {
   const [selectedProvider, setSelectedProvider] = useState<string>('')
   const [useDeepThinking, setUseDeepThinking] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [_mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   const { data: providers } = useProviders()
   const createConversation = useCreateConversation()

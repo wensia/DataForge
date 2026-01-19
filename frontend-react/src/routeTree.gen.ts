@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RecordDownloadRouteImport } from './routes/record-download'
-import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedTaskExecutionsRouteImport } from './routes/_authenticated/task-executions'
@@ -37,7 +36,6 @@ import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAnalysisIndexRouteImport } from './routes/_authenticated/analysis/index'
 import { Route as AuthenticatedAiChatIndexRouteImport } from './routes/_authenticated/ai-chat/index'
-import { Route as AuthenticatedAiChatTestIndexRouteImport } from './routes/_authenticated/ai-chat-test/index'
 import { Route as AuthenticatedSettingsUsersRouteImport } from './routes/_authenticated/settings/users'
 import { Route as AuthenticatedSettingsRobotRouteImport } from './routes/_authenticated/settings/robot'
 import { Route as AuthenticatedSettingsPromptsRouteImport } from './routes/_authenticated/settings/prompts'
@@ -64,11 +62,6 @@ import { Route as AuthenticatedAdminPagesRouteImport } from './routes/_authentic
 const RecordDownloadRoute = RecordDownloadRouteImport.update({
   id: '/record-download',
   path: '/record-download',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChatRoute = ChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -207,12 +200,6 @@ const AuthenticatedAiChatIndexRoute =
     path: '/ai-chat/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAiChatTestIndexRoute =
-  AuthenticatedAiChatTestIndexRouteImport.update({
-    id: '/ai-chat-test/',
-    path: '/ai-chat-test/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedSettingsUsersRoute =
   AuthenticatedSettingsUsersRouteImport.update({
     id: '/users',
@@ -344,7 +331,6 @@ const AuthenticatedAdminPagesRoute = AuthenticatedAdminPagesRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/chat': typeof ChatRoute
   '/record-download': typeof RecordDownloadRoute
   '/media': typeof AuthenticatedMediaRouteRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
@@ -383,7 +369,6 @@ export interface FileRoutesByFullPath {
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/robot': typeof AuthenticatedSettingsRobotRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
-  '/ai-chat-test': typeof AuthenticatedAiChatTestIndexRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -396,7 +381,6 @@ export interface FileRoutesByFullPath {
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/chat': typeof ChatRoute
   '/record-download': typeof RecordDownloadRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -433,7 +417,6 @@ export interface FileRoutesByTo {
   '/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/settings/robot': typeof AuthenticatedSettingsRobotRoute
   '/settings/users': typeof AuthenticatedSettingsUsersRoute
-  '/ai-chat-test': typeof AuthenticatedAiChatTestIndexRoute
   '/ai-chat': typeof AuthenticatedAiChatIndexRoute
   '/analysis': typeof AuthenticatedAnalysisIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
@@ -448,7 +431,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/chat': typeof ChatRoute
   '/record-download': typeof RecordDownloadRoute
   '/_authenticated/media': typeof AuthenticatedMediaRouteRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
@@ -487,7 +469,6 @@ export interface FileRoutesById {
   '/_authenticated/settings/prompts': typeof AuthenticatedSettingsPromptsRoute
   '/_authenticated/settings/robot': typeof AuthenticatedSettingsRobotRoute
   '/_authenticated/settings/users': typeof AuthenticatedSettingsUsersRoute
-  '/_authenticated/ai-chat-test/': typeof AuthenticatedAiChatTestIndexRoute
   '/_authenticated/ai-chat/': typeof AuthenticatedAiChatIndexRoute
   '/_authenticated/analysis/': typeof AuthenticatedAnalysisIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
@@ -502,7 +483,6 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/chat'
     | '/record-download'
     | '/media'
     | '/settings'
@@ -541,7 +521,6 @@ export interface FileRouteTypes {
     | '/settings/prompts'
     | '/settings/robot'
     | '/settings/users'
-    | '/ai-chat-test'
     | '/ai-chat'
     | '/analysis'
     | '/apps'
@@ -554,7 +533,6 @@ export interface FileRouteTypes {
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/chat'
     | '/record-download'
     | '/forgot-password'
     | '/otp'
@@ -591,7 +569,6 @@ export interface FileRouteTypes {
     | '/settings/prompts'
     | '/settings/robot'
     | '/settings/users'
-    | '/ai-chat-test'
     | '/ai-chat'
     | '/analysis'
     | '/apps'
@@ -605,7 +582,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
-    | '/chat'
     | '/record-download'
     | '/_authenticated/media'
     | '/_authenticated/settings'
@@ -644,7 +620,6 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/prompts'
     | '/_authenticated/settings/robot'
     | '/_authenticated/settings/users'
-    | '/_authenticated/ai-chat-test/'
     | '/_authenticated/ai-chat/'
     | '/_authenticated/analysis/'
     | '/_authenticated/apps/'
@@ -659,7 +634,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  ChatRoute: typeof ChatRoute
   RecordDownloadRoute: typeof RecordDownloadRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
@@ -680,13 +654,6 @@ declare module '@tanstack/react-router' {
       path: '/record-download'
       fullPath: '/record-download'
       preLoaderRoute: typeof RecordDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/chat': {
-      id: '/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof ChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -869,13 +836,6 @@ declare module '@tanstack/react-router' {
       path: '/ai-chat'
       fullPath: '/ai-chat'
       preLoaderRoute: typeof AuthenticatedAiChatIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ai-chat-test/': {
-      id: '/_authenticated/ai-chat-test/'
-      path: '/ai-chat-test'
-      fullPath: '/ai-chat-test'
-      preLoaderRoute: typeof AuthenticatedAiChatTestIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/users': {
@@ -1110,7 +1070,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnalysisChatRoute: typeof AuthenticatedAnalysisChatRoute
   AuthenticatedAnalysisStaffMappingRoute: typeof AuthenticatedAnalysisStaffMappingRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
-  AuthenticatedAiChatTestIndexRoute: typeof AuthenticatedAiChatTestIndexRoute
   AuthenticatedAiChatIndexRoute: typeof AuthenticatedAiChatIndexRoute
   AuthenticatedAnalysisIndexRoute: typeof AuthenticatedAnalysisIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
@@ -1132,7 +1091,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnalysisStaffMappingRoute:
     AuthenticatedAnalysisStaffMappingRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
-  AuthenticatedAiChatTestIndexRoute: AuthenticatedAiChatTestIndexRoute,
   AuthenticatedAiChatIndexRoute: AuthenticatedAiChatIndexRoute,
   AuthenticatedAnalysisIndexRoute: AuthenticatedAnalysisIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
@@ -1148,7 +1106,6 @@ const AuthenticatedRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  ChatRoute: ChatRoute,
   RecordDownloadRoute: RecordDownloadRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,

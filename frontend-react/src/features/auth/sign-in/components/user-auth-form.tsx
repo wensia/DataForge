@@ -60,15 +60,16 @@ export function UserAuthForm({
       toast.success(`欢迎回来，${result.user.name}！`)
 
       // 登录后跳转，优先使用 redirect 参数，回退到首页
+      const basePath = import.meta.env.BASE_URL || '/'
       const targetPath = (() => {
-        if (!redirectTo) return '/'
+        if (!redirectTo) return basePath
         try {
           const url = new URL(redirectTo, window.location.origin)
           // 避免回跳登录页
-          if (url.pathname === '/sign-in') return '/'
+          if (url.pathname.endsWith('/sign-in')) return basePath
           return `${url.pathname}${url.search}${url.hash}`
         } catch {
-          return redirectTo.startsWith('/') ? redirectTo : '/'
+          return redirectTo.startsWith('/') ? redirectTo : basePath
         }
       })()
 

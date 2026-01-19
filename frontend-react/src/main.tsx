@@ -67,7 +67,7 @@ const queryClient = new QueryClient({
         if (error.response?.status === 401) {
           // 避免在登录页重复导航
           const currentPath = window.location.pathname
-          if (currentPath !== '/sign-in') {
+          if (!currentPath.endsWith('/sign-in')) {
             toast.error('登录已过期，请重新登录')
             useAuthStore.getState().auth.reset()
             const redirect = `${router.history.location.href}`
@@ -95,6 +95,7 @@ const router = createRouter({
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
+  basepath: import.meta.env.BASE_URL,
 })
 
 // Register the router instance for type safety

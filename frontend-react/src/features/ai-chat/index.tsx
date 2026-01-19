@@ -1,7 +1,7 @@
 import * as React from "react"
 import { ChatList } from "./components/chat-list"
 import { ChatInput } from "./components/chat-input"
-import { cn } from "@/lib/utils"
+// import { cn } from "@/lib/utils"
 import { ChatLayout } from "./components/chat-layout"
 import { useAuthStore } from "@/stores/auth-store"
 
